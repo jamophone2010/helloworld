@@ -17,7 +17,7 @@ function love.load()
     paddle1 = {
         x = 30,
         y = windowHeight / 2 - paddleHeight / 2,
-        width = paddleWidth,
+        width = paddleWidth*2,
         height = paddleHeight,
         dy = 0
     }
