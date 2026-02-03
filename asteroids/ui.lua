@@ -11,10 +11,10 @@ function M.load()
   fonts.large = love.graphics.newFont(32)
 end
 
-function M.drawShip(s)
+function M.drawShip(s, color)
   local points = ship.getPoints(s)
 
-  love.graphics.setColor(1, 1, 1)
+  love.graphics.setColor(color or {1, 1, 1})
   love.graphics.polygon("line", points)
 
   if s.shieldTimer > 0 then
@@ -23,8 +23,8 @@ function M.drawShip(s)
   end
 end
 
-function M.drawAsteroid(a)
-  love.graphics.setColor(0.7, 0.7, 0.7)
+function M.drawAsteroid(a, color)
+  love.graphics.setColor(color or {0.7, 0.7, 0.7})
   local radius = asteroid.getRadius(a)
   local sides = 8
 

@@ -12,6 +12,7 @@ function M.new()
     phase = "idle",
     timer = 0,
     finalPocket = nil,
+    numPockets = 38,
     bounceOffset = 0
   }
 end
@@ -47,6 +48,8 @@ function M.update(ball, dt)
       ball.velocity = 0
       ball.spinning = false
       ball.phase = "stopped"
+      -- Position ball at the winning pocket
+      ball.angle = (ball.finalPocket / ball.numPockets) * 2 * math.pi
     end
   end
 end
@@ -59,6 +62,7 @@ function M.spin(ball, targetPocket, numPockets)
   ball.timer = 0
   ball.velocity = -INITIAL_SPEED
   ball.finalPocket = targetPocket
+  ball.numPockets = numPockets
   ball.angle = math.pi
 
   return true

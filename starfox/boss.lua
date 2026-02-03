@@ -46,6 +46,28 @@ function M.spawnFinalBoss()
   return M.currentBoss
 end
 
+function M.spawnArea6Boss()
+  M.currentBoss = {
+    type = "area6boss",
+    x = 400,
+    y = -180,
+    targetY = 100,
+    width = 180,
+    height = 120,
+    health = 50,
+    maxHealth = 120,
+    score = 5000,
+    phase = 1,
+    attackTimer = 2,
+    active = true,
+    entering = true,
+    spawnTimer = 0,
+    leftShield = {health = 20, x = -70, destroyed = false},
+    rightShield = {health = 20, x = 70, destroyed = false}
+  }
+  return M.currentBoss
+end
+
 function M.update(dt, playerX, playerY)
   local boss = M.currentBoss
   if not boss or not boss.active then return end
@@ -100,6 +122,62 @@ function M.update(dt, playerX, playerY)
         boss.shouldAttack = false
       end
     end
+
+  elseif boss.type == "area6boss" then
+    if boss.phase == 1 then
+      -- Phase 1: Shield generators active
+      boss.x = 400 + math.sin(love.timer.getTime() * 0.8) * 120
+
+      if boss.attackTimer <= 0 then
+        boss.attackTimer = 1.8
+        boss.shouldAttack = true
+      else
+        boss.shouldAttack = false
+      end
+
+      if boss.leftShield.destroyed and boss.rightShield.destroyed then
+        boss.phase = 2
+        boss.health = 50
+        boss.attackTimer = 1
+      end
+
+    elseif boss.phase == 2 then
+      -- Phase 2: Core exposed, 4-way spread attacks
+      boss.x = 400 + math.sin(love.timer.getTime() * 1.5) * 80
+
+      if boss.attackTimer <= 0 then
+        boss.attackTimer = 0.6
+        boss.shouldAttack = true
+        boss.spreadAttack = true
+      else
+        boss.shouldAttack = false
+        boss.spreadAttack = false
+      end
+
+      if boss.health <= 30 then
+        boss.phase = 3
+        boss.spawnTimer = 0
+      end
+
+    elseif boss.phase == 3 then
+      -- Phase 3: Critical mode, erratic movement, spawns fighters
+      boss.x = boss.x + math.sin(love.timer.getTime() * 4) * 200 * dt
+
+      if boss.attackTimer <= 0 then
+        boss.attackTimer = 0.4
+        boss.shouldAttack = true
+      else
+        boss.shouldAttack = false
+      end
+
+      boss.spawnTimer = boss.spawnTimer - dt
+      if boss.spawnTimer <= 0 then
+        boss.spawnTimer = 3
+        boss.shouldSpawnFighters = true
+      else
+        boss.shouldSpawnFighters = false
+      end
+    end
   end
 end
 
@@ -118,6 +196,23 @@ function M.damage(amount, hitArm)
       boss.rightArm.health = boss.rightArm.health - amount
       if boss.rightArm.health <= 0 then
         boss.rightArm.destroyed = true
+      end
+      return false
+    end
+    return false
+  end
+
+  if boss.type == "area6boss" and boss.phase == 1 then
+    if hitArm == "left" and not boss.leftShield.destroyed then
+      boss.leftShield.health = boss.leftShield.health - amount
+      if boss.leftShield.health <= 0 then
+        boss.leftShield.destroyed = true
+      end
+      return false
+    elseif hitArm == "right" and not boss.rightShield.destroyed then
+      boss.rightShield.health = boss.rightShield.health - amount
+      if boss.rightShield.health <= 0 then
+        boss.rightShield.destroyed = true
       end
       return false
     end

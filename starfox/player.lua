@@ -4,6 +4,9 @@ local SPEED = 250
 local INERTIA = 0.9
 local BARREL_ROLL_DURATION = 0.5
 local BARREL_ROLL_COOLDOWN = 1.0
+local DODGE_DISTANCE = 100
+local DODGE_WINDOW = 0.25
+local DODGE_COOLDOWN = 1.0
 
 function M.new()
   return {
@@ -21,12 +24,17 @@ function M.new()
     barrelRolling = false,
     barrelRollTimer = 0,
     barrelRollCooldown = 0,
-    barrelRollAngle = 0,
     invulnerable = false,
     invulnerableTimer = 0,
     damageTimer = 0,
     chargeLevel = 0,
-    charging = false
+    charging = false,
+    lastTapDirection = nil,
+    lastTapTime = 0,
+    dodgeCooldown = 0,
+    dodging = false,
+    dodgeTimer = 0,
+    dodgeDirection = nil
   }
 end
 
@@ -42,11 +50,9 @@ function M.update(player, dt)
 
   if player.barrelRolling then
     player.barrelRollTimer = player.barrelRollTimer - dt
-    player.barrelRollAngle = player.barrelRollAngle + dt * 12
 
     if player.barrelRollTimer <= 0 then
       player.barrelRolling = false
-      player.barrelRollAngle = 0
     end
   end
 
@@ -57,6 +63,14 @@ function M.update(player, dt)
   player.damageTimer = math.max(0, player.damageTimer - dt)
   if player.damageTimer <= 0 and player.health < player.maxHealth then
     player.health = math.min(player.maxHealth, player.health + dt)
+  end
+
+  player.dodgeCooldown = math.max(0, player.dodgeCooldown - dt)
+  if player.dodging then
+    player.dodgeTimer = player.dodgeTimer - dt
+    if player.dodgeTimer <= 0 then
+      player.dodging = false
+    end
   end
 end
 
@@ -70,9 +84,35 @@ function M.barrelRoll(player)
     player.barrelRolling = true
     player.barrelRollTimer = BARREL_ROLL_DURATION
     player.barrelRollCooldown = BARREL_ROLL_COOLDOWN
-    player.barrelRollAngle = 0
     return true
   end
+  return false
+end
+
+function M.tryDodge(player, direction)
+  local currentTime = love.timer.getTime()
+
+  if player.dodgeCooldown > 0 then
+    player.lastTapDirection = direction
+    player.lastTapTime = currentTime
+    return false
+  end
+
+  if player.lastTapDirection == direction and (currentTime - player.lastTapTime) < DODGE_WINDOW then
+    local dodgeX = direction == "left" and -DODGE_DISTANCE or DODGE_DISTANCE
+    player.x = player.x + dodgeX
+    player.x = math.max(30, math.min(770, player.x))
+    player.dodging = true
+    player.dodgeTimer = 0.15
+    player.dodgeCooldown = DODGE_COOLDOWN
+    player.dodgeDirection = direction
+    player.lastTapDirection = nil
+    player.lastTapTime = 0
+    return true
+  end
+
+  player.lastTapDirection = direction
+  player.lastTapTime = currentTime
   return false
 end
 
@@ -110,6 +150,10 @@ end
 
 function M.isAlive(player)
   return player.lives > 0
+end
+
+function M.getDodgeCooldownMax()
+  return DODGE_COOLDOWN
 end
 
 return M

@@ -4,6 +4,7 @@ local machine = require("slotmachine.machine")
 local credits = require("slotmachine.credits")
 local audio = require("slotmachine.audio")
 local ui = require("slotmachine.ui")
+local symbols = require("slotmachine.symbols")
 
 local gameState = {}
 
@@ -43,7 +44,7 @@ function M.draw()
   ui.drawUI(gameState.bank, gameState.machine.state)
 
   if gameState.machine.state == "payout" then
-    ui.drawWins(gameState.wins, gameState.totalWinnings)
+    ui.drawWins(gameState.wins, gameState.totalWinnings, symbols.PAYLINES)
   end
 end
 

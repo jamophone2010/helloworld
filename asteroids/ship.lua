@@ -5,6 +5,7 @@ local THRUST_ACCEL = 200
 local ROTATION_SPEED = 4
 local DRAG = 0.98
 local SHOOT_COOLDOWN = 0.25
+local RESPAWN_DELAY = 3
 
 function M.new(x, y)
   return {
@@ -19,11 +20,23 @@ function M.new(x, y)
     shieldTimer = 0,
     rapidFireTimer = 0,
     invulnerable = false,
-    damageTimer = 0
+    damageTimer = 0,
+    dead = false,
+    respawnTimer = 0,
+    spawnX = x,
+    spawnY = y
   }
 end
 
 function M.update(ship, dt)
+  if ship.dead then
+    ship.respawnTimer = ship.respawnTimer - dt
+    if ship.respawnTimer <= 0 then
+      M.respawn(ship)
+    end
+    return
+  end
+
   ship.x = ship.x + ship.vx * dt
   ship.y = ship.y + ship.vy * dt
 
@@ -37,6 +50,22 @@ function M.update(ship, dt)
   ship.damageTimer = math.max(0, ship.damageTimer - dt)
 
   ship.invulnerable = ship.shieldTimer > 0
+end
+
+function M.die(ship)
+  ship.dead = true
+  ship.respawnTimer = RESPAWN_DELAY
+end
+
+function M.respawn(ship)
+  ship.dead = false
+  ship.x = ship.spawnX
+  ship.y = ship.spawnY
+  ship.vx = 0
+  ship.vy = 0
+  ship.angle = -math.pi / 2
+  ship.shieldTimer = 2
+  ship.invulnerable = true
 end
 
 function M.thrust(ship, dt)

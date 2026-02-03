@@ -94,7 +94,7 @@ function M.fireBomb(player)
     y = player.y,
     radius = 10,
     alpha = 1,
-    damage = 10
+    damage = 5
   })
   return true
 end
@@ -121,6 +121,48 @@ function M.fireEnemyLaser(x, y, targetX, targetY)
     height = 6,
     owner = "enemy"
   })
+end
+
+function M.fireAllyLaser(x, y, targetX, targetY)
+  local dx = targetX - x
+  local dy = targetY - y
+  local dist = math.sqrt(dx * dx + dy * dy)
+
+  if dist > 0 then
+    dx = dx / dist
+    dy = dy / dist
+  else
+    dy = -1
+  end
+
+  table.insert(M.lasers, {
+    x = x,
+    y = y,
+    vx = dx * 400,
+    vy = dy * 400,
+    damage = 1,
+    width = 4,
+    height = 10,
+    owner = "ally"
+  })
+end
+
+local MIRROR_RADIUS = 60
+
+function M.mirrorProjectiles(playerX, playerY)
+  for _, laser in ipairs(M.lasers) do
+    if laser.owner == "enemy" and not laser.mirrored then
+      local dist = math.sqrt((laser.x - playerX)^2 + (laser.y - playerY)^2)
+      if dist < MIRROR_RADIUS then
+        laser.vy = -laser.vy
+        if laser.vx then
+          laser.vx = -laser.vx
+        end
+        laser.owner = "player"
+        laser.mirrored = true
+      end
+    end
+  end
 end
 
 return M

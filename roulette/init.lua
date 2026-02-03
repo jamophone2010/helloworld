@@ -20,6 +20,7 @@ function M.load()
   gameState.result = nil
   gameState.payout = 0
   gameState.payoutTimer = 0
+  gameState.history = {}
 
   audio.load()
   ui.load()
@@ -37,6 +38,13 @@ function M.update(dt)
   elseif gameState.state == "settling" then
     if ball.isStopped(gameState.ball) then
       gameState.result = wheel.getCurrentPocket(gameState.wheel)
+
+      -- Add to history (keep last 5)
+      _G.table.insert(gameState.history, 1, gameState.result)
+      if #gameState.history > 5 then
+        _G.table.remove(gameState.history)
+      end
+
       local totalPayout, wins = bets.calculatePayout(gameState.bets, gameState.result)
 
       gameState.payout = totalPayout
@@ -56,6 +64,11 @@ function M.update(dt)
       gameState.state = "betting"
       gameState.result = nil
       gameState.payout = 0
+      -- Reset wheel and ball for next spin
+      gameState.wheel.phase = "idle"
+      gameState.wheel.spinning = false
+      gameState.ball.phase = "idle"
+      gameState.ball.spinning = false
     end
   end
 end
@@ -64,13 +77,13 @@ function M.draw()
   love.graphics.setBackgroundColor(0.05, 0.15, 0.05)
 
   ui.drawWheel(gameState.wheel)
-  if gameState.ball.spinning or gameState.state == "settling" then
-    ui.drawBall(gameState.ball)
+  if gameState.ball.phase ~= "idle" then
+    ui.drawBall(gameState.ball, gameState.wheel)
   end
 
   ui.drawTable(gameState.table)
   ui.drawBets(gameState.bets, gameState.table)
-  ui.drawUI(gameState.bank, gameState.state, gameState.result)
+  ui.drawUI(gameState.bank, gameState.state, gameState.result, gameState.history, gameState.table, gameState.payout)
 
   if gameState.state == "payout" and gameState.payout > 0 then
     love.graphics.setFont(love.graphics.newFont(24))
@@ -82,7 +95,7 @@ end
 function M.keypressed(key)
   if key == "space" and gameState.state == "betting" then
     local totalBet = bets.getTotalBetAmount(gameState.bets)
-    if totalBet > 0 and totalBet <= gameState.bank.balance then
+    if totalBet > 0 then
       wheel.spin(gameState.wheel)
       ball.spin(gameState.ball, gameState.wheel.targetPocket, #wheel.POCKETS)
       gameState.state = "spinning"

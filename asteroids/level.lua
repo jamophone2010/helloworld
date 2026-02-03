@@ -1,11 +1,20 @@
 local M = {}
 local asteroid = require("asteroids.asteroid")
 
+local function randomColor()
+  return {
+    0.5 + math.random() * 0.5,
+    0.5 + math.random() * 0.5,
+    0.5 + math.random() * 0.5
+  }
+end
+
 function M.new()
   return {
     number = 1,
     ufoTimer = 30,
-    cleared = false
+    cleared = false,
+    color = randomColor()
   }
 end
 
@@ -58,6 +67,7 @@ function M.nextLevel(level)
   level.number = level.number + 1
   level.ufoTimer = 30
   level.cleared = false
+  level.color = randomColor()
 end
 
 return M

@@ -1,5 +1,7 @@
 local M = {}
 
+local player = require("starfox.player")
+
 local fonts = {}
 
 function M.load()
@@ -8,13 +10,13 @@ function M.load()
   fonts.large = love.graphics.newFont(24)
 end
 
-function M.draw(player, levelTime, callout, bossHealth, bossMaxHealth)
+function M.draw(p, levelTime, callout, bossHealth, bossMaxHealth, levelName, portalCount)
   love.graphics.setFont(fonts.normal)
   love.graphics.setColor(1, 1, 1)
   love.graphics.print("SHIELD", 10, 10)
 
   local shieldWidth = 150
-  local shieldPercent = player.health / player.maxHealth
+  local shieldPercent = p.health / p.maxHealth
 
   love.graphics.setColor(0.3, 0.3, 0.3)
   love.graphics.rectangle("fill", 80, 10, shieldWidth, 20)
@@ -29,7 +31,7 @@ function M.draw(player, levelTime, callout, bossHealth, bossMaxHealth)
   love.graphics.setColor(1, 1, 1)
   love.graphics.print("BOMBS:", 250, 10)
   for i = 1, 3 do
-    if i <= player.bombs then
+    if i <= p.bombs then
       love.graphics.setColor(1, 0.8, 0)
     else
       love.graphics.setColor(0.3, 0.3, 0.3)
@@ -38,28 +40,47 @@ function M.draw(player, levelTime, callout, bossHealth, bossMaxHealth)
   end
 
   love.graphics.setColor(1, 1, 1)
-  love.graphics.print("LIVES: " .. player.lives, 400, 10)
+  love.graphics.print("LIVES: " .. p.lives, 400, 10)
 
   love.graphics.setFont(fonts.large)
   love.graphics.setColor(1, 1, 1)
-  love.graphics.printf(string.format("%06d", player.score), 600, 10, 190, "right")
+  love.graphics.printf(string.format("%06d", p.score), 600, 10, 190, "right")
 
   love.graphics.setFont(fonts.small)
-  love.graphics.printf("CORNERIA", 600, 35, 190, "right")
+  love.graphics.printf(levelName or "CORNERIA", 600, 35, 190, "right")
 
-  if player.charging and player.chargeLevel > 0 then
+  if p.charging and p.chargeLevel > 0 then
     local chargeWidth = 100
     love.graphics.setColor(0.3, 0.3, 0.3)
     love.graphics.rectangle("fill", 350, 550, chargeWidth, 15)
 
     love.graphics.setColor(0.3, 0.5, 1)
-    love.graphics.rectangle("fill", 350, 550, chargeWidth * player.chargeLevel, 15)
+    love.graphics.rectangle("fill", 350, 550, chargeWidth * p.chargeLevel, 15)
 
     love.graphics.setColor(1, 1, 1)
     love.graphics.rectangle("line", 350, 550, chargeWidth, 15)
 
     love.graphics.print("CHARGE", 350, 535)
   end
+
+  -- Dodge cooldown gauge
+  local dodgeWidth = 60
+  local dodgeMax = player.getDodgeCooldownMax()
+  local dodgeReady = (dodgeMax - p.dodgeCooldown) / dodgeMax
+  love.graphics.setColor(0.3, 0.3, 0.3)
+  love.graphics.rectangle("fill", 10, 550, dodgeWidth, 15)
+
+  if dodgeReady >= 1 then
+    love.graphics.setColor(0.2, 0.8, 0.4)
+  else
+    love.graphics.setColor(0.6, 0.4, 0.2)
+  end
+  love.graphics.rectangle("fill", 10, 550, dodgeWidth * dodgeReady, 15)
+
+  love.graphics.setColor(1, 1, 1)
+  love.graphics.rectangle("line", 10, 550, dodgeWidth, 15)
+  love.graphics.setFont(fonts.small)
+  love.graphics.print("DODGE", 10, 535)
 
   if callout then
     love.graphics.setFont(fonts.normal)
@@ -81,6 +102,23 @@ function M.draw(player, levelTime, callout, bossHealth, bossMaxHealth)
 
     love.graphics.setColor(1, 1, 1)
     love.graphics.rectangle("line", 300, 65, bossBarWidth, 15)
+  end
+
+  -- Portal counter (only show if portals exist in level)
+  if portalCount and portalCount > 0 then
+    love.graphics.setFont(fonts.normal)
+    love.graphics.setColor(0.4, 0.8, 1)
+    love.graphics.print("WARP RINGS: " .. portalCount .. "/7", 10, 40)
+
+    -- Progress indicators
+    for i = 1, 7 do
+      if i <= portalCount then
+        love.graphics.setColor(0.4, 0.8, 1)
+      else
+        love.graphics.setColor(0.2, 0.3, 0.4)
+      end
+      love.graphics.circle("fill", 140 + i * 18, 50, 6)
+    end
   end
 end
 

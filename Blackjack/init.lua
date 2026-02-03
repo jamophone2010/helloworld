@@ -122,19 +122,25 @@ function M.dealerTurn()
 end
 
 function M.calculatePayout()
-  local currentHand = player.getCurrentHand(gameState.player)
   local dealerBlackjack = hand.isBlackjack(gameState.dealer.hand)
+  local totalPayout = 0
+  local lastResult = ""
 
-  local payout, result = bet.calculatePayout(
-    gameState.betting,
-    currentHand,
-    gameState.dealer.hand,
-    dealerBlackjack
-  )
+  for _, playerHand in ipairs(gameState.player.hands) do
+    local payout, result = bet.calculatePayout(
+      gameState.betting,
+      playerHand,
+      gameState.dealer.hand,
+      dealerBlackjack
+    )
+    totalPayout = totalPayout + payout
+    lastResult = result
+  end
 
-  gameState.result = result
+  gameState.result = lastResult
+  gameState.player.currentHandIndex = 1
 
-  if payout > 0 then
+  if totalPayout > 0 then
     audio.playWin()
   else
     audio.playLose()

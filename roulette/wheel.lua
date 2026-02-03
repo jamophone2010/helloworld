@@ -8,7 +8,7 @@ local BASE_SPEED = math.rad(360)
 local SPIN_SPEED = math.rad(720)
 local ACCEL_TIME = 0.5
 local COAST_TIME = 2.0
-local DECEL_TIME = 1.5
+local DECEL_TIME = 3.0
 
 function M.new()
   return {
@@ -17,7 +17,8 @@ function M.new()
     spinning = false,
     phase = "idle",
     timer = 0,
-    targetPocket = nil
+    targetPocket = nil,
+    decelStartAngle = 0
   }
 end
 
@@ -64,16 +65,28 @@ function M.update(wheel, dt)
     if wheel.timer >= COAST_TIME then
       wheel.phase = "decel"
       wheel.timer = 0
+      wheel.decelStartAngle = wheel.angle
     end
 
   elseif wheel.phase == "decel" then
     local t = math.min(wheel.timer / DECEL_TIME, 1)
+    -- Smooth easing: decelerate from SPIN_SPEED to 0
     local easeOut = 1 - math.pow(1 - t, 3)
-    wheel.velocity = SPIN_SPEED - (SPIN_SPEED - BASE_SPEED) * easeOut
+    wheel.velocity = SPIN_SPEED * (1 - easeOut)
+
+    -- Calculate current position based on decel progress
+    -- Integrate velocity over time for smooth position
+    local targetAngle = (wheel.targetPocket / #M.POCKETS) * 2 * math.pi
+    -- Add extra rotations for visual effect, then ease into final position
+    local extraRotations = 3 * 2 * math.pi
+    local totalTravel = extraRotations + targetAngle - wheel.decelStartAngle
+    -- Normalize total travel to be positive
+    while totalTravel < 0 do totalTravel = totalTravel + 2 * math.pi end
+
+    wheel.angle = wheel.decelStartAngle + totalTravel * easeOut
+    while wheel.angle >= 2 * math.pi do wheel.angle = wheel.angle - 2 * math.pi end
 
     if t >= 1 then
-      local pocketIndex = wheel.targetPocket
-      local targetAngle = (pocketIndex / #M.POCKETS) * 2 * math.pi
       wheel.angle = targetAngle
       wheel.velocity = 0
       wheel.spinning = false

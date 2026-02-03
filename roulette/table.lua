@@ -1,6 +1,6 @@
 local M = {}
 
-local GRID_START_X = 150
+local GRID_START_X = 250
 local GRID_START_Y = 50
 local CELL_WIDTH = 40
 local CELL_HEIGHT = 40

@@ -2,8 +2,8 @@ local M = {}
 local reel = require("slotmachine.reel")
 local symbols = require("slotmachine.symbols")
 
-local REEL_X_POSITIONS = {250, 350, 450}
-local REEL_Y = 200
+local REEL_X_POSITIONS = {200, 360, 520}
+local REEL_Y = 150
 
 function M.new()
   local machine = {
@@ -41,11 +41,41 @@ function M.update(machine, dt)
 
   elseif machine.state == "payout" then
     machine.payoutTimer = machine.payoutTimer + dt
-    if machine.payoutTimer >= 2.0 then
+    if machine.payoutTimer >= 5.0 then
       machine.state = "idle"
       machine.payoutTimer = 0
     end
   end
+end
+
+-- Weighted symbol selection: higher weight = more likely to appear
+local SYMBOL_WEIGHTS = {
+  cherry = 25,   -- most common
+  lemon = 20,
+  orange = 18,
+  plum = 15,
+  bar = 12,
+  seven = 7,
+  diamond = 3    -- rarest
+}
+
+local function getWeightedSymbolIndex(symbolList)
+  local totalWeight = 0
+  for _, sym in ipairs(symbolList) do
+    totalWeight = totalWeight + (SYMBOL_WEIGHTS[sym.id] or 10)
+  end
+
+  local roll = math.random() * totalWeight
+  local cumulative = 0
+
+  for i, sym in ipairs(symbolList) do
+    cumulative = cumulative + (SYMBOL_WEIGHTS[sym.id] or 10)
+    if roll <= cumulative then
+      return i
+    end
+  end
+
+  return #symbolList
 end
 
 function M.spin(machine)
@@ -59,7 +89,7 @@ function M.spin(machine)
   local spinDuration = 2.0
 
   for i, r in ipairs(machine.reels) do
-    local targetIndex = math.random(1, #symbols.SYMBOLS)
+    local targetIndex = getWeightedSymbolIndex(symbols.SYMBOLS)
     reel.startSpin(r, spinDuration + delays[i], targetIndex - 1)
   end
 

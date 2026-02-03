@@ -1,7 +1,9 @@
 local M = {}
 
-local SYMBOL_HEIGHT = 80
-local MAX_SPEED = 800
+local SYMBOL_HEIGHT = 120
+local SYMBOL_SPACING = 15
+local SYMBOL_TOTAL = SYMBOL_HEIGHT + SYMBOL_SPACING
+local MAX_SPEED = -800  -- negative for reverse direction
 local ACCEL_TIME = 0.2
 local DECEL_TIME = 0.5
 
@@ -17,6 +19,7 @@ function M.new(x, y, symbols)
     stopDelay = 0,
     accelTime = 0,
     decelTime = 0,
+    decelStartOffset = 0,
     phase = "idle"
   }
   return reel
@@ -29,6 +32,7 @@ function M.update(reel, dt)
     reel.accelTime = reel.accelTime + dt
     local t = math.min(reel.accelTime / ACCEL_TIME, 1)
     reel.velocity = MAX_SPEED * t * t
+    reel.offset = reel.offset + reel.velocity * dt
 
     if t >= 1 then
       reel.phase = "coast"
@@ -41,8 +45,10 @@ function M.update(reel, dt)
       if reel.stopDelay <= 0 then
         reel.phase = "decel"
         reel.decelTime = 0
+        reel.decelStartOffset = reel.offset
       end
     end
+    reel.offset = reel.offset + reel.velocity * dt
 
   elseif reel.phase == "decel" then
     reel.decelTime = reel.decelTime + dt
@@ -50,9 +56,8 @@ function M.update(reel, dt)
 
     local easeOut = 1 - math.pow(1 - t, 3)
 
-    local totalDist = reel.targetOffset - reel.offset
-    local newOffset = reel.offset + totalDist * easeOut
-    reel.velocity = (newOffset - reel.offset) / dt
+    local totalDist = reel.targetOffset - reel.decelStartOffset
+    reel.offset = reel.decelStartOffset + totalDist * easeOut
 
     if t >= 1 then
       reel.offset = reel.targetOffset
@@ -61,8 +66,6 @@ function M.update(reel, dt)
       reel.phase = "idle"
     end
   end
-
-  reel.offset = reel.offset + reel.velocity * dt
 end
 
 function M.startSpin(reel, delay, targetSymbolIndex)
@@ -73,21 +76,26 @@ function M.startSpin(reel, delay, targetSymbolIndex)
   reel.phase = "accel"
 
   local spins = 3
-  reel.targetOffset = reel.offset + (spins * #reel.symbols + targetSymbolIndex) * SYMBOL_HEIGHT
+  reel.targetOffset = reel.offset - (spins * #reel.symbols + targetSymbolIndex) * SYMBOL_TOTAL  -- negative for reverse
 end
 
 function M.isStopped(reel)
   return not reel.spinning
 end
 
+-- Safe modulo that always returns positive values
+local function posMod(a, b)
+  return ((a % b) + b) % b
+end
+
 function M.getVisibleSymbols(reel)
   local visible = {}
   local numSymbols = #reel.symbols
 
-  local topIndex = math.floor(reel.offset / SYMBOL_HEIGHT) % numSymbols
+  local topIndex = posMod(math.floor(reel.offset / SYMBOL_TOTAL), numSymbols)
 
   for i = 0, 2 do
-    local index = (topIndex + i) % numSymbols + 1
+    local index = posMod(topIndex + i, numSymbols) + 1
     visible[i + 1] = reel.symbols[index]
   end
 
@@ -95,7 +103,7 @@ function M.getVisibleSymbols(reel)
 end
 
 function M.getOffset(reel)
-  return reel.offset % (SYMBOL_HEIGHT * #reel.symbols)
+  return posMod(reel.offset, SYMBOL_TOTAL * #reel.symbols)
 end
 
 return M

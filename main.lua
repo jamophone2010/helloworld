@@ -25,7 +25,7 @@ end
 
 function love.load()
   love.window.setTitle("Game Hub")
-  love.window.setMode(800, 600)
+  love.window.setMode(1366, 768)
 
   hub.switchToGame = switchToGame
 

@@ -66,4 +66,48 @@ function M.triggerCover()
   M.addCallout("Falco", "I'll cover you!")
 end
 
+function M.triggerAlliesInbound()
+  M.addCallout("Bill", "Fox! We're on our way!")
+end
+
+function M.triggerMothershipWarning()
+  M.addCallout("Bill", "Take out that mothership!")
+end
+
+function M.triggerWarpRings()
+  M.addCallout("Slippy", "Fox! There are warp rings ahead!")
+end
+
+function M.triggerWarpProgress()
+  M.addCallout("Falco", "Keep going through those rings!")
+end
+
+function M.triggerWarpAlmost()
+  M.addCallout("Slippy", "Just one more ring, Fox!")
+end
+
+function M.triggerWarpReady()
+  M.addCallout("Falco", "Warp zone activated!")
+end
+
+function M.triggerRivalWarning()
+  M.addCallout("Falco", "Star Wolf! Watch your six, Fox!")
+end
+
+function M.triggerCoreExposed()
+  M.addCallout("Slippy", "The core is exposed! Hit it now!")
+end
+
+function M.triggerRivalReturn()
+  M.addCallout("Falco", "Wolf's back! Don't let him escape!")
+end
+
+function M.triggerMazeWarning()
+  M.addCallout("Slippy", "Careful Fox! Tight corridors ahead!")
+end
+
+function M.triggerVenomBossWarning()
+  M.addCallout("Falco", "That's Andross's weapon! Take it out!")
+end
+
 return M

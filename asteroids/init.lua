@@ -14,8 +14,8 @@ local gameState = {}
 
 function M.load()
   gameState.state = "menu"
-  gameState.width = 800
-  gameState.height = 600
+  gameState.width = 1366
+  gameState.height = 768
 
   audio.load()
   ui.load()
@@ -126,7 +126,9 @@ function M.checkCollisions()
           table.insert(gameState.asteroids, split)
         end
 
-        table.insert(gameState.particles, particle.new(a.x, a.y))
+        for _, p in ipairs(particle.new(a.x, a.y)) do
+          table.insert(gameState.particles, p)
+        end
         table.remove(gameState.asteroids, j)
         table.remove(gameState.bullets, i)
         break
@@ -143,7 +145,9 @@ function M.checkCollisions()
 
       if dist < u.size and b.owner == "player" then
         gameState.score = gameState.score + u.score
-        table.insert(gameState.particles, particle.new(u.x, u.y))
+        for _, p in ipairs(particle.new(u.x, u.y)) do
+          table.insert(gameState.particles, p)
+        end
 
         if math.random() < 0.3 then
           table.insert(gameState.powerups, powerup.new(u.x, u.y))
@@ -156,14 +160,17 @@ function M.checkCollisions()
     end
   end
 
-  if not gameState.ship.invulnerable then
+  if not gameState.ship.invulnerable and not gameState.ship.dead then
     for _, a in ipairs(gameState.asteroids) do
       local dist = math.sqrt((gameState.ship.x - a.x)^2 + (gameState.ship.y - a.y)^2)
 
       if dist < asteroid.getRadius(a) + gameState.ship.size then
-        gameState.health = gameState.health - 20
+        gameState.health = gameState.health - 25
         gameState.damageTimer = 3
-        table.insert(gameState.particles, particle.new(a.x, a.y))
+        ship.die(gameState.ship)
+        for _, p in ipairs(particle.new(a.x, a.y)) do
+          table.insert(gameState.particles, p)
+        end
         break
       end
     end
@@ -201,10 +208,13 @@ function M.draw()
   if gameState.state == "menu" then
     ui.drawMenu()
   elseif gameState.state == "playing" then
-    ui.drawShip(gameState.ship)
+    local color = gameState.level.color
+    if not gameState.ship.dead then
+      ui.drawShip(gameState.ship, color)
+    end
 
     for _, a in ipairs(gameState.asteroids) do
-      ui.drawAsteroid(a)
+      ui.drawAsteroid(a, color)
     end
 
     for _, b in ipairs(gameState.bullets) do
@@ -234,7 +244,7 @@ function M.keypressed(key)
     M.startGame()
   elseif gameState.state == "game_over" and key == "r" then
     gameState.state = "menu"
-  elseif gameState.state == "playing" then
+  elseif gameState.state == "playing" and not gameState.ship.dead then
     if key == "space" and ship.shoot(gameState.ship) then
       local cos = math.cos(gameState.ship.angle)
       local sin = math.sin(gameState.ship.angle)
@@ -255,14 +265,16 @@ function M.update(dt)
   if gameState.state == "playing" then
     M.updatePlaying(dt)
 
-    if love.keyboard.isDown("left") then
-      ship.rotate(gameState.ship, -1, dt)
-    end
-    if love.keyboard.isDown("right") then
-      ship.rotate(gameState.ship, 1, dt)
-    end
-    if love.keyboard.isDown("up") then
-      ship.thrust(gameState.ship, dt)
+    if not gameState.ship.dead then
+      if love.keyboard.isDown("left") then
+        ship.rotate(gameState.ship, -1, dt)
+      end
+      if love.keyboard.isDown("right") then
+        ship.rotate(gameState.ship, 1, dt)
+      end
+      if love.keyboard.isDown("up") then
+        ship.thrust(gameState.ship, dt)
+      end
     end
   end
 end
