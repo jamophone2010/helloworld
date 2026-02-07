@@ -1569,61 +1569,8 @@ function M.drawWarp(score)
 end
 
 function M.drawLevelSelect()
-  love.graphics.setBackgroundColor(0.01, 0.01, 0.08)
-
-  -- Draw static stars
-  for _, star in ipairs(levelselect.getStars()) do
-    love.graphics.setColor(1, 1, 1, star.brightness)
-    love.graphics.circle("fill", star.x, star.y, star.size)
-  end
-
-  local planets = levelselect.getPlanets()
-  local selected = levelselect.getSelected()
-
-  -- Draw connection lines
-  love.graphics.setColor(0.3, 0.4, 0.6, 0.6)
-  love.graphics.setLineWidth(2)
-  for _, planet in ipairs(planets) do
-    for _, connId in ipairs(planet.connections) do
-      if connId > planet.id then
-        local conn = planets[connId]
-        love.graphics.line(planet.x, planet.y, conn.x, conn.y)
-      end
-    end
-  end
-
-  -- Draw planets
-  for _, planet in ipairs(planets) do
-    local isSelected = (planet.id == selected.id)
-    local radius = isSelected and 20 or 14
-
-    -- Glow for selected
-    if isSelected then
-      love.graphics.setColor(0.3, 0.5, 1, 0.4)
-      love.graphics.circle("fill", planet.x, planet.y, radius + 8)
-    end
-
-    -- Planet body
-    love.graphics.setColor(0.2, 0.4, 0.7)
-    love.graphics.circle("fill", planet.x, planet.y, radius)
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.circle("line", planet.x, planet.y, radius)
-
-    -- Planet name
-    love.graphics.setFont(fonts.normal)
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.printf(planet.name, planet.x - 50, planet.y + radius + 4, 100, "center")
-  end
-
-  -- Title
-  love.graphics.setFont(fonts.large)
-  love.graphics.setColor(0.3, 0.5, 1)
-  love.graphics.printf("LYLAT SYSTEM", 0, 550, 800, "center")
-
-  -- Instructions
-  love.graphics.setFont(fonts.normal)
-  love.graphics.setColor(0.7, 0.7, 0.7)
-  love.graphics.printf("Arrows: Navigate | SPACE: Select | ESC: Back", 0, 580, 800, "center")
+  -- Delegate to levelselect's own draw function (LOTR-styled ring map)
+  levelselect.draw()
 end
 
 function M.drawPauseMenu(selectedIndex, isLevelSelect)
@@ -1642,7 +1589,7 @@ function M.drawPauseMenu(selectedIndex, isLevelSelect)
   if isLevelSelect then
     options = {"Resume", "Options", "Exit to Station"}
   else
-    options = {"Resume", "Restart Level", "Options", "Exit to Station"}
+    options = {"Resume", "Restart Level", "Options", "Return to Map", "Return to Station"}
   end
   local startY = 250
 

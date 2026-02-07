@@ -37,6 +37,31 @@ local function serializeHighScores(scores)
   return "{" .. table.concat(parts, ",") .. "}"
 end
 
+-- Parse a string set from format [key1|key2|key3]
+local function parseStringSet(str)
+  local set = {}
+  if not str then return set end
+  str = str:gsub("^%[", ""):gsub("%]$", "")
+  if str == "" then return set end
+  for item in str:gmatch("([^|]+)") do
+    set[item] = true
+  end
+  return set
+end
+
+-- Serialize a string set to format [key1|key2|key3]
+local function serializeStringSet(set)
+  if not set or next(set) == nil then
+    return "[]"
+  end
+  local parts = {}
+  for key, _ in pairs(set) do
+    table.insert(parts, tostring(key))
+  end
+  table.sort(parts)
+  return "[" .. table.concat(parts, "|") .. "]"
+end
+
 -- Get save data from a slot
 function M.getSave(slot)
   if slot < 1 or slot > 3 then
@@ -61,12 +86,26 @@ function M.getSave(slot)
     saveData.highScores = {}
   end
 
+  -- Extract purchasedShips (string set in [brackets])
+  local purchasedShipsStr = contents:match("purchasedShips:(%[[^%]]*%])")
+  saveData.purchasedShips = parseStringSet(purchasedShipsStr)
+  -- Default: starwing is always purchased
+  if next(saveData.purchasedShips) == nil then
+    saveData.purchasedShips = { starwing = true }
+  end
+
+  -- Extract unlockedQuests (string set in [brackets])
+  local unlockedQuestsStr = contents:match("unlockedQuests:(%[[^%]]*%])")
+  saveData.unlockedQuests = parseStringSet(unlockedQuestsStr)
+
   -- Parse remaining simple key:value pairs
-  for key, value in string.gmatch(contents, "([%w_]+):([^,}]+)") do
-    if key == "highScores" then
+  for key, value in string.gmatch(contents, "([%w_]+):([^,}%]]+)") do
+    if key == "highScores" or key == "purchasedShips" or key == "unlockedQuests" then
       -- Already handled above
-    elseif key == "credits" or key == "notes" or key == "level" or key == "timePlayed" then
+    elseif key == "credits" or key == "notes" or key == "level" or key == "timePlayed" or key == "currentFloor" then
       saveData[key] = tonumber(value)
+    elseif key == "hasMegaAntenna" or key == "hasPowerAmplifier" then
+      saveData[key] = (value == "true")
     elseif key == "selectedShip" then
       -- Ship ID - strip quotes
       saveData[key] = value:match("^'(.*)'") or value
@@ -75,6 +114,9 @@ function M.getSave(slot)
       saveData[key] = value:match("^['\"](.*)['\".]?$") or value
     end
   end
+
+  -- Defaults for new fields
+  saveData.currentFloor = saveData.currentFloor or 2
 
   return saveData
 end
@@ -89,7 +131,7 @@ function M.saveSave(slot, saveData)
 
   -- Format save data as string
   local saveString = string.format(
-    "name:'%s',credits:%d,notes:%d,level:%d,lastPlayed:'%s',timePlayed:%d,selectedShip:'%s',highScores:%s",
+    "name:'%s',credits:%d,notes:%d,level:%d,lastPlayed:'%s',timePlayed:%d,selectedShip:'%s',hasMegaAntenna:%s,hasPowerAmplifier:%s,currentFloor:%d,highScores:%s,purchasedShips:%s,unlockedQuests:%s",
     saveData.name or "Unnamed",
     saveData.credits or 0,
     saveData.notes or 0,
@@ -97,7 +139,12 @@ function M.saveSave(slot, saveData)
     os.date("%Y-%m-%d %H:%M"),
     saveData.timePlayed or 0,
     saveData.selectedShip or "starwing",
-    serializeHighScores(saveData.highScores)
+    saveData.hasMegaAntenna and "true" or "false",
+    saveData.hasPowerAmplifier and "true" or "false",
+    saveData.currentFloor or 2,
+    serializeHighScores(saveData.highScores),
+    serializeStringSet(saveData.purchasedShips or { starwing = true }),
+    serializeStringSet(saveData.unlockedQuests or {})
   )
 
   local success, err = love.filesystem.write(filename, saveString)

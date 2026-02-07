@@ -1,7 +1,10 @@
+-- hub/init.lua (REWRITTEN)
+-- Multi-floor space station hub with elevator system
+-- Replaces the old outdoor town with a 7-floor neon Coruscant station
+
 local M = {}
 
 local player = require("hub.player")
-local portals = require("hub.portals")
 local camera = require("hub.camera")
 local audio = require("hub.audio")
 local ui = require("hub.ui")
@@ -10,6 +13,9 @@ local npc = require("hub.npc")
 local currency = require("hub.currency")
 local pauseMenu = require("hub.pause_menu")
 local ships = require("starfox.ships")
+local floors = require("hub.floors")
+local elevator = require("hub.elevator")
+local spaceships = require("hub.spaceships")
 
 local gameState = {}
 
@@ -17,50 +23,70 @@ M.switchToGame = nil
 M.goToMainMenu = nil
 
 function M.load()
-  gameState.location = "outdoor" -- or interior name
-  gameState.player = player.new(12 * 32 + 16, 18 * 32 + 16)
+  gameState.currentFloor = gameState.currentFloor or 2   -- Use saved floor or default to Floor 2
+  gameState.location = "floor" -- "floor" or interior id like "casino"
+  gameState.interiorId = nil   -- Which interior we're in (nil = on floor)
+
+  -- Player starts near elevator on Floor 2
+  local floorDef = floors.getFloor(gameState.currentFloor)
+  local startX = floorDef.elevatorPos.x * 32 + 48
+  local startY = floorDef.elevatorPos.y * 32 + 48
+  gameState.player = player.new(startX, startY)
   gameState.camera = camera.new()
+
   gameState.nearbyPortal = nil
   gameState.nearbyNPC = nil
-  gameState.collisionMap = buildings.createCollisionMap(gameState.location, false)
+  gameState.nearBuildingDoor = nil  -- NEW: nearby building door
+  gameState.nearElevator = false    -- NEW: near elevator pad
+  gameState.collisionMap = floors.createFloorCollisionMap(gameState.currentFloor)
   gameState.currentPortals = nil
   gameState.currentNPCs = {}
   gameState.dialogueBox = nil
   gameState.lastKeyPress = 0
-  gameState.returnLocation = nil -- Track where to return after a game
-  gameState.returnPosition = nil -- Track exact position when entering game
-  gameState.credits = 1000000 -- Global casino credits
-  gameState.notes = currency.load() -- Persistent Notes currency
-  gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false} -- Items to apply to StarFox
-  gameState.paused = false -- Pause menu state
-  gameState.playerName = "Player" -- Player's chosen name
-  gameState.activeSlot = nil -- Which save slot is active (nil = new/unsaved game)
-  gameState.timePlayed = 0 -- Total time played in seconds
-  gameState.sessionStart = love.timer.getTime() -- When this session started
-  gameState.highScores = {} -- High scores per StarFox level {levelId = score}
-  gameState.selectedShip = "starwing" -- Currently selected ship for StarFox
-  gameState.animationTime = 0 -- Global animation timer for casino effects
+  gameState.returnLocation = nil
+  gameState.returnPosition = nil
+  gameState.returnFloor = nil       -- NEW: track floor when entering game
+  gameState.credits = 1000000
+  gameState.notes = currency.load()
+  gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false}
+  gameState.paused = false
+  gameState.playerName = "Player"
+  gameState.activeSlot = nil
+  gameState.timePlayed = 0
+  gameState.sessionStart = love.timer.getTime()
+  gameState.highScores = {}
+  gameState.selectedShip = "starwing"
+  gameState.animationTime = 0
+  gameState.hasMegaAntenna = false
+  gameState.hasPowerAmplifier = false
+
+  -- NEW: Multi-floor state (preserve if set before load, e.g. from save data)
+  gameState.purchasedShips = gameState.purchasedShips or {starwing = true}
+  gameState.unlockedQuests = gameState.unlockedQuests or {}
+  gameState.elevatorActive = false               -- Is elevator UI showing
+
+  -- Setup NPCs for starting floor
+  M.setupFloorNPCs(gameState.currentFloor)
 
   audio.load()
   ui.load()
   pauseMenu.load()
+  elevator.load()
+
+  -- Elevator callback
+  elevator.onFloorChange = function(newFloor)
+    M.changeFloor(newFloor)
+  end
 end
 
-function M.getCredits()
-  return gameState.credits
-end
+-- ═══════════════════════════════════════
+-- GETTERS / SETTERS (same API as before)
+-- ═══════════════════════════════════════
 
-function M.setCredits(amount)
-  gameState.credits = amount
-end
-
-function M.getNotes()
-  return gameState.notes
-end
-
-function M.setNotes(amount)
-  gameState.notes = amount
-end
+function M.getCredits() return gameState.credits end
+function M.setCredits(amount) gameState.credits = amount end
+function M.getNotes() return gameState.notes end
+function M.setNotes(amount) gameState.notes = amount end
 
 function M.addNotes(amount)
   gameState.notes = gameState.notes + amount
@@ -76,36 +102,15 @@ function M.spendNotes(amount)
   return false
 end
 
-function M.getShopItems()
-  return gameState.shopItems
-end
-
-function M.clearShopItems()
-  gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false}
-end
-
-function M.setPaused(paused)
-  gameState.paused = paused
-end
-
-function M.getPlayerName()
-  return gameState.playerName
-end
-
-function M.setPlayerName(name)
-  gameState.playerName = name or "Player"
-end
-
-function M.getActiveSlot()
-  return gameState.activeSlot
-end
-
-function M.setActiveSlot(slot)
-  gameState.activeSlot = slot
-end
+function M.getShopItems() return gameState.shopItems end
+function M.clearShopItems() gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false} end
+function M.setPaused(paused) gameState.paused = paused end
+function M.getPlayerName() return gameState.playerName end
+function M.setPlayerName(name) gameState.playerName = name or "Player" end
+function M.getActiveSlot() return gameState.activeSlot end
+function M.setActiveSlot(slot) gameState.activeSlot = slot end
 
 function M.getTimePlayed()
-  -- Return accumulated time plus current session time
   return gameState.timePlayed + (love.timer.getTime() - gameState.sessionStart)
 end
 
@@ -114,18 +119,10 @@ function M.setTimePlayed(seconds)
   gameState.sessionStart = love.timer.getTime()
 end
 
-function M.getHighScores()
-  return gameState.highScores
-end
+function M.getHighScores() return gameState.highScores end
+function M.setHighScores(scores) gameState.highScores = scores or {} end
 
-function M.setHighScores(scores)
-  gameState.highScores = scores or {}
-end
-
-function M.getSelectedShip()
-  return gameState.selectedShip or "starwing"
-end
-
+function M.getSelectedShip() return gameState.selectedShip or "starwing" end
 function M.setSelectedShip(id)
   gameState.selectedShip = id or "starwing"
   ships.setSelected(id or "starwing")
@@ -137,67 +134,242 @@ function M.updateHighScore(levelId, score)
   end
 end
 
-function M.update(dt)
-  -- Don't update game logic when paused
-  if gameState.paused then
-    return
-  end
+function M.hasMegaAntenna() return gameState.hasMegaAntenna end
+function M.setMegaAntenna(value) gameState.hasMegaAntenna = value end
+function M.hasPowerAmplifier() return gameState.hasPowerAmplifier end
+function M.setPowerAmplifier(value) gameState.hasPowerAmplifier = value end
 
-  -- Update animation timer
-  gameState.animationTime = gameState.animationTime + dt
+-- NEW: Multi-floor getters/setters
+function M.getPurchasedShips() return gameState.purchasedShips end
+function M.setPurchasedShips(ships_table) gameState.purchasedShips = ships_table or {starwing = true} end
+function M.getCurrentFloor() return gameState.currentFloor end
+function M.setCurrentFloor(floor) gameState.currentFloor = floor or 2 end
+function M.getUnlockedQuests() return gameState.unlockedQuests end
+function M.setUnlockedQuests(quests) gameState.unlockedQuests = quests or {} end
 
-  player.update(gameState.player, dt, gameState.collisionMap)
-  
-  -- Check if running (Z key held)
-  local isRunning = love.keyboard.isDown("z")
-  player.setRunning(gameState.player, isRunning)
-  
-  -- Continuous movement with held keys
-  local moved = false
-  if love.keyboard.isDown("up") then
-    moved = player.tryMove(gameState.player, "up", gameState.collisionMap) or moved
-  elseif love.keyboard.isDown("down") then
-    moved = player.tryMove(gameState.player, "down", gameState.collisionMap) or moved
-  elseif love.keyboard.isDown("left") then
-    moved = player.tryMove(gameState.player, "left", gameState.collisionMap) or moved
-  elseif love.keyboard.isDown("right") then
-    moved = player.tryMove(gameState.player, "right", gameState.collisionMap) or moved
-  end
-  
-  camera.update(gameState.camera, gameState.player.x, gameState.player.y)
+-- ═══════════════════════════════════════
+-- FLOOR MANAGEMENT
+-- ═══════════════════════════════════════
 
-  -- Check for nearby portals
-  gameState.nearbyPortal = portals.getNearbyPortal(gameState.player, gameState.currentPortals)
-  
-  -- Check for nearby NPCs
-  gameState.nearbyNPC = nil
-  for _, npc in ipairs(gameState.currentNPCs) do
-    if math.abs(gameState.player.gridX - npc.x) <= 1 and 
-       math.abs(gameState.player.gridY - npc.y) <= 1 then
-      gameState.nearbyNPC = npc
-      break
-    end
-  end
-  
-  -- Check if exiting building
-  if gameState.location ~= "outdoor" then
-    local interior = buildings.interiors[gameState.location]
-    if interior and gameState.player.gridX == interior.exitX and gameState.player.gridY == interior.exitY then
-      M.exitBuilding()
-    end
-  end
-  
-  -- Check if entering building (outdoor only)
-  if gameState.location == "outdoor" then
-    local building = buildings.getBuilding(gameState.player.gridX, gameState.player.gridY)
-    if building then
-      M.enterBuilding(building.interior)
+function M.setupFloorNPCs(floorId)
+  gameState.currentNPCs = {}
+  local floorDef = floors.getFloor(floorId)
+  if floorDef and floorDef.npcs then
+    for _, npcData in ipairs(floorDef.npcs) do
+      table.insert(gameState.currentNPCs, npc.new(npcData.name, npcData.x, npcData.y, npcData.dialogue))
     end
   end
 end
 
+function M.changeFloor(newFloor)
+  gameState.currentFloor = newFloor
+  gameState.location = "floor"
+  gameState.interiorId = nil
+
+  local floorDef = floors.getFloor(newFloor)
+  if floorDef then
+    -- Position player near elevator
+    local ex = floorDef.elevatorPos.x * 32 + 48
+    local ey = floorDef.elevatorPos.y * 32 + 48
+    gameState.player.gridX = math.floor(ex / 32)
+    gameState.player.gridY = math.floor(ey / 32) + 2  -- Step out of elevator
+    gameState.player.x = gameState.player.gridX * 32 + 16
+    gameState.player.y = gameState.player.gridY * 32 + 16
+    gameState.player.targetX = gameState.player.x
+    gameState.player.targetY = gameState.player.y
+
+    gameState.collisionMap = floors.createFloorCollisionMap(newFloor)
+    gameState.currentPortals = nil
+    M.setupFloorNPCs(newFloor)
+  end
+
+  -- Reset spaceships when changing floors
+  spaceships.reset()
+  gameState.elevatorActive = false
+end
+
+function M.enterBuilding(buildingId)
+  local interior = buildings.getInterior(buildingId)
+  if not interior then return end
+
+  gameState.interiorId = buildingId
+
+  -- Special locations use their own game module
+  if buildingId == "casino" then
+    gameState.location = "casino"
+  else
+    gameState.location = "interior"
+  end
+
+  -- Position player at exit (they entered from outside)
+  gameState.player.gridX = interior.exitX
+  gameState.player.gridY = interior.exitY - 1
+  gameState.player.x = gameState.player.gridX * 32 + 16
+  gameState.player.y = gameState.player.gridY * 32 + 16
+  gameState.player.targetX = gameState.player.x
+  gameState.player.targetY = gameState.player.y
+
+  gameState.collisionMap = buildings.createInteriorCollisionMap(buildingId)
+  gameState.currentPortals = interior.portals
+
+  -- Setup interior NPCs
+  gameState.currentNPCs = {}
+  if interior.npcs then
+    for _, npcData in ipairs(interior.npcs) do
+      table.insert(gameState.currentNPCs, npc.new(npcData.name, npcData.x, npcData.y, npcData.dialogue))
+    end
+  end
+end
+
+function M.exitBuilding()
+  -- Return to the current floor
+  gameState.location = "floor"
+  local buildingId = gameState.interiorId
+  gameState.interiorId = nil
+
+  local floorDef = floors.getFloor(gameState.currentFloor)
+  if floorDef then
+    -- Find which building we were in and position at its door
+    if floorDef.buildings then
+      for _, b in ipairs(floorDef.buildings) do
+        if b.interiorId == buildingId then
+          gameState.player.gridX = b.doorX
+          gameState.player.gridY = b.doorY + 1  -- Step outside
+          gameState.player.x = gameState.player.gridX * 32 + 16
+          gameState.player.y = gameState.player.gridY * 32 + 16
+          gameState.player.targetX = gameState.player.x
+          gameState.player.targetY = gameState.player.y
+          break
+        end
+      end
+    end
+
+    gameState.collisionMap = floors.createFloorCollisionMap(gameState.currentFloor)
+    gameState.currentPortals = nil
+    M.setupFloorNPCs(gameState.currentFloor)
+  end
+end
+
+-- ═══════════════════════════════════════
+-- UPDATE
+-- ═══════════════════════════════════════
+
+function M.update(dt)
+  if gameState.paused then return end
+
+  -- Update animation time
+  gameState.animationTime = gameState.animationTime + dt
+
+  -- Update elevator if active
+  if gameState.elevatorActive then
+    elevator.update(dt)
+    if elevator.getState() == "closed" then
+      gameState.elevatorActive = false
+    end
+    return  -- Don't update player movement while elevator is active
+  end
+
+  -- Update spaceships (for window animation)
+  spaceships.update(dt)
+
+  -- Update player
+  player.update(gameState.player, dt, gameState.collisionMap)
+
+  local isRunning = love.keyboard.isDown("z")
+  player.setRunning(gameState.player, isRunning)
+
+  -- Continuous movement
+  if love.keyboard.isDown("up") then
+    player.tryMove(gameState.player, "up", gameState.collisionMap)
+  elseif love.keyboard.isDown("down") then
+    player.tryMove(gameState.player, "down", gameState.collisionMap)
+  elseif love.keyboard.isDown("left") then
+    player.tryMove(gameState.player, "left", gameState.collisionMap)
+  elseif love.keyboard.isDown("right") then
+    player.tryMove(gameState.player, "right", gameState.collisionMap)
+  end
+
+  camera.update(gameState.camera, gameState.player.x, gameState.player.y)
+
+  -- Reset proximity flags
+  gameState.nearbyPortal = nil
+  gameState.nearbyNPC = nil
+  gameState.nearBuildingDoor = nil
+  gameState.nearElevator = false
+
+  if gameState.location == "floor" then
+    -- Check nearby building doors
+    local floorDef = floors.getFloor(gameState.currentFloor)
+    if floorDef and floorDef.buildings then
+      for _, b in ipairs(floorDef.buildings) do
+        if gameState.player.gridX == b.doorX and gameState.player.gridY == b.doorY then
+          gameState.nearBuildingDoor = b
+          break
+        end
+      end
+    end
+
+    -- Check elevator proximity
+    if floors.isOnElevator(gameState.currentFloor, gameState.player.gridX, gameState.player.gridY) then
+      gameState.nearElevator = true
+    end
+
+    -- Check auto-enter building (walk onto door tile)
+    -- (only if pressing E, not auto)
+  else
+    -- Inside a building
+    -- Check for nearby portals
+    if gameState.currentPortals then
+      for _, portal in ipairs(gameState.currentPortals) do
+        local dx = math.abs(gameState.player.gridX - portal.x)
+        local dy = math.abs(gameState.player.gridY - portal.y)
+        if dx <= 1 and dy <= 1 then
+          gameState.nearbyPortal = portal
+          break
+        end
+      end
+    end
+
+    -- Check for nearby NPCs
+    for _, npcObj in ipairs(gameState.currentNPCs) do
+      if math.abs(gameState.player.gridX - npcObj.x) <= 1 and
+         math.abs(gameState.player.gridY - npcObj.y) <= 1 then
+        gameState.nearbyNPC = npcObj
+        break
+      end
+    end
+
+    -- Check building exit
+    if gameState.interiorId then
+      if buildings.isAtExit(gameState.player.gridX, gameState.player.gridY, gameState.interiorId) then
+        M.exitBuilding()
+      end
+    end
+  end
+
+  -- Floor NPCs proximity (when on floor, not in building)
+  if gameState.location == "floor" then
+    for _, npcObj in ipairs(gameState.currentNPCs) do
+      if math.abs(gameState.player.gridX - npcObj.x) <= 1 and
+         math.abs(gameState.player.gridY - npcObj.y) <= 1 then
+        gameState.nearbyNPC = npcObj
+        break
+      end
+    end
+  end
+end
+
+-- ═══════════════════════════════════════
+-- DRAW
+-- ═══════════════════════════════════════
+
 function M.draw()
   ui.draw(gameState, gameState.animationTime)
+
+  -- Draw elevator overlay
+  if gameState.elevatorActive then
+    elevator.draw()
+  end
 
   -- Draw pause menu if paused
   if gameState.paused then
@@ -205,50 +377,71 @@ function M.draw()
   end
 end
 
+-- ═══════════════════════════════════════
+-- INPUT
+-- ═══════════════════════════════════════
+
 function M.keypressed(key)
   -- Handle pause menu
   if gameState.paused then
     pauseMenu.keypressed(key)
     return
   end
-  
+
+  -- Handle elevator
+  if gameState.elevatorActive then
+    elevator.keypressed(key)
+    return
+  end
+
   if key == "escape" then
-    gameState.paused = true
-    return
-  end
-  
-  if gameState.dialogueBox then
-    gameState.dialogueBox = nil
-    return
-  end
-  
-  if key == "e" then
-    -- Check for building entry (outdoor only)
-    if gameState.location == "outdoor" then
-      local building = buildings.getBuilding(gameState.player.gridX, gameState.player.gridY)
-      if building then
-        M.enterBuilding(building.interior)
-        audio.playPortal()
-        return
-      end
+    if gameState.dialogueBox then
+      gameState.dialogueBox = nil
+    else
+      gameState.paused = true
     end
-    
-    -- Check for portal entry
-    local enteredPortal = portals.getEnteredPortal(gameState.player, gameState.currentPortals)
-    if enteredPortal then
+    return
+  end
+
+  if gameState.dialogueBox then
+    if key == "e" or key == "escape" or key == "return" then
+      gameState.dialogueBox = nil
+    end
+    return
+  end
+
+  if key == "e" then
+    -- Elevator
+    if gameState.nearElevator and gameState.location == "floor" then
+      gameState.elevatorActive = true
+      elevator.open(gameState.currentFloor, gameState.unlockedQuests)
+      audio.playPortal()
+      return
+    end
+
+    -- Enter building
+    if gameState.nearBuildingDoor and gameState.location == "floor" then
+      M.enterBuilding(gameState.nearBuildingDoor.interior)
+      audio.playPortal()
+      return
+    end
+
+    -- Portal interaction (inside buildings)
+    if gameState.nearbyPortal then
       audio.playPortal()
       gameState.returnLocation = gameState.location
+      gameState.returnFloor = gameState.currentFloor
       gameState.returnPosition = {
         gridX = gameState.player.gridX,
         gridY = gameState.player.gridY
       }
       if M.switchToGame then
-        M.switchToGame(enteredPortal.game)
+        M.switchToGame(gameState.nearbyPortal.game)
       end
       return
     end
-    
-    -- Check for NPC dialogue
+
+    -- NPC dialogue
     if gameState.nearbyNPC then
       gameState.dialogueBox = {
         npc = gameState.nearbyNPC.name,
@@ -259,47 +452,17 @@ function M.keypressed(key)
   end
 end
 
-function M.enterBuilding(interiorName)
-  gameState.location = interiorName
-  local interior = buildings.interiors[interiorName]
-  
-  if interior then
-    gameState.player.gridX = interior.exitX
-    gameState.player.gridY = interior.exitY - 1
-    gameState.player.x = gameState.player.gridX * 32 + 16
-    gameState.player.y = gameState.player.gridY * 32 + 16
-    gameState.player.targetX = gameState.player.x
-    gameState.player.targetY = gameState.player.y
-    gameState.collisionMap = buildings.createCollisionMap(interiorName, true)
-    gameState.currentPortals = interior.portals
-    
-    -- Setup NPCs
-    gameState.currentNPCs = {}
-    if interior.npcs then
-      for _, npcData in ipairs(interior.npcs) do
-        table.insert(gameState.currentNPCs, npc.new(npcData.name, npcData.x, npcData.y, npcData.dialogue))
-      end
-    end
-  end
-end
-
-function M.exitBuilding()
-  gameState.location = "outdoor"
-  gameState.player.gridX = 12
-  gameState.player.gridY = 18
-  gameState.player.x = gameState.player.gridX * 32 + 16
-  gameState.player.y = gameState.player.gridY * 32 + 16
-  gameState.player.targetX = gameState.player.x
-  gameState.player.targetY = gameState.player.y
-  gameState.collisionMap = buildings.createCollisionMap("outdoor", false)
-  gameState.currentPortals = nil
-  gameState.currentNPCs = {}
-end
+-- ═══════════════════════════════════════
+-- RETURN FROM GAMES
+-- ═══════════════════════════════════════
 
 function M.returnFromGame()
-  if gameState.returnLocation and gameState.returnLocation ~= "outdoor" then
-    M.enterBuilding(gameState.returnLocation)
-    -- Restore exact position if available
+  if gameState.returnLocation and gameState.returnLocation ~= "floor" then
+    -- Was inside a building - re-enter it
+    if gameState.returnFloor then
+      gameState.currentFloor = gameState.returnFloor
+    end
+    M.enterBuilding(gameState.interiorId or gameState.returnLocation)
     if gameState.returnPosition then
       gameState.player.gridX = gameState.returnPosition.gridX
       gameState.player.gridY = gameState.returnPosition.gridY
@@ -309,19 +472,16 @@ function M.returnFromGame()
       gameState.player.targetY = gameState.player.y
     end
   else
-    gameState.location = "outdoor"
-    gameState.player.gridX = 12
-    gameState.player.gridY = 18
-    gameState.player.x = gameState.player.gridX * 32 + 16
-    gameState.player.y = gameState.player.gridY * 32 + 16
-    gameState.player.targetX = gameState.player.x
-    gameState.player.targetY = gameState.player.y
-    gameState.collisionMap = buildings.createCollisionMap("outdoor", false)
-    gameState.currentPortals = nil
-    gameState.currentNPCs = {}
+    -- Was on a floor
+    if gameState.returnFloor then
+      M.changeFloor(gameState.returnFloor)
+    else
+      M.changeFloor(gameState.currentFloor)
+    end
   end
   gameState.returnLocation = nil
   gameState.returnPosition = nil
+  gameState.returnFloor = nil
 end
 
 return M

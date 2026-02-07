@@ -18,7 +18,11 @@ local gameModules = {
   starfox = nil,
   shop = nil,
   casino_exchange = nil,
-  hangar = nil
+  hangar = nil,
+  mainstage = nil,
+  studio = nil,
+  shipyard = nil,
+  lookout = nil
 }
 
 local casinoGames = {slotmachine = true, roulette = true, blackjack = true}
@@ -32,6 +36,14 @@ function switchToGame(gameName)
       gameModules[gameName] = require("hub.casino_exchange")
     elseif gameName == "hangar" then
       gameModules[gameName] = require("hub.hangar")
+    elseif gameName == "mainstage" then
+      gameModules[gameName] = require("hub.mainstage")
+    elseif gameName == "studio" then
+      gameModules[gameName] = require("hub.studio")
+    elseif gameName == "shipyard" then
+      gameModules[gameName] = require("hub.shipyard")
+    elseif gameName == "lookout" then
+      gameModules[gameName] = require("hub.lookout")
     else
       gameModules[gameName] = require(gameName)
     end
@@ -42,6 +54,24 @@ function switchToGame(gameName)
   -- Pass credits to casino games
   if casinoGames[gameName] then
     currentGame.load(hub.getCredits())
+  elseif gameName == "mainstage" then
+    -- Mainstage: enter with random act
+    currentGame.enter()
+  elseif gameName == "studio" then
+    -- Studio: enter the DJ booth
+    currentGame.enter()
+  elseif gameName == "shipyard" then
+    -- Shipyard: pass purchased ships and notes
+    currentGame.enter(hub.getPurchasedShips())
+    currentGame.onPurchase = function(shipId, price)
+      hub.spendNotes(price)
+      local purchased = hub.getPurchasedShips()
+      purchased[shipId] = true
+      hub.setPurchasedShips(purchased)
+    end
+  elseif gameName == "lookout" then
+    -- Lookout: enter with high scores and stats
+    currentGame.enter()
   else
     currentGame.load()
   end
@@ -53,6 +83,17 @@ function switchToGame(gameName)
     -- Ensure ship selection is synced
     local ships = require("starfox.ships")
     ships.setSelected(hub.getSelectedShip())
+    -- Sync progression state
+    currentGame.setProgression(hub.hasMegaAntenna(), hub.hasPowerAmplifier())
+    -- Set return to hub callback for station selection
+    currentGame.setReturnToHub(returnToHub)
+    -- Set progression reward callbacks
+    currentGame.onMegaAntennaAwarded = function()
+      hub.setMegaAntenna(true)
+    end
+    currentGame.onPowerAmplifierAwarded = function()
+      hub.setPowerAmplifier(true)
+    end
   end
 end
 
@@ -78,6 +119,11 @@ function returnToHub()
     if levelId and score then
       hub.updateHighScore(levelId, score)
     end
+  end
+
+  -- Retrieve purchased ships from shipyard
+  if currentGame.purchasedShips then
+    hub.setPurchasedShips(currentGame.purchasedShips)
   end
 
   currentGame = hub
@@ -128,6 +174,11 @@ function startNewGameWithName(name)
   hub.setTimePlayed(0)
   hub.setActiveSlot(nil)
   hub.setHighScores({})
+  hub.setMegaAntenna(false)
+  hub.setPowerAmplifier(false)
+  hub.setPurchasedShips({ starwing = true })
+  hub.setCurrentFloor(2)
+  hub.setUnlockedQuests({})
   currency.save(0)
 
   -- Show intro crawl
@@ -154,6 +205,11 @@ function loadGame(slot, saveData)
   hub.setPlayerName(saveData.name or "Player")
   hub.setHighScores(saveData.highScores or {})
   hub.setSelectedShip(saveData.selectedShip or "starwing")
+  hub.setMegaAntenna(saveData.hasMegaAntenna or false)
+  hub.setPowerAmplifier(saveData.hasPowerAmplifier or false)
+  hub.setPurchasedShips(saveData.purchasedShips or { starwing = true })
+  hub.setCurrentFloor(saveData.currentFloor or 2)
+  hub.setUnlockedQuests(saveData.unlockedQuests or {})
   currency.save(saveData.notes or 0)
 
   -- Start game
@@ -194,7 +250,12 @@ function love.load()
       level = 1,
       timePlayed = hub.getTimePlayed(),
       highScores = hub.getHighScores(),
-      selectedShip = hub.getSelectedShip()
+      selectedShip = hub.getSelectedShip(),
+      hasMegaAntenna = hub.hasMegaAntenna(),
+      hasPowerAmplifier = hub.hasPowerAmplifier(),
+      purchasedShips = hub.getPurchasedShips(),
+      currentFloor = hub.getCurrentFloor(),
+      unlockedQuests = hub.getUnlockedQuests()
     }
   end
 
@@ -240,11 +301,32 @@ function love.keypressed(key)
   if currentMenu then
     currentMenu.keypressed(key)
   elseif currentGame then
-    -- Let starfox handle its own escape key for pause menu
-    if key == "escape" and currentGame ~= hub and currentGame ~= gameModules.starfox then
+    -- Let starfox and new hub modules handle their own escape key
+    local selfHandled = false
+    if currentGame == gameModules.starfox and gameModules.starfox then
+      selfHandled = true
+    elseif currentGame == gameModules.mainstage and gameModules.mainstage then
+      selfHandled = true
+    elseif currentGame == gameModules.studio and gameModules.studio then
+      selfHandled = true
+    elseif currentGame == gameModules.shipyard and gameModules.shipyard then
+      selfHandled = true
+    elseif currentGame == gameModules.lookout and gameModules.lookout then
+      selfHandled = true
+    end
+    if key == "escape" and currentGame ~= hub and not selfHandled then
       returnToHub()
     else
-      currentGame.keypressed(key)
+      -- For self-handled non-starfox games, check if they exited
+      if selfHandled and currentGame ~= gameModules.starfox then
+        currentGame.keypressed(key)
+        -- If the module exited itself (active = false), return to hub
+        if currentGame.active == false then
+          returnToHub()
+        end
+      else
+        currentGame.keypressed(key)
+      end
     end
   end
 end

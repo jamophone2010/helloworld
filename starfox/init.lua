@@ -30,6 +30,10 @@ local morseinput = require("starfox.morseinput")
 local gameState = {}
 local pendingShopItems = {lives = 0, bombs = 0, health = 0}
 
+-- Progression callbacks (set by main.lua)
+M.onMegaAntennaAwarded = nil
+M.onPowerAmplifierAwarded = nil
+
 -- Helper function to register kills for both score and supershot tracking
 local function registerKill(p, score)
   player.addScore(p, score)
@@ -156,6 +160,17 @@ function M.enterLevelSelect()
   levelselect.load()
 end
 
+-- Sync progression state from hub to levelselect
+function M.setProgression(hasMegaAntenna, hasPowerAmplifier)
+  levelselect.hasMegaAntenna = hasMegaAntenna or false
+  levelselect.hasPowerAmplifier = hasPowerAmplifier or false
+end
+
+-- Set return to hub callback for station selection
+function M.setReturnToHub(callback)
+  levelselect.returnToHub = callback
+end
+
 function M.exitToHub()
   if returnToHub then
     returnToHub()
@@ -175,6 +190,8 @@ function M.update(dt)
     M.updatePlaying(dt)
   elseif gameState.state == "paused" or gameState.state == "options" then
     -- Don't update game logic when paused
+  elseif gameState.state == "levelselect" or gameState.state == "levelselect_paused" or gameState.state == "levelselect_options" then
+    levelselect.update(dt)
   elseif gameState.state == "victory" then
     terrain.update(dt)
     ui.updateVictory(dt)
@@ -321,11 +338,14 @@ function M.updatePlaying(dt)
   end
 
   -- Victory conditions
-  -- Only count finalboss and area6boss as victory, not midboss
+  -- Only count finalboss and area6boss as victory, not midboss (unless midboss is the only boss)
   local finalBossDefeated = false
+  local midbossOnlyDefeated = false
   if boss.currentBoss and not boss.currentBoss.active then
     if boss.currentBoss.type == "finalboss" or boss.currentBoss.type == "area6boss" then
       finalBossDefeated = true
+    elseif boss.currentBoss.type == "midboss" then
+      midbossOnlyDefeated = true
     end
   end
 
@@ -333,6 +353,7 @@ function M.updatePlaying(dt)
 
   -- Auto-victory only for levels without boss enemies
   -- Don't auto-complete levels that have/had bosses, motherships, etc.
+  -- EXCEPT: Allow victory after midboss on Meteo (level 2) if it's the only boss
   local hasBossEnemy = boss.currentBoss ~= nil or
                        mothership.isActive() or mothership.isDefeated() or
                        bolse.isActive() or
@@ -350,12 +371,22 @@ function M.updatePlaying(dt)
                           not venomboss.isActive()
 
   -- Only allow auto-victory if no boss enemies exist/existed in this level
-  local autoVictory = allWavesSpawned and noEnemiesRemain and not hasBossEnemy
+  -- OR if midboss was defeated on Meteo (level 2)
+  local autoVictory = allWavesSpawned and noEnemiesRemain and (not hasBossEnemy or (midbossOnlyDefeated and gameState.levelId == 2))
 
   if bossVictory or autoVictory then
     gameState.notesEarned = math.floor(gameState.player.enemiesDefeated / 10)
     ui.resetVictory()
     gameState.state = "victory"
+
+    -- Award progression items for boss levels
+    if gameState.levelId == 19 and M.onMegaAntennaAwarded then
+      M.onMegaAntennaAwarded()
+      levelselect.hasMegaAntenna = true
+    elseif gameState.levelId == 20 and M.onPowerAmplifierAwarded then
+      M.onPowerAmplifierAwarded()
+      levelselect.hasPowerAmplifier = true
+    end
   end
 end
 
@@ -411,6 +442,24 @@ function M.spawnWaves()
         maze.deactivate()
       elseif wave.type == "venomboss" then
         venomboss.spawn()
+        gameState.totalEnemiesSpawned = gameState.totalEnemiesSpawned + 1
+        wingmen.triggerBossWarning()
+      elseif wave.type == "wardenboss" then
+        -- Warden boss (Inner Ring guardian)
+        boss.spawnFinalBoss() -- Reuse finalboss logic
+        boss.currentBoss.type = "wardenboss"
+        boss.currentBoss.health = 80
+        boss.currentBoss.maxHealth = 80
+        boss.currentBoss.score = 800
+        gameState.totalEnemiesSpawned = gameState.totalEnemiesSpawned + 1
+        wingmen.triggerBossWarning()
+      elseif wave.type == "sentinelboss" then
+        -- Sentinel boss (Middle Ring guardian)
+        boss.spawnFinalBoss() -- Reuse finalboss logic
+        boss.currentBoss.type = "sentinelboss"
+        boss.currentBoss.health = 120
+        boss.currentBoss.maxHealth = 120
+        boss.currentBoss.score = 1200
         gameState.totalEnemiesSpawned = gameState.totalEnemiesSpawned + 1
         wingmen.triggerBossWarning()
       end
@@ -1646,11 +1695,11 @@ function M.keypressed(key)
     elseif key == "up" then
       gameState.pauseMenuIndex = gameState.pauseMenuIndex - 1
       if gameState.pauseMenuIndex < 1 then
-        gameState.pauseMenuIndex = 4
+        gameState.pauseMenuIndex = 5
       end
     elseif key == "down" then
       gameState.pauseMenuIndex = gameState.pauseMenuIndex + 1
-      if gameState.pauseMenuIndex > 4 then
+      if gameState.pauseMenuIndex > 5 then
         gameState.pauseMenuIndex = 1
       end
     elseif key == "return" or key == "space" then
@@ -1664,7 +1713,10 @@ function M.keypressed(key)
         -- Options (placeholder for now)
         gameState.state = "options"
       elseif gameState.pauseMenuIndex == 4 then
-        -- Exit to Station
+        -- Return to Map
+        M.enterLevelSelect()
+      elseif gameState.pauseMenuIndex == 5 then
+        -- Return to Station
         M.exitToHub()
       end
     end

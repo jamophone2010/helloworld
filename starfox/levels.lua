@@ -333,6 +333,77 @@ M.FICHINA = {
   {time = 80, type = "finalboss"}
 }
 
+-- Inner Ring Boss: The Warden (id=19)
+-- Guardian of the Near Reaches - defeat to claim the Mega Antenna
+M.WARDEN = {
+  -- Opening waves
+  {time = 2, type = "wave", formation = "v", x = 400, count = 5},
+  {time = 6, type = "wave", formation = "line", x = 300, count = 4},
+  {time = 6, type = "wave", formation = "line", x = 500, count = 4},
+  {time = 12, type = "wave", formation = "wave", x = 400, count = 6},
+
+  -- First turret defense
+  {time = 18, type = "turret", x = 200},
+  {time = 18, type = "turret", x = 600},
+  {time = 22, type = "wave", formation = "v", x = 400, count = 7},
+
+  -- Mid-battle intensity
+  {time = 28, type = "wave", formation = "diamond", x = 350, count = 4},
+  {time = 28, type = "wave", formation = "diamond", x = 450, count = 4},
+  {time = 34, type = "capitalship", x = 400},
+  {time = 38, type = "wave", formation = "line", x = 400, count = 6},
+
+  -- Second turret wave
+  {time = 44, type = "turret", x = 300},
+  {time = 44, type = "turret", x = 500},
+  {time = 48, type = "wave", formation = "wave", x = 400, count = 8},
+
+  -- Boss warning and spawn
+  {time = 55, type = "callout", message = "triggerBossWarning"},
+  {time = 60, type = "wardenboss"}
+}
+
+-- Middle Ring Boss: The Sentinel (id=20)
+-- Guardian of the Middle Marches - defeat to claim the Power Amplifier
+M.SENTINEL = {
+  -- Intense opening - rapid assault
+  {time = 2, type = "wave", formation = "v", x = 400, count = 6},
+  {time = 5, type = "wave", formation = "line", x = 400, count = 5},
+  {time = 8, type = "wave", formation = "v", x = 300, count = 5},
+  {time = 8, type = "wave", formation = "v", x = 500, count = 5},
+
+  -- Capital ship with escort
+  {time = 14, type = "capitalship", x = 400},
+  {time = 16, type = "wave", formation = "diamond", x = 300, count = 4},
+  {time = 16, type = "wave", formation = "diamond", x = 500, count = 4},
+
+  -- Heavy turret defense
+  {time = 22, type = "turret", x = 150},
+  {time = 22, type = "turret", x = 400},
+  {time = 22, type = "turret", x = 650},
+  {time = 26, type = "wave", formation = "wave", x = 400, count = 8},
+
+  -- Dual capital ships
+  {time = 32, type = "capitalship", x = 250},
+  {time = 32, type = "capitalship", x = 550},
+  {time = 36, type = "wave", formation = "v", x = 400, count = 7},
+
+  -- Box formation assault
+  {time = 42, type = "wave", formation = "box", x = 350, count = 5},
+  {time = 42, type = "wave", formation = "box", x = 450, count = 5},
+  {time = 48, type = "turret", x = 200},
+  {time = 48, type = "turret", x = 600},
+
+  -- Triangle formation finale
+  {time = 54, type = "wave", formation = "triangle", x = 300, count = 5},
+  {time = 54, type = "wave", formation = "triangle", x = 500, count = 5},
+  {time = 60, type = "wave", formation = "wave", x = 400, count = 10},
+
+  -- Boss warning and spawn
+  {time = 68, type = "callout", message = "triggerBossWarning"},
+  {time = 73, type = "sentinelboss"}
+}
+
 function M.getWaves(levelId)
   if levelId == 2 then
     return M.METEO
@@ -352,6 +423,10 @@ function M.getWaves(levelId)
     return M.FICHINA
   elseif levelId == 18 then
     return M.VENOM
+  elseif levelId == 19 then
+    return M.WARDEN
+  elseif levelId == 20 then
+    return M.SENTINEL
   end
   return M.CORNERIA
 end
@@ -375,7 +450,9 @@ function M.getName(levelId)
     [15] = "FICHINA",
     [16] = "OUTER",
     [17] = "VENOM II",
-    [18] = "VENOM"
+    [18] = "VENOM",
+    [19] = "THE WARDEN",
+    [20] = "THE SENTINEL"
   }
   return names[levelId] or "CORNERIA"
 end
