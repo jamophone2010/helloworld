@@ -8,14 +8,18 @@ local symbols = require("slotmachine.symbols")
 
 local gameState = {}
 
-function M.load()
+function M.load(startingCredits)
   gameState.machine = machine.new()
-  gameState.bank = credits.new(100)
+  gameState.bank = credits.new(startingCredits or 1000)
   gameState.wins = {}
   gameState.totalWinnings = 0
 
   audio.load()
   ui.load()
+end
+
+function M.getCredits()
+  return gameState.bank.credits
 end
 
 function M.update(dt)

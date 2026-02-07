@@ -1,6 +1,7 @@
 local M = {}
 
 local player = require("starfox.player")
+local abilities = require("starfox.abilities")
 
 local fonts = {}
 
@@ -10,7 +11,7 @@ function M.load()
   fonts.large = love.graphics.newFont(24)
 end
 
-function M.draw(p, levelTime, callout, bossHealth, bossMaxHealth, levelName, portalCount)
+function M.draw(p, levelTime, callout, bossHealth, bossMaxHealth, levelName, portalCount, totalEnemiesSpawned)
   love.graphics.setFont(fonts.normal)
   love.graphics.setColor(1, 1, 1)
   love.graphics.print("SHIELD", 10, 10)
@@ -42,12 +43,34 @@ function M.draw(p, levelTime, callout, bossHealth, bossMaxHealth, levelName, por
   love.graphics.setColor(1, 1, 1)
   love.graphics.print("LIVES: " .. p.lives, 400, 10)
 
+  -- Determine enemies counter color
+  local enemiesColor = {1, 1, 1}  -- Default white
+  if p.enemiesEscaped == 0 then
+    -- Gold if no enemies escaped
+    enemiesColor = {1, 0.84, 0}
+  elseif totalEnemiesSpawned and totalEnemiesSpawned > 0 then
+    local killPercentage = (p.enemiesDefeated / totalEnemiesSpawned) * 100
+    if killPercentage < 60 then
+      -- Red if below 60%
+      enemiesColor = {1, 0, 0}
+    end
+    -- Otherwise stays white
+  end
+
   love.graphics.setFont(fonts.large)
-  love.graphics.setColor(1, 1, 1)
-  love.graphics.printf(string.format("%06d", p.score), 600, 10, 190, "right")
+  love.graphics.setColor(enemiesColor)
+  love.graphics.printf("ENEMIES: " .. p.enemiesDefeated, 600, 10, 190, "right")
 
   love.graphics.setFont(fonts.small)
   love.graphics.printf(levelName or "CORNERIA", 600, 35, 190, "right")
+
+  -- Time counter
+  local minutes = math.floor(levelTime / 60)
+  local seconds = math.floor(levelTime % 60)
+  local timeStr = string.format("%02d:%02d", minutes, seconds)
+  love.graphics.setFont(fonts.normal)
+  love.graphics.setColor(1, 1, 1)
+  love.graphics.printf(timeStr, 600, 560, 190, "right")
 
   if p.charging and p.chargeLevel > 0 then
     local chargeWidth = 100
@@ -81,6 +104,46 @@ function M.draw(p, levelTime, callout, bossHealth, bossMaxHealth, levelName, por
   love.graphics.rectangle("line", 10, 550, dodgeWidth, 15)
   love.graphics.setFont(fonts.small)
   love.graphics.print("DODGE", 10, 535)
+
+  -- Special ability gauge (drawn right of dodge)
+  abilities.drawGauge()
+
+  -- Weapon indicator
+  if p.hasLaser then
+    love.graphics.setFont(fonts.normal)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.print("WEAPON: " .. (p.currentWeapon == "blaster" and "BLASTER" or "SPARTAN LASER"), 10, 70)
+    
+    -- Spartan Laser cooldown timer (only show when cooling down)
+    if p.currentWeapon == "laser" and p.laserCooldown > 0 then
+      love.graphics.setFont(fonts.small)
+      love.graphics.setColor(1, 0.5, 0)
+      love.graphics.printf("COOLDOWN: " .. string.format("%.1f", p.laserCooldown) .. "s", 10, 90, 200, "left")
+    end
+    
+    -- Laser firing indicator
+    if p.laserFiring then
+      local fireWidth = 100
+      local firePercent = p.laserFireTime / 5.0
+      
+      love.graphics.setFont(fonts.small)
+      love.graphics.setColor(1, 1, 1)
+      love.graphics.print("LASER POWER", 10, 105)
+      
+      love.graphics.setColor(0.3, 0.3, 0.3)
+      love.graphics.rectangle("fill", 10, 120, fireWidth, 15)
+      
+      love.graphics.setColor(1, 0, 0)
+      love.graphics.rectangle("fill", 10, 120, fireWidth * firePercent, 15)
+      
+      love.graphics.setColor(1, 1, 1)
+      love.graphics.rectangle("line", 10, 120, fireWidth, 15)
+      
+      love.graphics.setFont(fonts.small)
+      love.graphics.setColor(1, 1, 0)
+      love.graphics.print("DPS: " .. string.format("%.1f", math.pow(3, p.laserFireTime)), 10, 140)
+    end
+  end
 
   if callout then
     love.graphics.setFont(fonts.normal)

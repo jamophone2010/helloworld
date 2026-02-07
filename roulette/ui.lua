@@ -163,6 +163,66 @@ function M.drawTable(tbl)
   end
 end
 
+-- Draw a single poker chip with realistic appearance
+local function drawPokerChip(x, y, value, stackHeight)
+  local radius = 14
+  local color = credits.getChipColor(value)
+  local label = credits.getChipLabel(value)
+  
+  stackHeight = stackHeight or 0
+  
+  -- Draw chip shadow for depth effect
+  love.graphics.setColor(0, 0, 0, 0.3)
+  love.graphics.circle("fill", x + 2, y + 2 + stackHeight, radius)
+  
+  -- Draw main chip body
+  love.graphics.setColor(color[1], color[2], color[3])
+  love.graphics.circle("fill", x, y + stackHeight, radius)
+  
+  -- Draw chip edge (darker)
+  love.graphics.setColor(color[1] * 0.7, color[2] * 0.7, color[3] * 0.7)
+  love.graphics.circle("line", x, y + stackHeight, radius)
+  love.graphics.setLineWidth(2)
+  love.graphics.circle("line", x, y + stackHeight, radius - 2)
+  love.graphics.setLineWidth(1)
+  
+  -- Draw inner circle for detail
+  love.graphics.setColor(1, 1, 1)
+  love.graphics.circle("line", x, y + stackHeight, radius - 4)
+  
+  -- Draw value text
+  love.graphics.setFont(fonts.small)
+  
+  -- Use black text for 1, 25, 10K, and 1M chips (light backgrounds), white for others
+  if value == 1 or value == 25 or value == 10000 or value == 1000000 then
+    love.graphics.setColor(0, 0, 0)
+  else
+    love.graphics.setColor(1, 1, 1)
+  end
+  
+  local textWidth = fonts.small:getWidth(label)
+  love.graphics.print(label, x - textWidth / 2, y + stackHeight - 7)
+end
+
+-- Draw a stack of chips
+local function drawChipStack(x, y, stack)
+  local totalHeight = 0
+  
+  for i, chip in ipairs(stack) do
+    for j = 1, math.min(chip.count, 10) do -- Limit visual stack to 10 chips
+      drawPokerChip(x, y, chip.value, -totalHeight)
+      totalHeight = totalHeight + 3 -- Stack height between chips
+    end
+    
+    -- If more than 10 chips, show count
+    if chip.count > 10 then
+      love.graphics.setFont(fonts.small)
+      love.graphics.setColor(1, 1, 0)
+      love.graphics.print("x" .. chip.count, x + 18, y - totalHeight - 5)
+    end
+  end
+end
+
 local function getBetPosition(bet, tbl)
   local gridX = tbl.gridX
   local gridY = tbl.gridY
@@ -211,14 +271,22 @@ local function getBetPosition(bet, tbl)
 end
 
 function M.drawBets(bets, tbl)
-  love.graphics.setFont(fonts.small)
   for _, bet in ipairs(bets.active) do
     local cx, cy, width = getBetPosition(bet, tbl)
     if cx and cy then
-      love.graphics.setColor(1, 1, 0, 0.7)
-      love.graphics.circle("fill", cx, cy, 12)
-      love.graphics.setColor(0, 0, 0)
-      love.graphics.printf(tostring(bet.amount), cx - width / 2, cy - 7, width, "center")
+      local chipStack = credits.getChipStack(bet.amount)
+      drawChipStack(cx, cy, chipStack)
+      
+      -- Show total amount below stack
+      if bet.amount >= 1000 then
+        love.graphics.setFont(fonts.small)
+        love.graphics.setColor(1, 1, 1)
+        local amountText = bet.amount >= 1000000 and (bet.amount / 1000000) .. "M" or
+                          bet.amount >= 1000 and (bet.amount / 1000) .. "K" or
+                          tostring(bet.amount)
+        local textWidth = fonts.small:getWidth(amountText)
+        love.graphics.print(amountText, cx - textWidth / 2, cy + 20)
+      end
     end
   end
 end
@@ -286,10 +354,38 @@ function M.drawUI(bank, state, result, history, tbl, payout)
   love.graphics.setColor(1, 1, 1)
   love.graphics.print("Credits: " .. bank.balance, 20, 20)
 
+  -- Draw chip selection with visual chips
   local chipValue = credits.getSelectedChipValue(bank)
-  love.graphics.print("Chip: " .. chipValue, 20, 50)
-  love.graphics.print("UP/DOWN: Change Chip", 20, 80)
-  love.graphics.print("Click Table: Place Bet", 20, 110)
+  love.graphics.print("Selected Chip:", 20, 50)
+  drawPokerChip(170, 63, chipValue)
+  
+  -- Draw all available chips in two rows
+  love.graphics.setColor(1, 1, 1)
+  love.graphics.print("Available Chips (UP/DOWN):", 20, 90)
+  local chipX = 20
+  local chipRow = 1
+  for i, value in ipairs(credits.CHIP_VALUES) do
+    if credits.canAfford(bank, value) then
+      if i == bank.selectedChipIndex then
+        -- Highlight selected chip
+        love.graphics.setColor(1, 1, 0, 0.3)
+        local chipY = (chipRow == 1) and 130 or 175
+        love.graphics.circle("fill", chipX + 14, chipY, 18)
+      end
+      local chipY = (chipRow == 1) and 130 or 175
+      drawPokerChip(chipX + 14, chipY, value)
+      chipX = chipX + 35
+      
+      -- Move to second row after 5 chips
+      if chipX > 200 and chipRow == 1 then
+        chipX = 20
+        chipRow = 2
+      end
+    end
+  end
+  
+  love.graphics.setColor(1, 1, 1)
+  love.graphics.print("Click Table: Place Bet", 20, 210)
 
   if history and #history > 0 then
     M.drawHistory(history)
@@ -297,11 +393,7 @@ function M.drawUI(bank, state, result, history, tbl, payout)
   M.drawPayoutTable(tbl)
 
   if state == "betting" then
-    love.graphics.print("SPACE: Spin", 20, 140)
-  elseif state == "payout" and result and payout and payout > 0 then
-    love.graphics.setFont(fonts.large)
-    love.graphics.setColor(1, 1, 0)
-    love.graphics.print("Result: " .. tostring(result), 20, 500)
+    love.graphics.print("SPACE: Spin", 20, 240)
   end
 end
 

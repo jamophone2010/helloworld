@@ -40,7 +40,7 @@ function M.getBetFromClick(table, mx, my)
   local cellH = table.cellHeight
 
   if mx >= gridX and mx <= gridX + cellW and my >= gridY and my <= gridY + cellH then
-    return {type = "straight", numbers = {0}}
+    return {type = "straight", numbers = {"0"}}
   end
 
   if mx >= gridX + cellW and mx <= gridX + 2 * cellW and my >= gridY and my <= gridY + cellH then

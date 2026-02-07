@@ -40,6 +40,28 @@ function M.spawnSquadron(playerX, playerY)
   end
 end
 
+--- Spawn a converted enemy as an ally (Mistral ability)
+function M.spawnConverted(x, y)
+  local ally = {
+    x = x,
+    y = y,
+    name = "Converted",
+    width = 25,
+    height = 25,
+    health = 15,
+    maxHealth = 15,
+    shootTimer = math.random() * 0.5 + 0.8,
+    targetX = nil,
+    targetY = nil,
+    shouldShoot = false,
+    active = true,
+    converted = true,  -- flag for purple glow rendering
+    followOffset = {x = (#M.allies % 2 == 0) and -80 or 80, y = 40}
+  }
+  table.insert(M.allies, ally)
+  return ally
+end
+
 function M.update(dt, playerX, playerY, enemies)
   for i = #M.allies, 1, -1 do
     local ally = M.allies[i]
@@ -47,7 +69,12 @@ function M.update(dt, playerX, playerY, enemies)
       table.remove(M.allies, i)
     else
       -- Follow player loosely
-      local offset = ALLY_OFFSETS[((i - 1) % #ALLY_OFFSETS) + 1]
+      local offset
+      if ally.converted and ally.followOffset then
+        offset = ally.followOffset
+      else
+        offset = ALLY_OFFSETS[((i - 1) % #ALLY_OFFSETS) + 1]
+      end
       local targetX = playerX + offset.x
       local targetY = playerY + offset.y
 

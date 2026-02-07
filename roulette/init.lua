@@ -10,12 +10,16 @@ local ui = require("roulette.ui")
 
 local gameState = {}
 
-function M.load()
+function M.load(startingCredits)
+  -- Seed random number generator for wheel results
+  math.randomseed(os.time())
+  math.random(); math.random(); math.random() -- Discard first few values for better randomness
+  
   gameState.wheel = wheel.new()
   gameState.ball = ball.new()
   gameState.table = table.new()
   gameState.bets = bets.new()
-  gameState.bank = credits.new(1000)
+  gameState.bank = credits.new(startingCredits or 1000)
   gameState.state = "betting"
   gameState.result = nil
   gameState.payout = 0
@@ -24,6 +28,10 @@ function M.load()
 
   audio.load()
   ui.load()
+end
+
+function M.getCredits()
+  return gameState.bank.balance
 end
 
 function M.update(dt)
@@ -64,11 +72,19 @@ function M.update(dt)
       gameState.state = "betting"
       gameState.result = nil
       gameState.payout = 0
-      -- Reset wheel and ball for next spin
+      
+      -- Fully reset wheel and ball for next spin
       gameState.wheel.phase = "idle"
       gameState.wheel.spinning = false
+      gameState.wheel.velocity = 0
+      gameState.wheel.timer = 0
+      gameState.wheel.targetPocket = nil
+      
       gameState.ball.phase = "idle"
       gameState.ball.spinning = false
+      gameState.ball.velocity = 0
+      gameState.ball.timer = 0
+      gameState.ball.finalPocket = nil
     end
   end
 end
@@ -86,9 +102,11 @@ function M.draw()
   ui.drawUI(gameState.bank, gameState.state, gameState.result, gameState.history, gameState.table, gameState.payout)
 
   if gameState.state == "payout" and gameState.payout > 0 then
-    love.graphics.setFont(love.graphics.newFont(24))
+    love.graphics.setFont(love.graphics.newFont(32))
     love.graphics.setColor(1, 1, 0)
-    love.graphics.printf("WIN: " .. gameState.payout, 0, 530, 800, "center")
+    love.graphics.print("Winner!", 150, 450)
+    love.graphics.setFont(love.graphics.newFont(28))
+    love.graphics.print(gameState.payout, 150, 490)
   end
 end
 

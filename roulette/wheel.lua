@@ -1,6 +1,6 @@
 local M = {}
 
-M.POCKETS = {0, 28, 9, 26, 30, 11, 7, 20, 32, 17, 5, 22, 34, 15, 3, 24, 36, 13, 1, "00", 27, 10, 25, 29, 12, 8, 19, 31, 18, 6, 21, 33, 16, 4, 23, 35, 14, 2}
+M.POCKETS = {"0", 28, 9, 26, 30, 11, 7, 20, 32, 17, 5, 22, 34, 15, 3, 24, 36, 13, 1, "00", 27, 10, 25, 29, 12, 8, 19, 31, 18, 6, 21, 33, 16, 4, 23, 35, 14, 2}
 
 M.RED_NUMBERS = {1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36}
 
@@ -13,7 +13,7 @@ local DECEL_TIME = 3.0
 function M.new()
   return {
     angle = 0,
-    velocity = BASE_SPEED,
+    velocity = 0,
     spinning = false,
     phase = "idle",
     timer = 0,
@@ -23,7 +23,7 @@ function M.new()
 end
 
 function M.getColor(number)
-  if number == 0 or number == "00" then
+  if number == 0 or number == "0" or number == "00" then
     return "green"
   end
 

@@ -87,6 +87,29 @@ M.MACBETH = {
   {time = 60, type = "finalboss"}
 }
 
+M.SECTORY = {
+  -- Sector Y: Continuous waves of 10 enemies in a line every 5 seconds
+  -- This level has infinite special attacks enabled
+  {time = 2, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 7, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 12, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 17, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 22, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 27, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 32, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 37, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 42, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 47, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 52, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 57, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 62, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 67, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 72, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 77, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 82, type = "callout", message = "triggerBossWarning"},
+  {time = 87, type = "finalboss"}
+}
+
 M.KATINA = {
   -- Bill's squadron arrives
   {time = 0, type = "callout", message = "triggerAlliesInbound"},
@@ -272,9 +295,49 @@ M.VENOM = {
   {time = 115, type = "venomboss"}
 }
 
+M.FICHINA = {
+  -- Opening - diamond formation
+  {time = 2, type = "wave", formation = "diamond", x = 400, count = 4},
+  {time = 8, type = "wave", formation = "diamond", x = 250, count = 4},
+  {time = 8, type = "wave", formation = "diamond", x = 550, count = 4},
+
+  -- Box formations
+  {time = 14, type = "wave", formation = "box", x = 400, count = 5},
+  {time = 20, type = "wave", formation = "box", x = 300, count = 5},
+  {time = 20, type = "wave", formation = "box", x = 500, count = 5},
+
+  -- Triangle formations
+  {time = 26, type = "wave", formation = "triangle", x = 400, count = 5},
+  {time = 32, type = "wave", formation = "triangle", x = 350, count = 5},
+  {time = 32, type = "wave", formation = "triangle", x = 450, count = 5},
+
+  -- Mixed assault
+  {time = 38, type = "wave", formation = "diamond", x = 400, count = 4},
+  {time = 42, type = "wave", formation = "box", x = 250, count = 5},
+  {time = 42, type = "wave", formation = "box", x = 550, count = 5},
+
+  -- Intense section
+  {time = 48, type = "wave", formation = "triangle", x = 300, count = 5},
+  {time = 50, type = "wave", formation = "triangle", x = 500, count = 5},
+  {time = 54, type = "wave", formation = "diamond", x = 400, count = 4},
+
+  -- Final waves before boss
+  {time = 60, type = "wave", formation = "box", x = 350, count = 5},
+  {time = 62, type = "wave", formation = "box", x = 450, count = 5},
+  {time = 66, type = "wave", formation = "triangle", x = 400, count = 5},
+  {time = 70, type = "wave", formation = "diamond", x = 300, count = 4},
+  {time = 70, type = "wave", formation = "diamond", x = 500, count = 4},
+
+  -- Boss
+  {time = 75, type = "callout", message = "triggerBossWarning"},
+  {time = 80, type = "finalboss"}
+}
+
 function M.getWaves(levelId)
   if levelId == 2 then
     return M.METEO
+  elseif levelId == 3 then
+    return M.SECTORY
   elseif levelId == 5 then
     return M.KATINA
   elseif levelId == 8 then
@@ -285,6 +348,8 @@ function M.getWaves(levelId)
     return M.BOLSE
   elseif levelId == 14 then
     return M.AREA6
+  elseif levelId == 15 then
+    return M.FICHINA
   elseif levelId == 18 then
     return M.VENOM
   end

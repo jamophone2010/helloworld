@@ -16,9 +16,38 @@ local bolse = require("starfox.bolse")
 local rival = require("starfox.rival")
 local maze = require("starfox.maze")
 local venomboss = require("starfox.venomboss")
+local bossexplosion = require("starfox.bossexplosion")
+local supershot = require("starfox.supershot")
+local abilities = require("starfox.abilities")
+local ships = require("starfox.ships")
 
 local fonts = {}
 local currentLevelId = 1
+
+-- Victory screen animation state
+local victoryState = {
+  active = false,
+  timer = 0,
+  enemiesDefeated = 0,
+  totalEnemies = 0,
+  baseNotesEarned = 0,
+  -- Counting animation
+  displayedEnemies = 0,
+  displayedNotes = 0,
+  countSpeed = 1,
+  countPhase = "counting",  -- "counting", "medals_pause", "medals", "done"
+  -- Medal bonus phase (now grouped)
+  groupedMedals = {},
+  medalIndex = 0,
+  medalTimer = 0,
+  medalBonusDisplayed = 0,
+  medalSlideIn = 0,
+  medalShowTimes = {},  -- tracks when each medal row was fully shown (for decay)
+  -- Visual effects
+  lastNoteThreshold = 0,
+  notePulse = 0,
+  noteFlashTimer = 0,
+}
 
 function M.setLevelId(levelId)
   currentLevelId = levelId
@@ -31,6 +60,7 @@ end
 function M.load()
   fonts.large = love.graphics.newFont(36)
   fonts.normal = love.graphics.newFont(20)
+  fonts.small = love.graphics.newFont(14)
   hud.load()
 end
 
@@ -87,9 +117,13 @@ function M.drawPortals()
 end
 
 function M.drawPlayer(player)
-  if player.invulnerable and math.floor(love.timer.getTime() * 10) % 2 == 0 then
+  -- Only flash when invulnerable but NOT barrel rolling and NOT ability-invulnerable
+  if player.invulnerable and not player.barrelRolling and not abilities.active and math.floor(love.timer.getTime() * 10) % 2 == 0 then
     return
   end
+
+  -- Get player draw alpha (for Phantom phase cloak)
+  local playerAlpha = abilities.getPlayerAlpha()
 
   -- Dodge trail effect
   if player.dodging then
@@ -107,14 +141,32 @@ function M.drawPlayer(player)
   love.graphics.push()
   love.graphics.translate(player.x, player.y)
 
-  love.graphics.setColor(0.3, 0.5, 1)
+  -- Barrel roll shield (semicircle in front)
+  if player.barrelRolling then
+    -- Glow effect (narrow radius)
+    for i = 3, 1, -1 do
+      local glowRadius = 35 + i * 2
+      local alpha = 0.15 * (4 - i) / 3
+      love.graphics.setColor(0.3, 0.8, 1, alpha)
+      love.graphics.setLineWidth(3)
+      love.graphics.arc("line", "open", 0, 0, glowRadius, -math.pi/2 - math.pi/3, -math.pi/2 + math.pi/3)
+    end
+
+    -- Main shield arc (no radial lines)
+    love.graphics.setColor(0.5, 1, 1, 0.8)
+    love.graphics.setLineWidth(2)
+    love.graphics.arc("line", "open", 0, 0, 35, -math.pi/2 - math.pi/3, -math.pi/2 + math.pi/3)
+    love.graphics.setLineWidth(1)
+  end
+
+  love.graphics.setColor(0.3, 0.5, 1, playerAlpha)
   love.graphics.polygon("fill", 0, -20, -15, 15, 15, 15)
 
-  love.graphics.setColor(0.5, 0.7, 1)
+  love.graphics.setColor(0.5, 0.7, 1, playerAlpha)
   love.graphics.polygon("fill", -25, 10, -15, 5, -15, 15, -25, 15)
   love.graphics.polygon("fill", 25, 10, 15, 5, 15, 15, 25, 15)
 
-  love.graphics.setColor(1, 1, 1)
+  love.graphics.setColor(1, 1, 1, playerAlpha)
   love.graphics.polygon("line", 0, -20, -15, 15, 15, 15)
 
   if player.charging and player.chargeLevel > 0.2 then
@@ -123,17 +175,76 @@ function M.drawPlayer(player)
     love.graphics.circle("fill", 0, -20, size)
   end
 
+  -- Paladin charge indicator (green/shield color)
+  if weapons.paladinCharging and weapons.paladinChargeLevel > 0.1 then
+    local time = love.timer.getTime()
+    local pulse = 0.6 + 0.4 * math.sin(time * 15)
+    local size = 10 + weapons.paladinChargeLevel * 40
+
+    -- Outer glow rings
+    for i = 3, 1, -1 do
+      local ringSize = size * (1 + i * 0.3)
+      local ringAlpha = (0.2 / i) * pulse
+      love.graphics.setColor(0.3, 1, 0.5, ringAlpha * playerAlpha)
+      love.graphics.circle("fill", 0, -25, ringSize)
+    end
+
+    -- Main charge orb
+    love.graphics.setColor(0.4, 1, 0.6, (0.6 + weapons.paladinChargeLevel * 0.4) * pulse * playerAlpha)
+    love.graphics.circle("fill", 0, -25, size)
+
+    -- Bright core
+    love.graphics.setColor(1, 1, 1, 0.8 * pulse * playerAlpha)
+    love.graphics.circle("fill", 0, -25, size * 0.5)
+  end
+
   love.graphics.pop()
 end
 
 function M.drawWingmen()
-  for _, wingman in ipairs(wingmen.wingmen) do
-    love.graphics.setColor(0.5, 0.5, 0.5)
-    love.graphics.polygon("fill", wingman.x, wingman.y - 10, wingman.x - 8, wingman.y + 8, wingman.x + 8, wingman.y + 8)
-  end
+  -- Wingmen are not drawn on screen
+  return
 end
 
 function M.drawLasers()
+  local abilities = require("starfox.abilities")
+  local isLancerActive = abilities.isMultiLockActive()
+  
+  -- Draw Spartan Laser beam first (so it appears behind regular lasers)
+  if weapons.spartanLaserBeam and weapons.spartanLaserBeam.active then
+    local beam = weapons.spartanLaserBeam
+    local alpha = 0.3 + (beam.fireTime / 5.0) * 0.5 -- Fade in as it charges
+    local currentWidth = beam.width or 10
+    local endY = beam.actualEndY or 0  -- End at boss surface or top of screen
+    local beamLength = beam.y - endY
+    
+    -- Draw bloom glow at impact point
+    if beam.actualEndY and beam.actualEndY > 0 then
+      local bloomAlpha = 0.11 + (beam.fireTime / 5.0) * 0.11
+      local bloomSize = 22.5 + beam.fireTime * 7.5
+      
+      -- Multiple layers for soft bloom
+      for i = 3, 1, -1 do
+        local size = bloomSize * i * 0.7
+        local layerAlpha = bloomAlpha / (i * 1.5)
+        love.graphics.setColor(1, 0.8, 0.3, layerAlpha)
+        love.graphics.circle("fill", beam.x, beam.actualEndY, size)
+      end
+    end
+    
+    -- Draw outer glow
+    love.graphics.setColor(1, 0, 0, alpha * 0.3)
+    love.graphics.rectangle("fill", beam.x - currentWidth, endY, currentWidth * 2, beamLength)
+    
+    -- Draw main beam
+    love.graphics.setColor(1, 0.2, 0, alpha)
+    love.graphics.rectangle("fill", beam.x - currentWidth/2, endY, currentWidth, beamLength)
+    
+    -- Draw core beam
+    love.graphics.setColor(1, 0.8, 0.8, alpha + 0.3)
+    love.graphics.rectangle("fill", beam.x - currentWidth/4, endY, currentWidth/2, beamLength)
+  end
+  
   for _, laser in ipairs(weapons.lasers) do
     local r, g, b = 0, 1, 0
     if laser.owner == "player" then
@@ -143,7 +254,11 @@ function M.drawLasers()
         r, g, b = 0, 1, 0
       end
     elseif laser.owner == "ally" then
-      r, g, b = 0.3, 0.8, 1
+      if laser.converted then
+        r, g, b = 0.6, 0.1, 1.0  -- Purple for Mistral converted wingmen
+      else
+        r, g, b = 0.3, 0.8, 1
+      end
     else
       r, g, b = 1, 0.3, 0.3
     end
@@ -161,8 +276,258 @@ function M.drawLasers()
     end
 
     -- Draw the laser itself
-    love.graphics.setColor(r, g, b)
-    love.graphics.rectangle("fill", laser.x - laser.width/2, laser.y - laser.height/2, laser.width, laser.height)
+    if laser.owner == "player" and isLancerActive then
+      -- Fancy animation for Lancer special: pulsing glow and spiral trail
+      local time = love.timer.getTime()
+      local pulse = 0.7 + 0.3 * math.sin(time * 10 + laser.y * 0.1)
+
+      -- Outer glow
+      for i = 3, 1, -1 do
+        local glowSize = i * 4
+        local glowAlpha = (0.4 / i) * pulse
+        love.graphics.setColor(0.2, 0.8, 1, glowAlpha)
+        love.graphics.rectangle("fill", laser.x - (laser.width + glowSize)/2, laser.y - (laser.height + glowSize)/2, laser.width + glowSize, laser.height + glowSize)
+      end
+
+      -- Spiral trail particles
+      for j = 0, 3 do
+        local offset = (time * 5 + laser.y * 0.05 + j * math.pi/2) % (math.pi * 2)
+        local spiralX = laser.x + math.cos(offset) * 8
+        local spiralY = laser.y + j * 3
+        love.graphics.setColor(0.4, 0.9, 1, 0.6 * pulse)
+        love.graphics.circle("fill", spiralX, spiralY, 2)
+      end
+
+      -- Main laser (brighter during Lancer special)
+      love.graphics.setColor(0.3, 1, 1, pulse)
+      love.graphics.rectangle("fill", laser.x - laser.width/2, laser.y - laser.height/2, laser.width, laser.height)
+
+      -- Core bright center
+      love.graphics.setColor(1, 1, 1, 0.8 * pulse)
+      love.graphics.rectangle("fill", laser.x - laser.width/4, laser.y - laser.height/2, laser.width/2, laser.height)
+    else
+      love.graphics.setColor(r, g, b)
+      love.graphics.rectangle("fill", laser.x - laser.width/2, laser.y - laser.height/2, laser.width, laser.height)
+    end
+  end
+end
+
+function M.drawMissiles()
+  local abilities = require("starfox.abilities")
+  local isLancerActive = abilities.isMultiLockActive()
+
+  for _, m in ipairs(weapons.missiles) do
+    if isLancerActive then
+      -- Fancy animation for Lancer missiles: pulsing glow and spiral trail
+      local time = love.timer.getTime()
+      local pulse = 0.7 + 0.3 * math.sin(time * 12 + m.x * 0.2 + m.y * 0.1)
+
+      -- Outer glow
+      for i = 3, 1, -1 do
+        local glowSize = i * 5
+        local glowAlpha = (0.35 / i) * pulse
+        love.graphics.setColor(0.2, 0.8, 1, glowAlpha)
+        love.graphics.circle("fill", m.x, m.y, glowSize)
+      end
+
+      -- Spiral trail
+      for j = 0, 3 do
+        local offset = (time * 8 + m.y * 0.08 + j * math.pi/2) % (math.pi * 2)
+        local spiralX = m.x + math.cos(offset) * 6
+        local spiralY = m.y + math.sin(offset) * 6
+        love.graphics.setColor(0.4, 0.9, 1, 0.5 * pulse)
+        love.graphics.circle("fill", spiralX, spiralY, 2)
+      end
+
+      -- Main missile body
+      love.graphics.setColor(0.3, 1, 1, pulse)
+      love.graphics.rectangle("fill", m.x - m.width/2, m.y - m.height/2, m.width, m.height)
+
+      -- Bright core
+      love.graphics.setColor(1, 1, 1, 0.7 * pulse)
+      love.graphics.rectangle("fill", m.x - m.width/4, m.y - m.height/2, m.width/2, m.height)
+
+      -- Exhaust trail
+      love.graphics.setColor(0.2, 0.6, 1, 0.5 * pulse)
+      love.graphics.rectangle("fill", m.x - 3, m.y + m.height/2, 6, 10)
+    else
+      love.graphics.setColor(1, 0.8, 0)
+      love.graphics.rectangle("fill", m.x - m.width/2, m.y - m.height/2, m.width, m.height)
+      love.graphics.setColor(1, 0.5, 0, 0.6)
+      love.graphics.rectangle("fill", m.x - 3, m.y + m.height/2, 6, 8)
+    end
+  end
+end
+
+function M.drawShotgunPellets()
+  local time = love.timer.getTime()
+
+  for _, pellet in ipairs(weapons.shotgunPellets) do
+    local lifeRatio = 1 - (pellet.age / pellet.maxAge)
+    local alpha = pellet.alpha * lifeRatio
+
+    -- Phantom ghostly colors: purple-blue gradient
+    local pulse = 0.6 + 0.4 * math.sin(time * 15 + pellet.x * 0.5 + pellet.y * 0.5)
+
+    -- Outer glow (large, diffuse)
+    for i = 5, 1, -1 do
+      local glowSize = i * 3
+      local glowAlpha = (alpha * 0.15 / i) * pulse
+      love.graphics.setColor(0.5, 0.3, 0.9, glowAlpha)
+      love.graphics.circle("fill", pellet.x, pellet.y, pellet.width + glowSize)
+    end
+
+    -- Middle glow (brighter)
+    love.graphics.setColor(0.6, 0.5, 1, alpha * 0.6 * pulse)
+    love.graphics.circle("fill", pellet.x, pellet.y, pellet.width * 1.5)
+
+    -- Core pellet (bright white-blue center)
+    love.graphics.setColor(0.9, 0.8, 1, alpha * pulse)
+    love.graphics.circle("fill", pellet.x, pellet.y, pellet.width)
+
+    -- Inner bright core
+    love.graphics.setColor(1, 1, 1, alpha * 0.9 * pulse)
+    love.graphics.circle("fill", pellet.x, pellet.y, pellet.width * 0.5)
+
+    -- Trailing ghost particles
+    if lifeRatio > 0.5 then
+      for j = 1, 3 do
+        local trailOffset = j * 8
+        local trailAlpha = alpha * 0.3 * (1 - j/4)
+        love.graphics.setColor(0.5, 0.4, 0.8, trailAlpha)
+        love.graphics.circle("fill", pellet.x - pellet.vx/50 * j, pellet.y - pellet.vy/50 * j, pellet.width * 0.7)
+      end
+    end
+  end
+end
+
+function M.drawChargedBlasts()
+  local time = love.timer.getTime()
+
+  for _, blast in ipairs(weapons.chargedBlasts) do
+    local pulse = 0.7 + 0.3 * math.sin(time * 20)
+
+    -- Outer expanding shockwave rings
+    for i = 3, 1, -1 do
+      local ringRadius = blast.currentRadius + i * 15 * math.sin(time * 10 + blast.age * 5)
+      local ringAlpha = 0.3 / i
+      love.graphics.setColor(0.3, 1, 0.5, ringAlpha)
+      love.graphics.setLineWidth(3)
+      love.graphics.circle("line", blast.x, blast.y, ringRadius)
+    end
+
+    -- Multiple bloom layers
+    for i = 5, 1, -1 do
+      local bloomRadius = blast.currentRadius * (1 + i * 0.2)
+      local bloomAlpha = (0.2 / i) * pulse
+      love.graphics.setColor(0.4, 1, 0.6, bloomAlpha)
+      love.graphics.circle("fill", blast.x, blast.y, bloomRadius)
+    end
+
+    -- Main blast sphere
+    love.graphics.setColor(0.5, 1, 0.7, 0.8 * pulse)
+    love.graphics.circle("fill", blast.x, blast.y, blast.currentRadius)
+
+    -- Bright core
+    love.graphics.setColor(1, 1, 1, 0.9 * pulse)
+    love.graphics.circle("fill", blast.x, blast.y, blast.currentRadius * 0.6)
+
+    -- Ultra-bright center
+    love.graphics.setColor(1, 1, 1, pulse)
+    love.graphics.circle("fill", blast.x, blast.y, blast.currentRadius * 0.3)
+
+    -- Rotating energy particles around the blast
+    for i = 0, 7 do
+      local angle = (i / 8) * math.pi * 2 + time * 5
+      local px = blast.x + math.cos(angle) * blast.currentRadius * 0.8
+      local py = blast.y + math.sin(angle) * blast.currentRadius * 0.8
+      love.graphics.setColor(0.8, 1, 0.9, 0.7)
+      love.graphics.circle("fill", px, py, 6)
+    end
+
+    love.graphics.setLineWidth(1)
+  end
+end
+
+function M.drawTargetingCrosshairs(player)
+  local targeting = require("starfox.targeting")
+  local abilities = require("starfox.abilities")
+  local isLancerActive = abilities.isMultiLockActive()
+
+  if not targeting.active and not isLancerActive then return end
+
+  -- Check dodge path for Lancer special
+  local inDodgePath = {}
+  if isLancerActive and player and player.dodging and player.dodgeStartX then
+    local minX = math.min(player.dodgeStartX, player.x)
+    local maxX = math.max(player.dodgeStartX, player.x)
+    for _, enemy in ipairs(enemies.enemies) do
+      local dy = enemy.y - player.y
+      if enemy.x >= minX and enemy.x <= maxX and dy < 0 then
+        inDodgePath[enemy] = true
+      end
+    end
+  end
+
+  for _, enemy in ipairs(enemies.enemies) do
+    local progress = targeting.getLockProgress(enemy)
+    local isLocked = targeting.locks[enemy] and targeting.locks[enemy].locked
+    local isInDodge = inDodgePath[enemy]
+
+    -- During Lancer special: show fancy crosshairs for locked enemies OR enemies in dodge path
+    -- During normal targeting: show progress crosshairs for all
+    local shouldShow = isLancerActive and (isLocked or isInDodge) or (not isLancerActive and progress > 0)
+    
+    if shouldShow then
+      if isLancerActive and (isLocked or isInDodge) then progress = 1 end
+      local size = 20
+      local alpha = 0.5 + progress * 0.5
+
+      if isLancerActive and (isLocked or isInDodge) then
+        -- Cyan animated crosshair for Lancer special
+        local time = love.timer.getTime()
+        local pulse = 0.7 + 0.3 * math.sin(time * 6 + enemy.x * 0.1)
+        love.graphics.setColor(0.2, 0.9, 1, alpha * pulse)
+        love.graphics.setLineWidth(2)
+
+        -- Spinning crosshair corners
+        local spin = time * 2
+        for c = 0, 3 do
+          local angle = spin + c * math.pi/2
+          local cx = enemy.x + math.cos(angle) * size
+          local cy = enemy.y + math.sin(angle) * size
+          local ix = enemy.x + math.cos(angle) * size * 0.5
+          local iy = enemy.y + math.sin(angle) * size * 0.5
+          love.graphics.line(cx, cy, ix, iy)
+        end
+
+        -- Pulsing lock circle
+        love.graphics.circle("line", enemy.x, enemy.y, size * 0.7 * pulse)
+
+        -- Diamond indicator
+        local ds = 4
+        love.graphics.polygon("fill", enemy.x, enemy.y - ds, enemy.x + ds, enemy.y, enemy.x, enemy.y + ds, enemy.x - ds, enemy.y)
+      else
+        local r, g = progress < 1 and 1 or 0, progress < 1 and progress or 1
+        love.graphics.setColor(r, g, 0, alpha)
+        love.graphics.setLineWidth(2)
+
+        -- Crosshair corners
+        love.graphics.line(enemy.x - size, enemy.y, enemy.x - size/2, enemy.y)
+        love.graphics.line(enemy.x + size, enemy.y, enemy.x + size/2, enemy.y)
+        love.graphics.line(enemy.x, enemy.y - size, enemy.x, enemy.y - size/2)
+        love.graphics.line(enemy.x, enemy.y + size, enemy.x, enemy.y + size/2)
+
+        -- Lock progress
+        if progress < 1 then
+          love.graphics.arc("line", "open", enemy.x, enemy.y, size*0.7, 0, progress*math.pi*2)
+        else
+          love.graphics.circle("line", enemy.x, enemy.y, size*0.7)
+        end
+      end
+
+      love.graphics.setLineWidth(1)
+    end
   end
 end
 
@@ -192,8 +557,35 @@ function M.drawEnemies()
       if alpha <= 0.01 then goto continue end
     end
 
-    love.graphics.setColor(1, 0.3, 0.3, alpha)
+    -- Set color based on enemy type
+    local r, g, b = 1, 0.3, 0.3
+    if enemy.color == "green" then
+      r, g, b = 0.3, 1, 0.3
+    elseif enemy.color == "blue" then
+      r, g, b = 0.3, 0.5, 1
+    end
+
+    love.graphics.setColor(r, g, b, alpha)
     love.graphics.polygon("fill", enemy.x, enemy.y + 15, enemy.x - 12, enemy.y - 10, enemy.x + 12, enemy.y - 10)
+
+    -- Draw health bar for enemies with > 1 max health
+    if enemy.maxHealth and enemy.maxHealth > 1 then
+      local barWidth = 30
+      local barHeight = 4
+      local healthPercent = enemy.health / enemy.maxHealth
+
+      -- Background
+      love.graphics.setColor(0.2, 0.2, 0.2, alpha)
+      love.graphics.rectangle("fill", enemy.x - barWidth/2, enemy.y - 20, barWidth, barHeight)
+
+      -- Health
+      love.graphics.setColor(r * 0.7, g * 0.7, b * 0.7, alpha)
+      love.graphics.rectangle("fill", enemy.x - barWidth/2, enemy.y - 20, barWidth * healthPercent, barHeight)
+
+      -- Border
+      love.graphics.setColor(1, 1, 1, alpha * 0.5)
+      love.graphics.rectangle("line", enemy.x - barWidth/2, enemy.y - 20, barWidth, barHeight)
+    end
 
     ::continue::
   end
@@ -328,18 +720,31 @@ end
 
 function M.drawAllies()
   for _, ally in ipairs(allies.allies) do
-    -- Blue triangle (friendly color)
-    love.graphics.setColor(0.2, 0.6, 1)
-    love.graphics.polygon("fill", ally.x, ally.y - 12, ally.x - 10, ally.y + 10, ally.x + 10, ally.y + 10)
+    if ally.converted then
+      -- Purple glow for converted wingmen
+      love.graphics.setColor(0.6, 0.1, 1, 0.2)
+      love.graphics.circle("fill", ally.x, ally.y, 20)
+      love.graphics.setColor(0.5, 0.1, 0.9)
+      love.graphics.polygon("fill", ally.x, ally.y - 12, ally.x - 10, ally.y + 10, ally.x + 10, ally.y + 10)
+      love.graphics.setColor(0.7, 0.3, 1)
+      love.graphics.polygon("fill", ally.x - 18, ally.y + 5, ally.x - 10, ally.y, ally.x - 10, ally.y + 10, ally.x - 18, ally.y + 10)
+      love.graphics.polygon("fill", ally.x + 18, ally.y + 5, ally.x + 10, ally.y, ally.x + 10, ally.y + 10, ally.x + 18, ally.y + 10)
+      love.graphics.setColor(0.8, 0.5, 1, 0.6)
+      love.graphics.polygon("line", ally.x, ally.y - 12, ally.x - 10, ally.y + 10, ally.x + 10, ally.y + 10)
+    else
+      -- Blue triangle (friendly color)
+      love.graphics.setColor(0.2, 0.6, 1)
+      love.graphics.polygon("fill", ally.x, ally.y - 12, ally.x - 10, ally.y + 10, ally.x + 10, ally.y + 10)
 
-    -- Wings
-    love.graphics.setColor(0.3, 0.7, 1)
-    love.graphics.polygon("fill", ally.x - 18, ally.y + 5, ally.x - 10, ally.y, ally.x - 10, ally.y + 10, ally.x - 18, ally.y + 10)
-    love.graphics.polygon("fill", ally.x + 18, ally.y + 5, ally.x + 10, ally.y, ally.x + 10, ally.y + 10, ally.x + 18, ally.y + 10)
+      -- Wings
+      love.graphics.setColor(0.3, 0.7, 1)
+      love.graphics.polygon("fill", ally.x - 18, ally.y + 5, ally.x - 10, ally.y, ally.x - 10, ally.y + 10, ally.x - 18, ally.y + 10)
+      love.graphics.polygon("fill", ally.x + 18, ally.y + 5, ally.x + 10, ally.y, ally.x + 10, ally.y + 10, ally.x + 18, ally.y + 10)
 
-    -- Outline
-    love.graphics.setColor(1, 1, 1, 0.6)
-    love.graphics.polygon("line", ally.x, ally.y - 12, ally.x - 10, ally.y + 10, ally.x + 10, ally.y + 10)
+      -- Outline
+      love.graphics.setColor(1, 1, 1, 0.6)
+      love.graphics.polygon("line", ally.x, ally.y - 12, ally.x - 10, ally.y + 10, ally.x + 10, ally.y + 10)
+    end
   end
 end
 
@@ -663,8 +1068,28 @@ end
 function M.drawParticles()
   for _, p in ipairs(particles.particles) do
     local alpha = p.life / p.maxLife
-    love.graphics.setColor(p.color[1], p.color[2], p.color[3], alpha)
-    love.graphics.circle("fill", p.x, p.y, p.size)
+
+    if p.bloom then
+      -- Bloom effect: multiple layers of decreasing alpha
+      for i = 5, 1, -1 do
+        local bloomSize = p.size * (1 + i * 0.5)
+        local bloomAlpha = (alpha * 0.15 / i)
+        love.graphics.setColor(p.color[1], p.color[2], p.color[3], bloomAlpha)
+        love.graphics.circle("fill", p.x, p.y, bloomSize)
+      end
+
+      -- Bright core
+      love.graphics.setColor(p.color[1], p.color[2], p.color[3], alpha * 0.8)
+      love.graphics.circle("fill", p.x, p.y, p.size)
+
+      -- Extra bright center
+      love.graphics.setColor(1, 1, 1, alpha * 0.6)
+      love.graphics.circle("fill", p.x, p.y, p.size * 0.5)
+    else
+      -- Normal particle
+      love.graphics.setColor(p.color[1], p.color[2], p.color[3], alpha)
+      love.graphics.circle("fill", p.x, p.y, p.size)
+    end
   end
 end
 
@@ -704,15 +1129,417 @@ function M.drawGameOver(score)
   love.graphics.printf("Press R to retry", 0, 340, 800, "center")
 end
 
-function M.drawVictory(score)
-  love.graphics.setFont(fonts.large)
-  love.graphics.setColor(0, 1, 0)
-  love.graphics.printf("MISSION COMPLETE", 0, 200, 800, "center")
+function M.startVictoryAnimation(enemiesDefeated, totalEnemies, notesEarned)
+  victoryState.active = true
+  victoryState.timer = 0
+  victoryState.enemiesDefeated = enemiesDefeated
+  victoryState.totalEnemies = totalEnemies
+  victoryState.baseNotesEarned = notesEarned
+  victoryState.displayedEnemies = 0
+  victoryState.displayedNotes = 0
+  victoryState.countSpeed = 8
+  victoryState.countPhase = "counting"
+  victoryState.groupedMedals = supershot.getGroupedEarnedMedals()
+  victoryState.medalIndex = 0
+  victoryState.medalTimer = 0
+  victoryState.medalBonusDisplayed = 0
+  victoryState.medalSlideIn = 0
+  victoryState.medalShowTimes = {}
+  victoryState.lastNoteThreshold = 0
+  victoryState.notePulse = 0
+  victoryState.noteFlashTimer = 0
+end
 
+function M.updateVictory(dt)
+  if not victoryState.active then return end
+  victoryState.timer = victoryState.timer + dt
+
+  if victoryState.countPhase == "counting" then
+    -- Accelerate the count over time
+    victoryState.countSpeed = math.min(victoryState.countSpeed + dt * 20, 120)
+    victoryState.displayedEnemies = victoryState.displayedEnemies + victoryState.countSpeed * dt
+
+    if victoryState.displayedEnemies >= victoryState.enemiesDefeated then
+      victoryState.displayedEnemies = victoryState.enemiesDefeated
+      victoryState.displayedNotes = victoryState.baseNotesEarned
+      victoryState.countPhase = "medals_pause"
+      victoryState.medalTimer = 0
+    else
+      -- Update notes proportionally
+      local newNotes = math.floor(victoryState.displayedEnemies / 10)
+      if newNotes > victoryState.displayedNotes then
+        victoryState.displayedNotes = newNotes
+        victoryState.notePulse = 1.0
+        victoryState.noteFlashTimer = 0.3
+      end
+    end
+  elseif victoryState.countPhase == "medals_pause" then
+    -- Brief pause before showing medals
+    victoryState.medalTimer = victoryState.medalTimer + dt
+    if victoryState.medalTimer >= 0.8 then
+      if #victoryState.groupedMedals > 0 then
+        victoryState.countPhase = "medals"
+        victoryState.medalIndex = 1
+        victoryState.medalTimer = 0
+        victoryState.medalSlideIn = 0
+        victoryState.medalBonusDisplayed = 0
+      else
+        victoryState.countPhase = "done"
+      end
+    end
+  elseif victoryState.countPhase == "medals" then
+    local groups = victoryState.groupedMedals
+    if victoryState.medalIndex > #groups then
+      victoryState.countPhase = "done"
+    else
+      victoryState.medalTimer = victoryState.medalTimer + dt
+      victoryState.medalSlideIn = math.min(victoryState.medalSlideIn + dt * 4, 1.0)
+
+      -- After slide-in, increment the bonus notes for this group
+      local group = groups[victoryState.medalIndex]
+      local totalGroupBonus = supershot.getMedalBonusNotes(group.medal.threshold) * group.count
+      if victoryState.medalSlideIn >= 1.0 and victoryState.medalBonusDisplayed < totalGroupBonus then
+        local addSpeed = math.max(totalGroupBonus * 2, 8)
+        victoryState.medalBonusDisplayed = victoryState.medalBonusDisplayed + addSpeed * dt
+        if victoryState.medalBonusDisplayed >= totalGroupBonus then
+          victoryState.medalBonusDisplayed = totalGroupBonus
+        end
+        local newTotal = victoryState.baseNotesEarned + math.floor(victoryState.medalBonusDisplayed)
+        -- Accumulate from previous groups
+        for i = 1, victoryState.medalIndex - 1 do
+          local prevGroup = groups[i]
+          newTotal = newTotal + supershot.getMedalBonusNotes(prevGroup.medal.threshold) * prevGroup.count
+        end
+        if newTotal > victoryState.displayedNotes then
+          victoryState.displayedNotes = newTotal
+          victoryState.notePulse = 1.0
+          victoryState.noteFlashTimer = 0.3
+        end
+      end
+
+      -- Move to next group after counting is done and a pause
+      if victoryState.medalBonusDisplayed >= totalGroupBonus then
+        -- Record when this medal row finished counting
+        if not victoryState.medalShowTimes[victoryState.medalIndex] then
+          victoryState.medalShowTimes[victoryState.medalIndex] = love.timer.getTime()
+        end
+        if victoryState.medalTimer > 2.0 then
+          -- Calculate accumulated notes before moving on
+          local accumulatedBonus = 0
+          for i = 1, victoryState.medalIndex do
+            local g = groups[i]
+            accumulatedBonus = accumulatedBonus + supershot.getMedalBonusNotes(g.medal.threshold) * g.count
+          end
+          victoryState.displayedNotes = victoryState.baseNotesEarned + accumulatedBonus
+          victoryState.medalIndex = victoryState.medalIndex + 1
+          victoryState.medalTimer = 0
+          victoryState.medalSlideIn = 0
+          victoryState.medalBonusDisplayed = 0
+        end
+      end
+    end
+  end
+
+  -- Decay visual effects
+  victoryState.notePulse = math.max(0, victoryState.notePulse - dt * 3)
+  victoryState.noteFlashTimer = math.max(0, victoryState.noteFlashTimer - dt)
+end
+
+function M.drawVictory(enemiesDefeated, totalEnemies, notesEarned)
+  notesEarned = notesEarned or 0
+
+  -- Start animation if not active
+  if not victoryState.active then
+    M.startVictoryAnimation(enemiesDefeated, totalEnemies, notesEarned)
+  end
+
+  local dispEnemies = math.floor(victoryState.displayedEnemies)
+  local dispNotes = victoryState.displayedNotes
+  local percentage = totalEnemies > 0 and (dispEnemies / totalEnemies * 100) or 0
+  local finalPercentage = totalEnemies > 0 and (enemiesDefeated / totalEnemies * 100) or 0
+  local rank = ""
+  local title = ""
+  local titleColor = {0, 1, 0}
+  local isPerfect = false
+
+  if finalPercentage >= 100 then
+    rank = "S"
+    isPerfect = true
+  elseif finalPercentage >= 95 then
+    rank = "S"
+  elseif finalPercentage >= 90 then
+    rank = "A"
+  elseif finalPercentage >= 80 then
+    rank = "B"
+  elseif finalPercentage >= 70 then
+    rank = "C"
+  elseif finalPercentage >= 60 then
+    rank = "D"
+  else
+    rank = "E"
+  end
+
+  if finalPercentage >= 60 then
+    if isPerfect then
+      title = "PERFECT STAGE!!"
+      titleColor = {1, 1, 0}
+    else
+      title = "STAGE CLEAR"
+      titleColor = {0, 1, 0}
+    end
+  else
+    title = "STAGE FAILED"
+    titleColor = {1, 0, 0}
+  end
+
+  -- Draw fireworks for perfect stage
+  if isPerfect and victoryState.countPhase ~= "counting" then
+    M.drawFireworks()
+  end
+
+  love.graphics.setFont(fonts.large)
+  love.graphics.setColor(titleColor)
+  love.graphics.printf(title, 0, 150, 800, "center")
+
+  -- Enemies Defeated line with counting animation
   love.graphics.setFont(fonts.normal)
   love.graphics.setColor(1, 1, 1)
-  love.graphics.printf("Final Score: " .. score, 0, 280, 800, "center")
-  love.graphics.printf("Press R to play again", 0, 340, 800, "center")
+  love.graphics.printf(string.format("Enemies Defeated: %d / %d (%.1f%%)", dispEnemies, totalEnemies, percentage), 0, 230, 800, "center")
+
+  -- Rank (show only after counting done)
+  if victoryState.countPhase ~= "counting" then
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.printf("Rank: " .. rank, 0, 260, 800, "center")
+  end
+
+  -- Notes Earned with pulse animation
+  local noteScale = 1.0 + victoryState.notePulse * 0.3
+  local noteY = 295
+
+  love.graphics.push()
+  love.graphics.translate(400, noteY + 10)
+  love.graphics.scale(noteScale, noteScale)
+
+  if victoryState.noteFlashTimer > 0 then
+    love.graphics.setColor(1, 1, 0.5)
+  else
+    love.graphics.setColor(1, 1, 0)
+  end
+  love.graphics.setFont(fonts.normal)
+  love.graphics.printf(string.format("Notes Earned: %d", dispNotes), -400, -10, 800, "center")
+  love.graphics.pop()
+
+  -- Draw medal bonuses
+  if victoryState.countPhase == "medals" or victoryState.countPhase == "done" then
+    M.drawVictoryMedals()
+  end
+
+  -- Press R prompt (show after done)
+  if victoryState.countPhase == "done" then
+    love.graphics.setFont(fonts.normal)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.printf("Press R to continue", 0, 520, 800, "center")
+  end
+end
+
+function M.drawVictoryMedals()
+  local groups = victoryState.groupedMedals
+  if #groups == 0 then return end
+
+  local startY = 340
+  local rowHeight = 45
+  local time = love.timer.getTime()
+  local DECAY_DURATION = 5.0  -- seconds to slow animations to a stop
+
+  for i, group in ipairs(groups) do
+    local medal = group.medal
+    local count = group.count
+    local r, g, b = medal.color[1], medal.color[2], medal.color[3]
+    local rr, rg, rb = medal.rimColor[1], medal.rimColor[2], medal.rimColor[3]
+    local totalGroupBonus = supershot.getMedalBonusNotes(medal.threshold) * count
+    local y = startY + (i - 1) * rowHeight
+
+    -- Calculate slide and alpha
+    local slideIn = 0
+    local alpha = 0
+    local bonusCount = totalGroupBonus  -- fully counted by default
+
+    if victoryState.countPhase == "medals" then
+      if i < victoryState.medalIndex then
+        slideIn = 1.0
+        alpha = 1.0
+      elseif i == victoryState.medalIndex then
+        slideIn = victoryState.medalSlideIn
+        alpha = slideIn
+        bonusCount = math.floor(victoryState.medalBonusDisplayed)
+      else
+        slideIn = 0
+        alpha = 0
+      end
+    elseif victoryState.countPhase == "done" then
+      slideIn = 1.0
+      alpha = 1.0
+    end
+
+    if alpha <= 0 then goto continueLoop end
+
+    -- Calculate animation decay factor (1.0 = full intensity, 0.0 = stopped)
+    local decayFactor = 1.0
+    local showTime = victoryState.medalShowTimes[i]
+    if showTime then
+      local elapsed = time - showTime
+      decayFactor = math.max(0, 1.0 - (elapsed / DECAY_DURATION))
+    end
+
+    local offsetX = (1.0 - slideIn) * 200
+    local baseX = 180 + offsetX
+    local baseY = y
+
+    -- Animation intensity per tier, scaled by decay
+    local pulseAmt = 0
+    local glowInt = 1.0
+    local shakeX = 0
+
+    if medal.threshold == 10 then
+      pulseAmt = math.sin(time * 8) * 1.5 * decayFactor
+      glowInt = 1.0 + math.sin(time * 10) * 0.2 * decayFactor
+    elseif medal.threshold == 15 then
+      pulseAmt = math.sin(time * 10) * 2 * decayFactor
+      glowInt = 1.0 + math.sin(time * 13) * 0.3 * decayFactor
+      shakeX = math.sin(time * 18) * 1 * decayFactor
+    elseif medal.threshold == 20 then
+      pulseAmt = math.sin(time * 12) * 3 * decayFactor
+      glowInt = 1.0 + math.sin(time * 16) * 0.5 * decayFactor
+      shakeX = math.sin(time * 25) * 1.5 * decayFactor
+    elseif medal.threshold == 25 then
+      pulseAmt = math.sin(time * 16) * 4 * decayFactor
+      glowInt = 1.0 + math.sin(time * 20) * 0.7 * decayFactor
+      shakeX = math.sin(time * 35) * 2.5 * decayFactor
+    end
+
+    baseX = baseX + shakeX
+
+    -- Glow behind row for higher tiers
+    if medal.threshold >= 15 and decayFactor > 0 then
+      local glowLayers = medal.threshold >= 25 and 3 or (medal.threshold >= 20 and 2 or 1)
+      for j = 1, glowLayers do
+        love.graphics.setColor(r, g, b, (0.06 * glowInt * alpha * decayFactor) / j)
+        love.graphics.rectangle("fill", baseX - 8 - j * 4, baseY - 4 - j * 2,
+          440 + j * 8, rowHeight - 4 + j * 4, 6, 6)
+      end
+    end
+
+    -- Background panel
+    love.graphics.setColor(0, 0, 0, 0.45 * alpha)
+    love.graphics.rectangle("fill", baseX - 4, baseY, 440, rowHeight - 8, 6, 6)
+
+    love.graphics.setColor(rr, rg, rb, 0.5 * alpha * glowInt)
+    love.graphics.setLineWidth(1.5)
+    love.graphics.rectangle("line", baseX - 4, baseY, 440, rowHeight - 8, 6, 6)
+    love.graphics.setLineWidth(1)
+
+    -- Medal icon
+    local iconX = baseX + 16
+    local iconY = baseY + (rowHeight - 8) / 2
+    local iconPulse = 1.0 + pulseAmt * 0.01
+
+    -- Outer glow
+    love.graphics.setColor(r, g, b, 0.2 * alpha * glowInt)
+    love.graphics.circle("fill", iconX, iconY, 14 * iconPulse)
+
+    -- Disc
+    love.graphics.setColor(rr, rg, rb, 0.9 * alpha)
+    love.graphics.circle("fill", iconX, iconY, 10 * iconPulse)
+
+    -- Inner
+    love.graphics.setColor(r, g, b, alpha)
+    love.graphics.circle("fill", iconX, iconY, 7 * iconPulse)
+
+    -- Star
+    love.graphics.setColor(1, 1, 1, 0.9 * alpha)
+    local sz = 4 * iconPulse
+    love.graphics.polygon("fill",
+      iconX, iconY - sz,
+      iconX + sz * 0.3, iconY - sz * 0.3,
+      iconX + sz, iconY,
+      iconX + sz * 0.3, iconY + sz * 0.3,
+      iconX, iconY + sz,
+      iconX - sz * 0.3, iconY + sz * 0.3,
+      iconX - sz, iconY,
+      iconX - sz * 0.3, iconY - sz * 0.3
+    )
+
+    -- Rim
+    love.graphics.setColor(1, 1, 1, 0.4 * alpha)
+    love.graphics.circle("line", iconX, iconY, 10 * iconPulse)
+
+    -- Medal label with count
+    love.graphics.setFont(fonts.normal)
+    love.graphics.setColor(r, g, b, alpha)
+    local labelText = medal.label
+    if count > 1 then
+      labelText = medal.label .. " x" .. count
+    end
+    love.graphics.print(labelText, baseX + 36, baseY + 7)
+
+    -- Bonus notes text
+    local bonusText = string.format("+%d Notes", bonusCount)
+    love.graphics.setFont(fonts.normal)
+
+    -- Animate color intensity for bonus text, scaled by decay
+    local bonusAlpha = alpha
+    if i == victoryState.medalIndex and victoryState.countPhase == "medals" then
+      bonusAlpha = alpha * (0.7 + math.sin(time * 12) * 0.3)
+    end
+    love.graphics.setColor(1, 1, 0, bonusAlpha)
+    love.graphics.printf(bonusText, baseX + 36, baseY + 7, 380, "right")
+
+    ::continueLoop::
+  end
+end
+
+function M.resetVictory()
+  victoryState.active = false
+  victoryState.timer = 0
+  victoryState.countPhase = "counting"
+end
+
+function M.drawFireworks()
+  local time = love.timer.getTime()
+  local elapsed = time % 5  -- 5 second loop
+  local progress = elapsed / 5  -- 0 to 1
+  local fadeStart = 0.8  -- Start fading at 4 seconds
+  local alpha = 1
+  
+  if progress >= fadeStart then
+    alpha = 1 - ((progress - fadeStart) / (1 - fadeStart))
+  end
+  
+  if alpha <= 0 then return end
+  
+  -- Left side fireworks
+  for i = 1, 8 do
+    local angle = (i / 8) * math.pi * 2 + time * 3
+    local distance = progress * 200
+    local x = 100 + math.cos(angle) * distance
+    local y = 150 + math.sin(angle) * distance
+    
+    local sparkleSize = (1 - progress) * 3 + 1
+    love.graphics.setColor(1, math.random() * 0.5, 0, alpha)
+    love.graphics.circle("fill", x, y, sparkleSize)
+  end
+  
+  -- Right side fireworks
+  for i = 1, 8 do
+    local angle = (i / 8) * math.pi * 2 + time * 3
+    local distance = progress * 200
+    local x = 700 + math.cos(angle) * distance
+    local y = 150 + math.sin(angle) * distance
+    
+    local sparkleSize = (1 - progress) * 3 + 1
+    love.graphics.setColor(0, 1, math.random() * 0.5, alpha)
+    love.graphics.circle("fill", x, y, sparkleSize)
+  end
 end
 
 function M.drawWarp(score)
@@ -797,6 +1624,63 @@ function M.drawLevelSelect()
   love.graphics.setFont(fonts.normal)
   love.graphics.setColor(0.7, 0.7, 0.7)
   love.graphics.printf("Arrows: Navigate | SPACE: Select | ESC: Back", 0, 580, 800, "center")
+end
+
+function M.drawPauseMenu(selectedIndex, isLevelSelect)
+  -- Semi-transparent overlay
+  love.graphics.setColor(0, 0, 0, 0.7)
+  love.graphics.rectangle("fill", 0, 0, 800, 600)
+
+  -- Title
+  love.graphics.setFont(fonts.large)
+  love.graphics.setColor(0.3, 0.5, 1)
+  love.graphics.printf("PAUSED", 0, 150, 800, "center")
+
+  -- Menu options
+  love.graphics.setFont(fonts.normal)
+  local options
+  if isLevelSelect then
+    options = {"Resume", "Options", "Exit to Station"}
+  else
+    options = {"Resume", "Restart Level", "Options", "Exit to Station"}
+  end
+  local startY = 250
+
+  for i, option in ipairs(options) do
+    if i == selectedIndex then
+      love.graphics.setColor(1, 1, 0)
+      love.graphics.printf("> " .. option .. " <", 0, startY + (i - 1) * 40, 800, "center")
+    else
+      love.graphics.setColor(0.7, 0.7, 0.7)
+      love.graphics.printf(option, 0, startY + (i - 1) * 40, 800, "center")
+    end
+  end
+
+  -- Instructions
+  love.graphics.setFont(fonts.small)
+  love.graphics.setColor(0.5, 0.5, 0.5)
+  love.graphics.printf("Arrows: Navigate | ENTER: Select | ESC: Resume", 0, 450, 800, "center")
+end
+
+function M.drawOptionsMenu()
+  -- Semi-transparent overlay
+  love.graphics.setColor(0, 0, 0, 0.7)
+  love.graphics.rectangle("fill", 0, 0, 800, 600)
+
+  -- Title
+  love.graphics.setFont(fonts.large)
+  love.graphics.setColor(0.3, 0.5, 1)
+  love.graphics.printf("OPTIONS", 0, 200, 800, "center")
+
+  -- Placeholder text
+  love.graphics.setFont(fonts.normal)
+  love.graphics.setColor(0.7, 0.7, 0.7)
+  love.graphics.printf("Options menu coming soon...", 0, 280, 800, "center")
+
+  -- Instructions
+  love.graphics.setFont(fonts.small)
+  love.graphics.setColor(0.5, 0.5, 0.5)
+  love.graphics.printf("ESC: Back", 0, 450, 800, "center")
 end
 
 return M

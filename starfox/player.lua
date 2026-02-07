@@ -5,7 +5,7 @@ local INERTIA = 0.9
 local BARREL_ROLL_DURATION = 0.5
 local BARREL_ROLL_COOLDOWN = 1.0
 local DODGE_DISTANCE = 100
-local DODGE_WINDOW = 0.25
+local DODGE_WINDOW = 0.15
 local DODGE_COOLDOWN = 1.0
 
 function M.new()
@@ -20,7 +20,8 @@ function M.new()
     maxHealth = 100,
     lives = 3,
     bombs = 3,
-    score = 0,
+    enemiesDefeated = 0,
+    enemiesEscaped = 0,
     barrelRolling = false,
     barrelRollTimer = 0,
     barrelRollCooldown = 0,
@@ -34,7 +35,17 @@ function M.new()
     dodgeCooldown = 0,
     dodging = false,
     dodgeTimer = 0,
-    dodgeDirection = nil
+    dodgeDirection = nil,
+    currentWeapon = "blaster",
+    hasLaser = false,
+    laserFiring = false,
+    laserFireTime = 0,
+    laserCooldown = 0,
+    speedMultiplier = 1.0,
+    dodgeMultiplier = 1.0,
+    shipType = "starwing",
+    hasSpecial = false,
+    shotgunHeld = false
   }
 end
 
@@ -72,10 +83,14 @@ function M.update(player, dt)
       player.dodging = false
     end
   end
+
+  -- Update laser cooldown
+  player.laserCooldown = math.max(0, player.laserCooldown - dt)
 end
 
 function M.move(player, dx, dy)
-  player.vx = player.vx + dx * SPEED * 0.1
+  local lateralSpeed = SPEED * (player.speedMultiplier or 1.0)
+  player.vx = player.vx + dx * lateralSpeed * 0.1
   player.vy = player.vy + dy * SPEED * 0.1
 end
 
@@ -91,15 +106,21 @@ end
 
 function M.tryDodge(player, direction)
   local currentTime = love.timer.getTime()
+  
+  -- Check if infinite dodge is active (Lancer/Paladin special abilities)
+  local abilities = require("starfox.abilities")
+  local hasInfiniteDodge = abilities.hasInfiniteDodge and abilities.hasInfiniteDodge()
 
-  if player.dodgeCooldown > 0 then
+  if player.dodgeCooldown > 0 and not hasInfiniteDodge then
     player.lastTapDirection = direction
     player.lastTapTime = currentTime
     return false
   end
 
   if player.lastTapDirection == direction and (currentTime - player.lastTapTime) < DODGE_WINDOW then
-    local dodgeX = direction == "left" and -DODGE_DISTANCE or DODGE_DISTANCE
+    local dodgeDist = DODGE_DISTANCE * (player.dodgeMultiplier or 1.0)
+    local dodgeX = direction == "left" and -dodgeDist or dodgeDist
+    player.dodgeStartX = player.x
     player.x = player.x + dodgeX
     player.x = math.max(30, math.min(770, player.x))
     player.dodging = true
@@ -145,7 +166,7 @@ function M.useBomb(player)
 end
 
 function M.addScore(player, points)
-  player.score = player.score + points
+  player.enemiesDefeated = player.enemiesDefeated + 1
 end
 
 function M.isAlive(player)
@@ -154,6 +175,18 @@ end
 
 function M.getDodgeCooldownMax()
   return DODGE_COOLDOWN
+end
+
+function M.switchWeapon(player)
+  if player.hasLaser then
+    if player.currentWeapon == "blaster" then
+      player.currentWeapon = "laser"
+    else
+      player.currentWeapon = "blaster"
+    end
+    return true
+  end
+  return false
 end
 
 return M

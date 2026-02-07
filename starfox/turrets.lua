@@ -24,7 +24,7 @@ function M.update(dt, scrollOffset, playerX, playerY)
   for i = #M.turrets, 1, -1 do
     local turret = M.turrets[i]
 
-    turret.y = turret.terrainY - scrollOffset
+    turret.y = scrollOffset - turret.terrainY
 
     turret.active = turret.y > -50 and turret.y < 650
 
