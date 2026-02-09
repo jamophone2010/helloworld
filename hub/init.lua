@@ -27,10 +27,10 @@ function M.load()
   gameState.location = "floor" -- "floor" or interior id like "casino"
   gameState.interiorId = nil   -- Which interior we're in (nil = on floor)
 
-  -- Player starts near elevator on Floor 2
+  -- Player starts at elevator center on Floor 2
   local floorDef = floors.getFloor(gameState.currentFloor)
-  local startX = floorDef.elevatorPos.x * 32 + 48
-  local startY = floorDef.elevatorPos.y * 32 + 48
+  local startX = floorDef.elevatorPos.x * 32 + 16
+  local startY = floorDef.elevatorPos.y * 32 + 16
   gameState.player = player.new(startX, startY)
   gameState.camera = camera.new()
 
@@ -43,6 +43,8 @@ function M.load()
   gameState.currentNPCs = {}
   gameState.dialogueBox = nil
   gameState.lastKeyPress = 0
+  gameState.buildingEntryCooldown = 0  -- Prevent immediate re-entry
+  gameState.transition = nil  -- {phase, timer, duration, callback} for fade transitions
   gameState.returnLocation = nil
   gameState.returnPosition = nil
   gameState.returnFloor = nil       -- NEW: track floor when entering game
@@ -168,11 +170,9 @@ function M.changeFloor(newFloor)
 
   local floorDef = floors.getFloor(newFloor)
   if floorDef then
-    -- Position player near elevator
-    local ex = floorDef.elevatorPos.x * 32 + 48
-    local ey = floorDef.elevatorPos.y * 32 + 48
-    gameState.player.gridX = math.floor(ex / 32)
-    gameState.player.gridY = math.floor(ey / 32) + 2  -- Step out of elevator
+    -- Position player at elevator center
+    gameState.player.gridX = floorDef.elevatorPos.x
+    gameState.player.gridY = floorDef.elevatorPos.y
     gameState.player.x = gameState.player.gridX * 32 + 16
     gameState.player.y = gameState.player.gridY * 32 + 16
     gameState.player.targetX = gameState.player.x
@@ -193,6 +193,9 @@ function M.enterBuilding(buildingId)
   if not interior then return end
 
   gameState.interiorId = buildingId
+
+  -- Store current position (door location) for exit
+  gameState.returnPosition = {gridX = gameState.player.gridX, gridY = gameState.player.gridY}
 
   -- Special locations use their own game module
   if buildingId == "casino" then
@@ -222,24 +225,48 @@ function M.enterBuilding(buildingId)
 end
 
 function M.exitBuilding()
+  -- Start fade-out transition, then return to floor
+  gameState.transition = {
+    phase = "out",
+    timer = 0,
+    duration = 0.2,
+    callback = function()
+      M.doExitBuilding()
+    end
+  }
+end
+
+function M.doExitBuilding()
   -- Return to the current floor
   gameState.location = "floor"
   local buildingId = gameState.interiorId
   gameState.interiorId = nil
+  gameState.buildingEntryCooldown = 0.5  -- 0.5 second cooldown to prevent re-entry
 
   local floorDef = floors.getFloor(gameState.currentFloor)
   if floorDef then
-    -- Find which building we were in and position at its door
-    if floorDef.buildings then
-      for _, b in ipairs(floorDef.buildings) do
-        if b.interiorId == buildingId then
-          gameState.player.gridX = b.doorX
-          gameState.player.gridY = b.doorY + 1  -- Step outside
-          gameState.player.x = gameState.player.gridX * 32 + 16
-          gameState.player.y = gameState.player.gridY * 32 + 16
-          gameState.player.targetX = gameState.player.x
-          gameState.player.targetY = gameState.player.y
-          break
+    -- Use stored door position if available, spawn one tile below (in front of) the door
+    if gameState.returnPosition then
+      gameState.player.gridX = gameState.returnPosition.gridX
+      gameState.player.gridY = gameState.returnPosition.gridY + 1  -- One tile below door
+      gameState.player.x = gameState.player.gridX * 32 + 16
+      gameState.player.y = gameState.player.gridY * 32 + 16
+      gameState.player.targetX = gameState.player.x
+      gameState.player.targetY = gameState.player.y
+      gameState.returnPosition = nil
+    else
+      -- Fallback: find the building door and spawn one tile below
+      if floorDef.buildings then
+        for _, b in ipairs(floorDef.buildings) do
+          if b.interior == buildingId then
+            gameState.player.gridX = b.doorX
+            gameState.player.gridY = b.doorY + 1  -- One tile below door
+            gameState.player.x = gameState.player.gridX * 32 + 16
+            gameState.player.y = gameState.player.gridY * 32 + 16
+            gameState.player.targetX = gameState.player.x
+            gameState.player.targetY = gameState.player.y
+            break
+          end
         end
       end
     end
@@ -278,18 +305,54 @@ function M.update(dt)
   local isRunning = love.keyboard.isDown("z")
   player.setRunning(gameState.player, isRunning)
 
+  -- Update NPCs (wandering behavior)
+  for _, npcObj in ipairs(gameState.currentNPCs) do
+    npc.update(npcObj, dt, gameState.collisionMap, gameState.currentNPCs, gameState.player)
+  end
+
   -- Continuous movement
   if love.keyboard.isDown("up") then
-    player.tryMove(gameState.player, "up", gameState.collisionMap)
+    player.tryMove(gameState.player, "up", gameState.collisionMap, gameState.currentNPCs)
   elseif love.keyboard.isDown("down") then
-    player.tryMove(gameState.player, "down", gameState.collisionMap)
+    player.tryMove(gameState.player, "down", gameState.collisionMap, gameState.currentNPCs)
   elseif love.keyboard.isDown("left") then
-    player.tryMove(gameState.player, "left", gameState.collisionMap)
+    player.tryMove(gameState.player, "left", gameState.collisionMap, gameState.currentNPCs)
   elseif love.keyboard.isDown("right") then
-    player.tryMove(gameState.player, "right", gameState.collisionMap)
+    player.tryMove(gameState.player, "right", gameState.collisionMap, gameState.currentNPCs)
   end
 
   camera.update(gameState.camera, gameState.player.x, gameState.player.y)
+
+  -- Update building transition
+  if gameState.transition then
+    gameState.transition.timer = gameState.transition.timer + dt
+    if gameState.transition.phase == "out" then
+      -- Fading to black
+      if gameState.transition.timer >= gameState.transition.duration then
+        -- Execute the actual enter/exit
+        if gameState.transition.callback then
+          gameState.transition.callback()
+        end
+        -- Switch to fade-in phase
+        gameState.transition.phase = "in"
+        gameState.transition.timer = 0
+      end
+    elseif gameState.transition.phase == "in" then
+      -- Fading back from black
+      if gameState.transition.timer >= gameState.transition.duration then
+        gameState.transition = nil
+      end
+    end
+    return  -- Don't update player/proximity during transition
+  end
+
+  -- Update building entry cooldown
+  if gameState.buildingEntryCooldown > 0 then
+    gameState.buildingEntryCooldown = gameState.buildingEntryCooldown - dt
+    if gameState.buildingEntryCooldown < 0 then
+      gameState.buildingEntryCooldown = 0
+    end
+  end
 
   -- Reset proximity flags
   gameState.nearbyPortal = nil
@@ -298,12 +361,23 @@ function M.update(dt)
   gameState.nearElevator = false
 
   if gameState.location == "floor" then
-    -- Check nearby building doors
+    -- Check nearby building doors (only if cooldown expired and no transition)
     local floorDef = floors.getFloor(gameState.currentFloor)
-    if floorDef and floorDef.buildings then
+    if floorDef and floorDef.buildings and gameState.buildingEntryCooldown <= 0 and not gameState.transition then
       for _, b in ipairs(floorDef.buildings) do
         if gameState.player.gridX == b.doorX and gameState.player.gridY == b.doorY then
           gameState.nearBuildingDoor = b
+          -- Start fade-out transition, then enter building
+          local interiorId = b.interior
+          gameState.transition = {
+            phase = "out",
+            timer = 0,
+            duration = 0.2,
+            callback = function()
+              M.enterBuilding(interiorId)
+              audio.playPortal()
+            end
+          }
           break
         end
       end
@@ -332,8 +406,10 @@ function M.update(dt)
 
     -- Check for nearby NPCs
     for _, npcObj in ipairs(gameState.currentNPCs) do
-      if math.abs(gameState.player.gridX - npcObj.x) <= 1 and
-         math.abs(gameState.player.gridY - npcObj.y) <= 1 then
+      local npcGridX = npcObj.gridX or npcObj.x
+      local npcGridY = npcObj.gridY or npcObj.y
+      if math.abs(gameState.player.gridX - npcGridX) <= 1 and
+         math.abs(gameState.player.gridY - npcGridY) <= 1 then
         gameState.nearbyNPC = npcObj
         break
       end
@@ -350,8 +426,10 @@ function M.update(dt)
   -- Floor NPCs proximity (when on floor, not in building)
   if gameState.location == "floor" then
     for _, npcObj in ipairs(gameState.currentNPCs) do
-      if math.abs(gameState.player.gridX - npcObj.x) <= 1 and
-         math.abs(gameState.player.gridY - npcObj.y) <= 1 then
+      local npcGridX = npcObj.gridX or npcObj.x
+      local npcGridY = npcObj.gridY or npcObj.y
+      if math.abs(gameState.player.gridX - npcGridX) <= 1 and
+         math.abs(gameState.player.gridY - npcGridY) <= 1 then
         gameState.nearbyNPC = npcObj
         break
       end
@@ -374,6 +452,19 @@ function M.draw()
   -- Draw pause menu if paused
   if gameState.paused then
     pauseMenu.draw()
+  end
+
+  -- Draw building transition fade overlay
+  if gameState.transition then
+    local alpha = 0
+    if gameState.transition.phase == "out" then
+      alpha = gameState.transition.timer / gameState.transition.duration
+    elseif gameState.transition.phase == "in" then
+      alpha = 1 - gameState.transition.timer / gameState.transition.duration
+    end
+    alpha = math.max(0, math.min(1, alpha))
+    love.graphics.setColor(0, 0, 0, alpha)
+    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
   end
 end
 
@@ -415,13 +506,6 @@ function M.keypressed(key)
     if gameState.nearElevator and gameState.location == "floor" then
       gameState.elevatorActive = true
       elevator.open(gameState.currentFloor, gameState.unlockedQuests)
-      audio.playPortal()
-      return
-    end
-
-    -- Enter building
-    if gameState.nearBuildingDoor and gameState.location == "floor" then
-      M.enterBuilding(gameState.nearBuildingDoor.interior)
       audio.playPortal()
       return
     end

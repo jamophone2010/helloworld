@@ -47,16 +47,16 @@ function M.setRunning(player, isRunning)
   player.running = isRunning
 end
 
-function M.tryMove(player, direction, collisionMap)
+function M.tryMove(player, direction, collisionMap, npcs)
   if player.moving then
     return false
   end
-  
+
   player.direction = direction
-  
+
   local newGridX = player.gridX
   local newGridY = player.gridY
-  
+
   if direction == "up" then
     newGridY = newGridY - 1
   elseif direction == "down" then
@@ -66,19 +66,35 @@ function M.tryMove(player, direction, collisionMap)
   elseif direction == "right" then
     newGridX = newGridX + 1
   end
-  
-  -- Check collision
+
+  -- Check wall collision
   if collisionMap and collisionMap[newGridY] then
     if collisionMap[newGridY][newGridX] then
       return false
     end
   end
-  
+
+  -- Check NPC collision
+  if npcs then
+    for _, npc in ipairs(npcs) do
+      local npcGridX = npc.gridX or npc.x
+      local npcGridY = npc.gridY or npc.y
+      -- Also check NPC's target position if they're moving
+      local npcTargetX = npc.moving and npc.targetX or npcGridX
+      local npcTargetY = npc.moving and npc.targetY or npcGridY
+
+      if (npcGridX == newGridX and npcGridY == newGridY) or
+         (npcTargetX == newGridX and npcTargetY == newGridY) then
+        return false
+      end
+    end
+  end
+
   player.targetX = newGridX * GRID_SIZE + GRID_SIZE / 2
   player.targetY = newGridY * GRID_SIZE + GRID_SIZE / 2
   player.moving = true
   player.moveProgress = 0
-  
+
   return true
 end
 

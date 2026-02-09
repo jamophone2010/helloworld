@@ -158,12 +158,19 @@ function M.drawNeonBuilding(b, gs, time)
   love.graphics.setLineWidth(1)
 
   -- Building name sign (above building)
-  local nameFont = love.graphics.getFont()
-  local nameW = nameFont:getWidth(b.name) + 20
+  -- Save current font and use a consistent small font for signs
+  local previousFont = love.graphics.getFont()
+  local signFont = love.graphics.newFont(12) -- Small font for building signs
+  love.graphics.setFont(signFont)
+  
+  local nameW = signFont:getWidth(b.name) + 20
   local nameH = 22
   local nameX = bx + bw/2 - nameW/2
   local nameY = by - nameH - 6
-  M.drawNeonSign(b.name, nameX, nameY, nameW, nameH, nameFont, nr, ng, nb, time)
+  M.drawNeonSign(b.name, nameX, nameY, nameW, nameH, signFont, nr, ng, nb, time)
+  
+  -- Restore previous font
+  love.graphics.setFont(previousFont)
 end
 
 -- Draw floor tile pattern (space station plating)

@@ -34,15 +34,13 @@ M.floors = {
 
     },
     npcs = {
-      {name = "Rogue AI", x = 12, y = 5, dialogue = "I've been down here since the station was built. They forgot about me... but I remember everything."},
+      {name = "Rogue AI", x = 12, y = 10, dialogue = "I've been down here since the station was built. They forgot about me... but I remember everything."},
       {name = "Maintenance Droid", x = 18, y = 15, dialogue = "Bzzt... structural integrity at 97.3%. The sub-levels hold secrets older than the station itself."},
       {name = "Shadow Broker", x = 10, y = 14, dialogue = "Information is the real currency. Credits come and go, but knowledge... that's power."},
     },
     paths = {
-      -- Horizontal corridors
-      {x1 = 0, y1 = 9, x2 = 29, y2 = 11},
-      -- Vertical corridors
-      {x1 = 14, y1 = 0, x2 = 16, y2 = 19},
+      -- Open area below buildings (doors at y=7 connect to y=8)
+      {x1 = 1, y1 = 8, x2 = 28, y2 = 18},
     },
   },
 
@@ -73,13 +71,18 @@ M.floors = {
       {name = "Dockworker Pete", x = 8, y = 10, dialogue = "These crates aren't gonna move themselves! ...Actually, the droids do most of it. I just supervise."},
       {name = "Dockworker Maya", x = 20, y = 8, dialogue = "We got a fresh shipment of Tibanna gas from the outer rim. That stuff powers the best weapons."},
       {name = "Foreman Briggs", x = 14, y = 8, dialogue = "Keep the aisles clear! Last week someone left a crate of thermal detonators in the walkway."},
-      {name = "Cargo Droid CX-7", x = 6, y = 15, dialogue = "Inventory scan: 4,237 crates. 12 unaccounted for. This is... concerning."},
+      {name = "Cargo Droid CX-7", x = 12, y = 12, dialogue = "Inventory scan: 4,237 crates. 12 unaccounted for. This is... concerning."},
       {name = "Stowaway Kid", x = 25, y = 12, dialogue = "Shh! Don't tell anyone I'm here. I snuck aboard at the last port. This station is amazing!"},
     },
     paths = {
-      {x1 = 0, y1 = 8, x2 = 29, y2 = 12},
-      {x1 = 14, y1 = 0, x2 = 16, y2 = 19},
-      {x1 = 10, y1 = 13, x2 = 20, y2 = 13},
+      -- Main corridor between building rows
+      {x1 = 1, y1 = 7, x2 = 28, y2 = 13},
+      -- Foreman's Office connector (door at y=5, tile y=6 bridges to corridor)
+      {x1 = 13, y1 = 6, x2 = 15, y2 = 6},
+      -- Vertical gap between bottom buildings
+      {x1 = 10, y1 = 13, x2 = 21, y2 = 18},
+      -- Bottom strip below bottom buildings
+      {x1 = 1, y1 = 18, x2 = 28, y2 = 18},
     },
     -- Slateport-style crate decorations
     crates = {
@@ -127,9 +130,18 @@ M.floors = {
       {name = "Tourist", x = 24, y = 10, dialogue = "I came here all the way from the Andromeda sector! Your Cantina has the best Bantha milk."},
     },
     paths = {
-      {x1 = 0, y1 = 9, x2 = 34, y2 = 12},
-      {x1 = 16, y1 = 0, x2 = 18, y2 = 21},
-      {x1 = 10, y1 = 13, x2 = 24, y2 = 13},
+      -- Main corridor between building rows
+      {x1 = 1, y1 = 8, x2 = 33, y2 = 13},
+      -- Cosmetics connector (door at y=6, tile y=7 bridges to corridor)
+      {x1 = 14, y1 = 7, x2 = 16, y2 = 7},
+      -- Item Shop connector (door at y=6, tile y=7 bridges to corridor)
+      {x1 = 26, y1 = 7, x2 = 28, y2 = 7},
+      -- Left gap between Shipbuilder and Bank
+      {x1 = 9, y1 = 13, x2 = 13, y2 = 20},
+      -- Right gap between Bank and Food Court
+      {x1 = 20, y1 = 13, x2 = 25, y2 = 20},
+      -- Bottom strip below bottom buildings
+      {x1 = 1, y1 = 19, x2 = 33, y2 = 20},
     },
   },
 
@@ -166,9 +178,14 @@ M.floors = {
       {name = "Kid with a Dog", x = 28, y = 11, dialogue = "My dog Cosmo loves chasing the cargo droids on Floor 1! Don't tell the Foreman."},
     },
     paths = {
-      {x1 = 0, y1 = 8, x2 = 34, y2 = 12},
-      {x1 = 16, y1 = 0, x2 = 18, y2 = 21},
-      {x1 = 10, y1 = 13, x2 = 24, y2 = 13},
+      -- Main corridor between building rows
+      {x1 = 1, y1 = 7, x2 = 33, y2 = 13},
+      -- Left gap between Studio and Park
+      {x1 = 9, y1 = 13, x2 = 13, y2 = 20},
+      -- Right gap between Park and Library
+      {x1 = 21, y1 = 13, x2 = 25, y2 = 20},
+      -- Bottom strip below bottom buildings
+      {x1 = 1, y1 = 19, x2 = 33, y2 = 20},
     },
   },
 
@@ -197,15 +214,20 @@ M.floors = {
     },
     npcs = {
       {name = "Deck Chief Ramos", x = 12, y = 9, dialogue = "All pilots report to the flight deck! We've got bogeys on the long-range scanners."},
-      {name = "Mechanic Torque", x = 20, y = 4, dialogue = "Your ship's in good shape. But if you want the REAL upgrades, talk to the Shipbuilder on Floor 2."},
+      {name = "Mechanic Torque", x = 20, y = 9, dialogue = "Your ship's in good shape. But if you want the REAL upgrades, talk to the Shipbuilder on Floor 2."},
       {name = "Pilot Ace", x = 8, y = 12, dialogue = "I've flown every route from Corneria to Venom. Sector Y is where the real dogfighters earn their wings."},
       {name = "Navigation Droid", x = 30, y = 10, dialogue = "Plotting course... Warning: Asteroid density in Sector X exceeds safe parameters by 340%."},
       {name = "Recruit", x = 22, y = 12, dialogue = "Is it true the Phantom can phase through walls? I heard the test pilot went invisible for a whole minute!"},
     },
     paths = {
-      {x1 = 0, y1 = 9, x2 = 34, y2 = 12},
-      {x1 = 16, y1 = 0, x2 = 18, y2 = 21},
-      {x1 = 10, y1 = 7, x2 = 24, y2 = 8},
+      -- Main corridor between building rows
+      {x1 = 1, y1 = 8, x2 = 33, y2 = 13},
+      -- Left gap between Repair Bay and Briefing Room
+      {x1 = 9, y1 = 13, x2 = 13, y2 = 20},
+      -- Right gap between Briefing Room and Armory
+      {x1 = 21, y1 = 13, x2 = 25, y2 = 20},
+      -- Bottom strip below bottom buildings
+      {x1 = 1, y1 = 19, x2 = 33, y2 = 20},
     },
   },
 
@@ -232,14 +254,18 @@ M.floors = {
        color = {0.1, 0.08, 0.25}, neonColor = {0.4, 0.2, 0.8}},
     },
     npcs = {
-      {name = "Piano Robot", x = 12, y = 5, dialogue = "♪ Clair de Lune, by Claude Debussy. A piece that captures the essence of moonlight on still water. ♪"},
-      {name = "Astronomer Vega", x = 18, y = 5, dialogue = "That spiral galaxy out there... NGC 4414. Forty million light-years away. And yet, here we are, looking at it."},
+      {name = "Piano Robot", x = 12, y = 8, dialogue = "♪ Clair de Lune, by Claude Debussy. A piece that captures the essence of moonlight on still water. ♪"},
+      {name = "Astronomer Vega", x = 18, y = 8, dialogue = "That spiral galaxy out there... NGC 4414. Forty million light-years away. And yet, here we are, looking at it."},
       {name = "Philosopher Sage", x = 10, y = 15, dialogue = "Mozart said 'The music is not in the notes, but in the silence between.' Wise words for a pilot too."},
       {name = "Old Captain", x = 20, y = 15, dialogue = "I've seen the edge of the galaxy. It's not an edge at all — it's a beginning. Chopin understood beginnings."},
     },
     paths = {
-      {x1 = 0, y1 = 8, x2 = 29, y2 = 11},
-      {x1 = 14, y1 = 0, x2 = 16, y2 = 19},
+      -- Main corridor between building rows
+      {x1 = 1, y1 = 7, x2 = 28, y2 = 12},
+      -- Center gap between Sky Lounge and Piano Bar
+      {x1 = 8, y1 = 12, x2 = 21, y2 = 18},
+      -- Bottom strip below bottom buildings
+      {x1 = 1, y1 = 17, x2 = 28, y2 = 18},
     },
   },
 
@@ -262,12 +288,12 @@ M.floors = {
        color = {0.15, 0.15, 0.15}, neonColor = {1.0, 1.0, 1.0}},
     },
     npcs = {
-      {name = "Station Commander", x = 12, y = 5, dialogue = "You've proven yourself worthy of the highest level. Few ever reach the Apex. Welcome, pilot."},
+      {name = "Station Commander", x = 12, y = 8, dialogue = "You've proven yourself worthy of the highest level. Few ever reach the Apex. Welcome, pilot."},
       {name = "Ancient Hologram", x = 8, y = 8, dialogue = "I am the echo of this station's first captain. Vivaldi's Four Seasons played at our maiden voyage. What a day..."},
     },
     paths = {
-      {x1 = 0, y1 = 7, x2 = 24, y2 = 10},
-      {x1 = 11, y1 = 0, x2 = 13, y2 = 17},
+      -- Open area below buildings (doors at y=6 connect to y=7)
+      {x1 = 1, y1 = 7, x2 = 23, y2 = 16},
     },
   },
 }
@@ -336,21 +362,43 @@ function M.createFloorCollisionMap(floorId)
   end
 
   -- Buildings are solid except at doors
-  for _, b in ipairs(floor.buildings) do
-    for by = b.y, b.y + b.h - 1 do
-      for bx = b.x, b.x + b.w - 1 do
-        if map[by] and map[by][bx] ~= nil then
-          map[by][bx] = true
+  if floor.buildings then
+    -- Need a font to calculate sign widths for collision
+    local font = love.graphics.getFont()
+    
+    for _, b in ipairs(floor.buildings) do
+      for by = b.y, b.y + b.h - 1 do
+        for bx = b.x, b.x + b.w - 1 do
+          if map[by] and map[by][bx] ~= nil then
+            map[by][bx] = true
+          end
         end
       end
-    end
-    -- Door is walkable
-    if map[b.doorY] then
-      map[b.doorY][b.doorX] = false
+      
+      -- Neon sign above building - calculate actual sign width in grid tiles
+      if b.y > 0 and b.name then
+        local signPixelWidth = font:getWidth(b.name) + 20
+        local signGridWidth = math.ceil(signPixelWidth / 32)
+        local buildingCenterX = b.x + b.w / 2
+        local signStartX = math.floor(buildingCenterX - signGridWidth / 2)
+        local signEndX = signStartX + signGridWidth - 1
+        
+        -- Mark sign tiles as solid
+        for sx = signStartX, signEndX do
+          if sx >= 0 and sx < floor.width and map[b.y - 1] and map[b.y - 1][sx] ~= nil then
+            map[b.y - 1][sx] = true
+          end
+        end
+      end
+      
+      -- Door is walkable
+      if map[b.doorY] then
+        map[b.doorY][b.doorX] = false
+      end
     end
   end
 
-  -- Paths are walkable (clear any collisions, but preserve perimeter walls)
+  -- Paths are walkable (clear any collisions, but preserve perimeter walls and buildings)
   if floor.paths then
     for _, path in ipairs(floor.paths) do
       for py = path.y1, path.y2 do
@@ -358,7 +406,19 @@ function M.createFloorCollisionMap(floorId)
           if map[py] and map[py][px] ~= nil then
             -- Don't clear perimeter walls
             local isPerimeter = (py == 0 or py == floor.height - 1 or px == 0 or px == floor.width - 1)
-            if not isPerimeter then
+            
+            -- Don't clear buildings (check if this tile is part of a building)
+            local isBuilding = false
+            if floor.buildings then
+              for _, b in ipairs(floor.buildings) do
+                if px >= b.x and px < b.x + b.w and py >= b.y and py < b.y + b.h then
+                  isBuilding = true
+                  break
+                end
+              end
+            end
+            
+            if not isPerimeter and not isBuilding then
               map[py][px] = false
             end
           end

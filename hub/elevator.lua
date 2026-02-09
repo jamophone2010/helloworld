@@ -105,7 +105,7 @@ function M.draw(unlockedQuests)
   local sw, sh = love.graphics.getWidth(), love.graphics.getHeight()
   
   if state == "traveling" then
-    M.drawTravelScreen(sw, sh)
+    M.drawTravelScreen(sw, sh, unlockedQuests)
   elseif state == "arriving" then
     M.drawArrivalScreen(sw, sh)
   elseif state == "menu" then
@@ -113,7 +113,7 @@ function M.draw(unlockedQuests)
   end
 end
 
-function M.drawTravelScreen(sw, sh)
+function M.drawTravelScreen(sw, sh, unlockedQuests)
   -- Full black screen with shake
   love.graphics.push()
   love.graphics.translate(math.random() * shakeAmount - shakeAmount/2, math.random() * shakeAmount - shakeAmount/2)
@@ -140,6 +140,49 @@ function M.drawTravelScreen(sw, sh)
     love.graphics.setColor(0.2, 0.6, 1.0, alpha)
     love.graphics.rectangle("fill", 0, stripY, sw, 3)
   end
+  
+  -- Space station graphic (right side)
+  local stationX = sw - 150
+  local stationY = sh / 2
+  
+  -- Draw space station levels (vertical tower) - floor 6 at top, floor 0 at bottom
+  -- Only show secret floors if quest is completed
+  local showSecrets = unlockedQuests and (unlockedQuests["quest_floor0"] or unlockedQuests["quest_floor6"])
+  
+  for i = 0, 6 do
+    -- Skip secret floors unless unlocked
+    if (i == 0 or i == 6) and not showSecrets then
+      goto continue
+    end
+    
+    local levelY = stationY + 150 - i * 50
+    -- Level platform
+    love.graphics.setColor(0.15, 0.15, 0.2)
+    love.graphics.rectangle("fill", stationX - 30, levelY - 3, 60, 6, 2)
+    love.graphics.setColor(0.25, 0.25, 0.35, 0.6)
+    love.graphics.rectangle("line", stationX - 30, levelY - 3, 60, 6, 2)
+    
+    -- Level number
+    love.graphics.setFont(smallFont)
+    love.graphics.setColor(0.4, 0.5, 0.6, 0.5)
+    love.graphics.print(i, stationX - 50, levelY - 6)
+    
+    ::continue::
+  end
+  
+  -- Central elevator shaft
+  love.graphics.setColor(0.1, 0.1, 0.15, 0.8)
+  love.graphics.rectangle("fill", stationX - 8, stationY - 160, 16, 320, 3)
+  love.graphics.setColor(0.2, 0.4, 0.6, 0.4)
+  love.graphics.rectangle("line", stationX - 8, stationY - 160, 16, 320, 3)
+  
+  -- Flashing dot at current position (inverted so higher floors are higher up)
+  local dotY = stationY + 150 - floorIndicatorY * 50
+  local pulse = 0.5 + 0.5 * math.sin(time * 4)
+  love.graphics.setColor(1, 1, 1, pulse)
+  love.graphics.circle("fill", stationX, dotY, 6)
+  love.graphics.setColor(0.6, 0.8, 1.0, pulse * 0.5)
+  love.graphics.circle("fill", stationX, dotY, 10)
   
   -- Floor indicator display (center top)
   local indicatorX = sw / 2
