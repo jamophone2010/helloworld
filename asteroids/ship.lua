@@ -1,9 +1,9 @@
 local M = {}
 
-local MAX_SPEED = 400
+local MAX_SPEED = 600
 local THRUST_ACCEL = 200
 local ROTATION_SPEED = 4
-local DRAG = 0.98
+local DRAG = 1.0  -- No deceleration
 local SHOOT_COOLDOWN = 0.25
 local RESPAWN_DELAY = 3
 

@@ -76,6 +76,34 @@ function switchToGame(gameName)
     currentGame.load()
   end
 
+  -- Set up asteroids callbacks
+  if gameName == "asteroids" then
+    currentGame.returnToHub = returnToHub
+    currentGame.enterStarfox = function(levelId)
+      -- Mark this level as visited via portal
+      hub.markPortalLevelVisited(levelId)
+
+      -- Switch from asteroids to starfox with a specific level
+      switchToGame("starfox")
+      if gameModules.starfox then
+        -- Set up return to asteroids callback
+        gameModules.starfox.setReturnToAsteroids(function()
+          switchToGame("asteroids")
+          -- Restore to portal entry tile
+          if gameModules.asteroids and gameModules.asteroids.restoreFromPortal then
+            gameModules.asteroids.restoreFromPortal()
+          end
+        end)
+        if gameModules.starfox.startLevel then
+          gameModules.starfox.startLevel(levelId)
+        end
+      end
+    end
+    -- Sync ship selection
+    local ships = require("starfox.ships")
+    ships.setSelected(hub.getSelectedShip())
+  end
+
   -- Pass shop items to starfox
   if gameName == "starfox" then
     currentGame.setShopItems(hub.getShopItems())
@@ -85,6 +113,8 @@ function switchToGame(gameName)
     ships.setSelected(hub.getSelectedShip())
     -- Sync progression state
     currentGame.setProgression(hub.hasMegaAntenna(), hub.hasPowerAmplifier())
+    -- Pass visited portal levels for Floor 4 level select
+    currentGame.setVisitedPortalLevels(hub.getVisitedPortalLevels())
     -- Set return to hub callback for station selection
     currentGame.setReturnToHub(returnToHub)
     -- Set progression reward callbacks
@@ -125,6 +155,9 @@ function returnToHub()
   if currentGame.purchasedShips then
     hub.setPurchasedShips(currentGame.purchasedShips)
   end
+
+  -- Set flag to trigger fade-in when hub loads
+  hub.setFadeInFromStarfox(true)
 
   currentGame = hub
   hub.returnFromGame()
@@ -179,6 +212,7 @@ function startNewGameWithName(name)
   hub.setPurchasedShips({ starwing = true })
   hub.setCurrentFloor(2)
   hub.setUnlockedQuests({})
+  hub.setVisitedPortalLevels({})
   currency.save(0)
 
   -- Show intro crawl
@@ -210,6 +244,7 @@ function loadGame(slot, saveData)
   hub.setPurchasedShips(saveData.purchasedShips or { starwing = true })
   hub.setCurrentFloor(saveData.currentFloor or 2)
   hub.setUnlockedQuests(saveData.unlockedQuests or {})
+  hub.setVisitedPortalLevels(saveData.visitedPortalLevels or {})
   currency.save(saveData.notes or 0)
 
   -- Start game
@@ -255,7 +290,8 @@ function love.load()
       hasPowerAmplifier = hub.hasPowerAmplifier(),
       purchasedShips = hub.getPurchasedShips(),
       currentFloor = hub.getCurrentFloor(),
-      unlockedQuests = hub.getUnlockedQuests()
+      unlockedQuests = hub.getUnlockedQuests(),
+      visitedPortalLevels = hub.getVisitedPortalLevels()
     }
   end
 
@@ -301,9 +337,11 @@ function love.keypressed(key)
   if currentMenu then
     currentMenu.keypressed(key)
   elseif currentGame then
-    -- Let starfox and new hub modules handle their own escape key
+    -- Let starfox, asteroids and new hub modules handle their own escape key
     local selfHandled = false
     if currentGame == gameModules.starfox and gameModules.starfox then
+      selfHandled = true
+    elseif currentGame == gameModules.asteroids and gameModules.asteroids then
       selfHandled = true
     elseif currentGame == gameModules.mainstage and gameModules.mainstage then
       selfHandled = true
@@ -317,8 +355,8 @@ function love.keypressed(key)
     if key == "escape" and currentGame ~= hub and not selfHandled then
       returnToHub()
     else
-      -- For self-handled non-starfox games, check if they exited
-      if selfHandled and currentGame ~= gameModules.starfox then
+      -- For self-handled non-starfox/non-asteroids games, check if they exited
+      if selfHandled and currentGame ~= gameModules.starfox and currentGame ~= gameModules.asteroids then
         currentGame.keypressed(key)
         -- If the module exited itself (active = false), return to hub
         if currentGame.active == false then

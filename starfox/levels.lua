@@ -404,6 +404,24 @@ M.SENTINEL = {
   {time = 73, type = "sentinelboss"}
 }
 
+function M.getEnemyCount(levelId)
+  local waves = M.getWaves(levelId)
+  local count = 0
+  for _, wave in ipairs(waves) do
+    if wave.type == "wave" then
+      count = count + (wave.count or 0)
+    elseif wave.type == "turret" or wave.type == "capitalship" or wave.type == "mothership"
+        or wave.type == "midboss" or wave.type == "finalboss" or wave.type == "area6boss"
+        or wave.type == "rival" or wave.type == "venomboss" or wave.type == "wardenboss"
+        or wave.type == "sentinelboss" then
+      count = count + 1
+    elseif wave.type == "bolsestation" then
+      count = count + 7
+    end
+  end
+  return count
+end
+
 function M.getWaves(levelId)
   if levelId == 2 then
     return M.METEO

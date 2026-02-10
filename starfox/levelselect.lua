@@ -4,6 +4,8 @@ local M = {}
 M.hasMegaAntenna = false
 M.hasPowerAmplifier = false
 M.returnToHub = nil -- Callback to return to hub
+M.visitedPortalLevels = {} -- Levels visited via asteroids portals
+M.accessFromHub = false -- True when accessed from Floor 4 hub (restricts to visited levels)
 
 -- Ring configuration
 local RINGS = {
@@ -44,13 +46,13 @@ local LOCATIONS = {
    description = "Return to the safety of thy haven"},
 
   -- Inner Ring (Blue Path) - 4 levels evenly spaced
-  {id = 1, name = "Corneria", ring = "inner", angle = 0,
+  {id = 1, name = "Cakewalk Corner", ring = "inner", angle = 0,
    description = "Where journeys begin, the homeworld awaits"},
-  {id = 2, name = "Meteo", ring = "inner", angle = 90,
+  {id = 2, name = "Asteroid Alley", ring = "inner", angle = 90,
    description = "An asteroid field of ancient stone and starlight"},
   {id = 4, name = "Fortuna", ring = "inner", angle = 180,
    description = "A world of mist and forgotten battles"},
-  {id = 8, name = "Sector X", ring = "inner", angle = 270,
+  {id = 8, name = "Vacuous Voidway", ring = "inner", angle = 270,
    description = "The ruins of a weapon, vast and terrible"},
 
   -- Inner Ring Boss
@@ -137,6 +139,12 @@ function M.getSelected()
   return LOCATIONS[selectedIndex]
 end
 
+function M.setSelectedIndex(index)
+  if index >= 1 and index <= #LOCATIONS then
+    selectedIndex = index
+  end
+end
+
 function M.getSelectedId()
   return LOCATIONS[selectedIndex].id
 end
@@ -151,7 +159,17 @@ end
 
 -- Check if a location is accessible based on progression
 function M.isAccessible(location)
+  -- Station is always accessible
   if location.id == 0 then return true end
+
+  -- If accessed from Floor 4 hub, only visited portal levels are accessible
+  if M.accessFromHub then
+    if not M.visitedPortalLevels[location.id] then
+      return false
+    end
+  end
+
+  -- Normal ring-based progression check
   local ring = RINGS[location.ring]
   return ring and ring.accessible()
 end

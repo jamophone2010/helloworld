@@ -22,9 +22,9 @@ function M.getAsteroidCount(level)
   return 4 + (level.number - 1) * 2
 end
 
-function M.spawnAsteroids(level, width, height)
+function M.spawnAsteroids(level, width, height, overrideCount)
   local asteroids = {}
-  local count = M.getAsteroidCount(level)
+  local count = overrideCount or M.getAsteroidCount(level)
 
   for i = 1, count do
     local side = math.random(4)

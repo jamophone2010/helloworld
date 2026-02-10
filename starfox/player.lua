@@ -8,10 +8,11 @@ local DODGE_DISTANCE = 100
 local DODGE_WINDOW = 0.15
 local DODGE_COOLDOWN = 1.0
 
-function M.new()
+function M.new(startFromPortal)
+  local startY = startFromPortal and 650 or 500
   return {
     x = 400,
-    y = 500,
+    y = startY,
     vx = 0,
     vy = 0,
     width = 40,
@@ -45,11 +46,26 @@ function M.new()
     dodgeMultiplier = 1.0,
     shipType = "starwing",
     hasSpecial = false,
-    shotgunHeld = false
+    shotgunHeld = false,
+    portalEntryTimer = startFromPortal and 1.0 or 0,
+    portalEntryActive = startFromPortal or false
   }
 end
 
 function M.update(player, dt)
+  -- Handle portal entry animation
+  if player.portalEntryActive then
+    player.portalEntryTimer = player.portalEntryTimer - dt
+    -- Automatically fly upward from bottom to normal position
+    player.y = player.y - 150 * dt
+
+    if player.portalEntryTimer <= 0 or player.y <= 500 then
+      player.y = 500
+      player.portalEntryActive = false
+      player.portalEntryTimer = 0
+    end
+  end
+
   player.x = player.x + player.vx * dt
   player.y = player.y + player.vy * dt
 

@@ -48,6 +48,7 @@ function M.load()
   gameState.returnLocation = nil
   gameState.returnPosition = nil
   gameState.returnFloor = nil       -- NEW: track floor when entering game
+  gameState.fadeInFromStarfox = false  -- NEW: trigger fade-in if returning from starfox
   gameState.credits = 1000000
   gameState.notes = currency.load()
   gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false}
@@ -57,6 +58,7 @@ function M.load()
   gameState.timePlayed = 0
   gameState.sessionStart = love.timer.getTime()
   gameState.highScores = {}
+  gameState.visitedPortalLevels = {}
   gameState.selectedShip = "starwing"
   gameState.animationTime = 0
   gameState.hasMegaAntenna = false
@@ -78,6 +80,17 @@ function M.load()
   -- Elevator callback
   elevator.onFloorChange = function(newFloor)
     M.changeFloor(newFloor)
+  end
+  
+  -- Start with fade-in if returning from starfox
+  if gameState.fadeInFromStarfox then
+    gameState.transition = {
+      phase = "in",
+      timer = 0,
+      duration = 0.5,
+      callback = nil
+    }
+    gameState.fadeInFromStarfox = false
   end
 end
 
@@ -116,6 +129,10 @@ function M.getTimePlayed()
   return gameState.timePlayed + (love.timer.getTime() - gameState.sessionStart)
 end
 
+function M.setFadeInFromStarfox(enable)
+  gameState.fadeInFromStarfox = enable
+end
+
 function M.setTimePlayed(seconds)
   gameState.timePlayed = seconds or 0
   gameState.sessionStart = love.timer.getTime()
@@ -134,6 +151,15 @@ function M.updateHighScore(levelId, score)
   if score > (gameState.highScores[levelId] or 0) then
     gameState.highScores[levelId] = score
   end
+end
+
+function M.getVisitedPortalLevels() return gameState.visitedPortalLevels or {} end
+function M.setVisitedPortalLevels(levels) gameState.visitedPortalLevels = levels or {} end
+function M.markPortalLevelVisited(levelId)
+  if not gameState.visitedPortalLevels then
+    gameState.visitedPortalLevels = {}
+  end
+  gameState.visitedPortalLevels[levelId] = true
 end
 
 function M.hasMegaAntenna() return gameState.hasMegaAntenna end
@@ -541,6 +567,17 @@ end
 -- ═══════════════════════════════════════
 
 function M.returnFromGame()
+  -- Set up fade-in if returning from starfox
+  if gameState.fadeInFromStarfox then
+    gameState.transition = {
+      phase = "in",
+      timer = 0,
+      duration = 0.5,
+      callback = nil
+    }
+    gameState.fadeInFromStarfox = false
+  end
+
   if gameState.returnLocation and gameState.returnLocation ~= "floor" then
     -- Was inside a building - re-enter it
     if gameState.returnFloor then

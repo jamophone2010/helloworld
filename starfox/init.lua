@@ -34,6 +34,10 @@ local pendingShopItems = {lives = 0, bombs = 0, health = 0}
 M.onMegaAntennaAwarded = nil
 M.onPowerAmplifierAwarded = nil
 
+-- Track if entered from asteroids portal
+M.enteredFromPortal = false
+M.returnToAsteroids = nil
+
 -- Helper function to register kills for both score and supershot tracking
 local function registerKill(p, score)
   player.addScore(p, score)
@@ -42,7 +46,7 @@ local function registerKill(p, score)
 end
 
 function M.load()
-  gameState.state = "menu"
+  gameState.state = "levelselect"
   gameState.player = nil
   gameState.waveIndex = 1
   gameState.bossDefeated = false
@@ -73,11 +77,20 @@ function M.load()
 
   audio.load()
   ui.load()
+  levelselect.load()
 end
 
 function M.startGame()
-  gameState.state = "playing"
-  gameState.player = player.new()
+  gameState.state = "intro"
+  gameState.introTimer = 0
+  gameState.introTotalDuration = 4.5 -- total intro length before playing
+  gameState.player = player.new(M.enteredFromPortal)
+  
+  -- Disable portal entry animation since we handle intro via yOffset
+  -- Also set player to normal play position to avoid clamping jump
+  gameState.player.portalEntryActive = false
+  gameState.player.portalEntryTimer = 0
+  gameState.player.y = 500
 
   -- Capture shop items before clearing
   local shopLives = pendingShopItems.lives or 0
@@ -160,6 +173,29 @@ function M.enterLevelSelect()
   levelselect.load()
 end
 
+-- Start a specific level directly (used by asteroids portals)
+function M.startLevel(levelId)
+  -- Mark that we entered from a portal (not hub)
+  M.enteredFromPortal = true
+  levelselect.accessFromHub = false
+
+  -- Find and select the level in levelselect
+  local locations = levelselect.getLocations()
+  for i, loc in ipairs(locations) do
+    if loc.id == levelId then
+      levelselect.setSelectedIndex(i)
+      break
+    end
+  end
+
+  M.startGame()
+end
+
+-- Set callback for returning to asteroids from portal
+function M.setReturnToAsteroids(callback)
+  M.returnToAsteroids = callback
+end
+
 -- Sync progression state from hub to levelselect
 function M.setProgression(hasMegaAntenna, hasPowerAmplifier)
   levelselect.hasMegaAntenna = hasMegaAntenna or false
@@ -169,6 +205,14 @@ end
 -- Set return to hub callback for station selection
 function M.setReturnToHub(callback)
   levelselect.returnToHub = callback
+end
+
+-- Set visited portal levels for Floor 4 level select restriction
+function M.setVisitedPortalLevels(levels)
+  levelselect.visitedPortalLevels = levels or {}
+  -- When called from hub, mark that we're accessing from hub (restricts level select)
+  levelselect.accessFromHub = true
+  M.enteredFromPortal = false
 end
 
 function M.exitToHub()
@@ -186,7 +230,43 @@ function M.setShopItems(items)
 end
 
 function M.update(dt)
-  if gameState.state == "playing" then
+  if gameState.state == "fadingtostation" then
+    gameState.fadeTimer = gameState.fadeTimer + dt
+    if gameState.fadeTimer >= gameState.fadeDuration then
+      -- Fade complete, return to hub
+      if levelselect.returnToHub then
+        levelselect.returnToHub()
+      end
+    end
+  elseif gameState.state == "restarting" then
+    gameState.fadeTimer = gameState.fadeTimer + dt
+    if gameState.fadeTimer >= gameState.fadeDuration then
+      -- Fade complete, restart the level
+      M.startGame()
+    end
+  elseif gameState.state == "fadingtoportal" then
+    gameState.fadeTimer = gameState.fadeTimer + dt
+    if gameState.fadeTimer >= gameState.fadeDuration then
+      -- Fade complete, return to asteroids
+      if M.returnToAsteroids then
+        M.returnToAsteroids()
+      end
+    end
+  elseif gameState.state == "intro" then
+    gameState.introTimer = gameState.introTimer + dt
+    
+    -- Gradually start moving stars from 2.5s onwards (when ship starts entering)
+    if gameState.introTimer >= 2.5 then
+      local accelProgress = (gameState.introTimer - 2.5) / 2.0  -- 0 to 1 over 2 seconds
+      terrain.update(dt * accelProgress)  -- Gradually increase terrain speed
+    end
+    
+    if gameState.introTimer >= gameState.introTotalDuration then
+      gameState.state = "playing"
+      -- Just reset scroll offset without regenerating stars to avoid jump
+      terrain.scrollOffset = 0
+    end
+  elseif gameState.state == "playing" then
     M.updatePlaying(dt)
   elseif gameState.state == "paused" or gameState.state == "options" then
     -- Don't update game logic when paused
@@ -475,7 +555,8 @@ function M.handleEnemyShooting()
   for _, enemy in ipairs(enemies.enemies) do
     if enemy.shootTimer <= 0 then
       enemy.shootTimer = math.random() * 2 + 1
-      if math.random() < 0.3 then
+      -- Only shoot if enemy is above the player (not passed)
+      if math.random() < 0.3 and enemy.y < gameState.player.y then
         weapons.fireEnemyLaser(enemy.x, enemy.y, gameState.player.x, gameState.player.y)
       end
     end
@@ -1514,8 +1595,10 @@ function M.checkHitBox(a, b)
 end
 
 function M.draw()
-  if gameState.state == "menu" then
-    ui.drawMenu()
+  if gameState.state == "intro" then
+    ui.drawBackground()
+    ui.drawPlayer(gameState.player, gameState.introTimer)
+    ui.drawIntro(gameState.introTimer, levels.getName(gameState.levelId), gameState.levelId, levels.getEnemyCount(gameState.levelId))
   elseif gameState.state == "levelselect" then
     ui.drawLevelSelect()
   elseif gameState.state == "levelselect_paused" then
@@ -1564,6 +1647,51 @@ function M.draw()
   elseif gameState.state == "warp" then
     ui.drawBackground()
     ui.drawWarp(gameState.player.enemiesDefeated)
+  elseif gameState.state == "postlevel" then
+    ui.drawBackground()
+    ui.drawPostLevelMenu(gameState.postLevelIndex)
+  elseif gameState.state == "fadingtoportal" then
+    ui.drawBackground()
+    local fadeAlpha = gameState.fadeTimer / gameState.fadeDuration
+    love.graphics.setColor(0, 0, 0, fadeAlpha)
+    love.graphics.rectangle("fill", 0, 0, 800, 600)
+  elseif gameState.state == "fadingtostation" then
+    ui.drawBackground()
+    local fadeAlpha = gameState.fadeTimer / gameState.fadeDuration
+    love.graphics.setColor(0, 0, 0, fadeAlpha)
+    love.graphics.rectangle("fill", 0, 0, 800, 600)
+  elseif gameState.state == "restarting" then
+    -- Draw current game state in background (same as playing state)
+    ui.drawBackground()
+    ui.drawPortals()
+    ui.drawTurrets()
+    ui.drawCapitalShips()
+    ui.drawMothership()
+    ui.drawEnemies()
+    ui.drawBoss()
+    ui.drawBolseStation()
+    ui.drawVenomBoss()
+    ui.drawMaze()
+    ui.drawRival()
+    ui.drawRivalLasers()
+    ui.drawLasers()
+    ui.drawMissiles()
+    ui.drawShotgunPellets()
+    ui.drawChargedBlasts()
+    ui.drawTargetingCrosshairs(gameState.player)
+    ui.drawBombs()
+    ui.drawWingmen()
+    ui.drawAllies()
+    ui.drawPlayer(gameState.player)
+    abilities.drawEffects(gameState.player)
+    ui.drawParticles()
+    bossexplosion.draw()
+    ui.drawHUD(gameState.player, terrain.getLevelTime(), boss.isActive(), levels.getName(gameState.levelId), portals.getCollected(), gameState.totalEnemiesSpawned)
+    supershot.draw()
+    -- White fade overlay
+    local fadeAlpha = gameState.fadeTimer / gameState.fadeDuration
+    love.graphics.setColor(1, 1, 1, fadeAlpha)
+    love.graphics.rectangle("fill", 0, 0, 800, 600)
   elseif gameState.state == "paused" then
     -- Draw game in background
     ui.drawBackground()
@@ -1593,7 +1721,7 @@ function M.draw()
     ui.drawHUD(gameState.player, terrain.getLevelTime(), boss.isActive(), levels.getName(gameState.levelId), portals.getCollected(), gameState.totalEnemiesSpawned)
     supershot.draw()
     -- Draw pause menu overlay
-    ui.drawPauseMenu(gameState.pauseMenuIndex, false)
+    ui.drawPauseMenu(gameState.pauseMenuIndex, false, M.enteredFromPortal)
   elseif gameState.state == "options" then
     -- Draw game in background
     ui.drawBackground()
@@ -1628,9 +1756,7 @@ function M.draw()
 end
 
 function M.keypressed(key)
-  if gameState.state == "menu" and key == "space" then
-    M.enterLevelSelect()
-  elseif gameState.state == "levelselect" then
+  if gameState.state == "levelselect" then
     if key == "up" then
       levelselect.navigate("up")
     elseif key == "down" then
@@ -1666,8 +1792,10 @@ function M.keypressed(key)
         -- Options (placeholder for now)
         gameState.state = "levelselect_options"
       elseif gameState.pauseMenuIndex == 3 then
-        -- Exit to Station
-        M.exitToHub()
+        -- Exit to Station with fade to black
+        gameState.state = "fadingtostation"
+        gameState.fadeTimer = 0
+        gameState.fadeDuration = 0.5
       end
     end
   elseif gameState.state == "playing" then
@@ -1707,17 +1835,27 @@ function M.keypressed(key)
         -- Resume
         gameState.state = "playing"
       elseif gameState.pauseMenuIndex == 2 then
-        -- Restart Level
-        M.startGame()
+        -- Restart Level with fade to white
+        gameState.state = "restarting"
+        gameState.fadeTimer = 0
+        gameState.fadeDuration = 0.7
       elseif gameState.pauseMenuIndex == 3 then
         -- Options (placeholder for now)
         gameState.state = "options"
       elseif gameState.pauseMenuIndex == 4 then
-        -- Return to Map
-        M.enterLevelSelect()
+        -- Return to Map/Portal
+        if M.enteredFromPortal and M.returnToAsteroids then
+          M.enteredFromPortal = false
+          M.returnToAsteroids()
+        else
+          M.enterLevelSelect()
+        end
       elseif gameState.pauseMenuIndex == 5 then
-        -- Return to Station
-        M.exitToHub()
+        -- Return to Station with fade to black
+        M.enteredFromPortal = false
+        gameState.state = "fadingtostation"
+        gameState.fadeTimer = 0
+        gameState.fadeDuration = 0.5
       end
     end
   elseif gameState.state == "options" then
@@ -1729,7 +1867,43 @@ function M.keypressed(key)
       gameState.state = "levelselect_paused"
     end
   elseif (gameState.state == "gameover" or gameState.state == "victory" or gameState.state == "warp") and key == "r" then
-    M.enterLevelSelect()
+    -- Open post-level menu with 3 options
+    gameState.state = "postlevel"
+    gameState.postLevelIndex = 1
+  elseif gameState.state == "postlevel" then
+    if key == "up" then
+      gameState.postLevelIndex = gameState.postLevelIndex - 1
+      if gameState.postLevelIndex < 1 then
+        gameState.postLevelIndex = 3
+      end
+    elseif key == "down" then
+      gameState.postLevelIndex = gameState.postLevelIndex + 1
+      if gameState.postLevelIndex > 3 then
+        gameState.postLevelIndex = 1
+      end
+    elseif key == "return" or key == "space" then
+      if gameState.postLevelIndex == 1 then
+        -- Return to Portal (asteroids world map near portal) with fade to black
+        if M.returnToAsteroids then
+          M.enteredFromPortal = false
+          -- Start fade to black, then call returnToAsteroids
+          gameState.state = "fadingtoportal"
+          gameState.fadeTimer = 0
+          gameState.fadeDuration = 0.5
+        else
+          M.enterLevelSelect()
+        end
+      elseif gameState.postLevelIndex == 2 then
+        -- Go To World Map (Lylat System level select)
+        M.enterLevelSelect()
+      elseif gameState.postLevelIndex == 3 then
+        -- Return To Station (hub) with fade to black
+        M.enteredFromPortal = false
+        gameState.state = "fadingtostation"
+        gameState.fadeTimer = 0
+        gameState.fadeDuration = 0.5
+      end
+    end
   end
 end
 

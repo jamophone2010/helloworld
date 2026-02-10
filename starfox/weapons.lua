@@ -58,9 +58,12 @@ function M.update(dt, player)
 
   for i = #M.lasers, 1, -1 do
     local laser = M.lasers[i]
+    laser.x = laser.x + (laser.vx or 0) * dt
     laser.y = laser.y + laser.vy * dt
 
-    if laser.y < -20 or laser.y > 620 then
+    -- Remove if off-screen or stuck (near-zero velocity)
+    local speed = math.sqrt((laser.vx or 0)^2 + laser.vy^2)
+    if laser.y < -20 or laser.y > 620 or laser.x < -20 or laser.x > 820 or speed < 10 then
       table.remove(M.lasers, i)
     end
   end

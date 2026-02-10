@@ -59,9 +59,99 @@ end
 
 function M.load()
   fonts.large = love.graphics.newFont(36)
+  fonts.xlarge = love.graphics.newFont(52)
   fonts.normal = love.graphics.newFont(20)
   fonts.small = love.graphics.newFont(14)
   hud.load()
+end
+
+-- Level intro sequence:
+-- 0.0s - 1.0s: White fade-in + warp lines top-to-bottom phasing out
+-- 0.5s - 2.5s: IntroTitle fades in
+-- 2.5s - 4.5s: IntroTitle fades out
+-- 4.5s: Playing begins
+function M.drawIntro(timer, levelName, levelId, enemyCount)
+  -- Phase 1: Warp lines going top to bottom, phasing out over 1 second
+  if timer < 1.0 then
+    local lineAlpha = 1.0 - timer -- fade from 1 to 0 over 1s
+    local time = love.timer.getTime()
+    for i = 1, 40 do
+      local speed = 300 + i * 40
+      local x = 400 + math.sin(i * 0.7 + time * 2) * (150 + i * 3)
+      local y = (timer * speed * 2 + i * 30) % 700 - 50
+      local streakLen = 20 + i * 1.5
+      local alpha = lineAlpha * (0.3 + (i / 40) * 0.5)
+      love.graphics.setColor(0.6, 0.8, 1, alpha)
+      love.graphics.setLineWidth(1 + (i / 40) * 2)
+      love.graphics.line(x, y, x + math.sin(i * 0.3) * 3, y + streakLen)
+    end
+    love.graphics.setLineWidth(1)
+  end
+
+  -- White overlay fading out over 1 second
+  if timer < 1.0 then
+    local whiteAlpha = 1.0 - timer
+    love.graphics.setColor(1, 1, 1, whiteAlpha)
+    love.graphics.rectangle("fill", 0, 0, 800, 600)
+  end
+
+  -- IntroTitle overlay
+  -- Fades in: 0.5s to 2.5s (alpha ramps 0->1 over 0.5s, holds until 2.5s)
+  -- Fades out: 2.5s to 4.5s
+  local titleAlpha = 0
+  if timer >= 0.5 and timer < 1.0 then
+    -- Fade in (0.5s to 1.0s)
+    titleAlpha = (timer - 0.5) / 0.5
+  elseif timer >= 1.0 and timer < 2.5 then
+    -- Fully visible
+    titleAlpha = 1.0
+  elseif timer >= 2.5 and timer < 4.5 then
+    -- Fade out (2.5s to 4.5s)
+    titleAlpha = 1.0 - (timer - 2.5) / 2.0
+  end
+
+  if titleAlpha > 0 then
+    -- Semi-transparent dark backdrop for readability
+    love.graphics.setColor(0, 0, 0, 0.4 * titleAlpha)
+    love.graphics.rectangle("fill", 0, 0, 800, 600)
+
+    -- Split stage name into words for stacking
+    local words = {}
+    for word in levelName:gmatch("%S+") do
+      table.insert(words, word)
+    end
+
+    -- Calculate vertical layout
+    -- Line 1: "Stage #X:" (small text)
+    -- Line 2 (+3): Stage name words (xlarge text, stacked)
+    -- Last line: "Enemies Detected = X" (smaller, blue)
+    local centerY = 300
+    local stageLineH = 24
+    local nameLineH = 60
+    local enemyLineH = 24
+    local totalH = stageLineH + #words * nameLineH + 20 + enemyLineH
+    local startY = centerY - totalH / 2
+
+    -- Line 1: Stage number
+    love.graphics.setFont(fonts.normal)
+    love.graphics.setColor(0.8, 0.8, 0.9, titleAlpha)
+    love.graphics.printf("Stage #" .. levelId .. ":", 0, startY, 800, "center")
+    startY = startY + stageLineH + 8
+
+    -- Line 2 (+3): Stage name - each word stacked
+    love.graphics.setFont(fonts.xlarge)
+    love.graphics.setColor(1, 1, 1, titleAlpha)
+    for _, word in ipairs(words) do
+      love.graphics.printf(word, 0, startY, 800, "center")
+      startY = startY + nameLineH
+    end
+    startY = startY + 12
+
+    -- Last line: Enemy count (blue, smaller)
+    love.graphics.setFont(fonts.small)
+    love.graphics.setColor(0.4, 0.7, 1, titleAlpha)
+    love.graphics.printf("Enemies Detected = " .. enemyCount, 0, startY, 800, "center")
+  end
 end
 
 function M.drawBackground()
@@ -116,7 +206,23 @@ function M.drawPortals()
   end
 end
 
-function M.drawPlayer(player)
+function M.drawPlayer(player, introTimer)
+  -- During intro (2.5s onwards), animate ship gradually entering from bottom
+  local yOffset = 0
+  if introTimer then
+    if introTimer < 2.5 then
+      -- Off-screen at bottom
+      yOffset = 700
+    elseif introTimer < 4.5 then
+      -- Slide in over 2 seconds (from 2.5s to 4.5s)
+      local slideProgress = (introTimer - 2.5) / 2.0
+      yOffset = 700 * (1.0 - slideProgress)
+    else
+      -- Clamp to 0 once fully transitioned
+      yOffset = 0
+    end
+  end
+
   -- Only flash when invulnerable but NOT barrel rolling and NOT ability-invulnerable
   if player.invulnerable and not player.barrelRolling and not abilities.active and math.floor(love.timer.getTime() * 10) % 2 == 0 then
     return
@@ -139,7 +245,7 @@ function M.drawPlayer(player)
   end
 
   love.graphics.push()
-  love.graphics.translate(player.x, player.y)
+  love.graphics.translate(player.x, player.y + yOffset)
 
   -- Barrel roll shield (semicircle in front)
   if player.barrelRolling then
@@ -1568,12 +1674,43 @@ function M.drawWarp(score)
   love.graphics.printf("Press R to continue", 0, 400, 800, "center")
 end
 
+function M.drawPostLevelMenu(selectedIndex)
+  -- Semi-transparent overlay
+  love.graphics.setColor(0, 0, 0, 0.8)
+  love.graphics.rectangle("fill", 0, 0, 800, 600)
+
+  -- Title
+  love.graphics.setFont(fonts.large)
+  love.graphics.setColor(0.3, 0.5, 1)
+  love.graphics.printf("MISSION COMPLETE", 0, 150, 800, "center")
+
+  -- Menu options
+  love.graphics.setFont(fonts.normal)
+  local options = {"Return to Portal", "Go To World Map", "Return To Station"}
+  local startY = 260
+
+  for i, option in ipairs(options) do
+    if i == selectedIndex then
+      love.graphics.setColor(1, 1, 0)
+      love.graphics.printf("> " .. option .. " <", 0, startY + (i - 1) * 50, 800, "center")
+    else
+      love.graphics.setColor(0.7, 0.7, 0.7)
+      love.graphics.printf(option, 0, startY + (i - 1) * 50, 800, "center")
+    end
+  end
+
+  -- Instructions
+  love.graphics.setFont(fonts.small)
+  love.graphics.setColor(0.5, 0.5, 0.5)
+  love.graphics.printf("Arrows: Navigate | ENTER: Select", 0, 450, 800, "center")
+end
+
 function M.drawLevelSelect()
   -- Delegate to levelselect's own draw function (LOTR-styled ring map)
   levelselect.draw()
 end
 
-function M.drawPauseMenu(selectedIndex, isLevelSelect)
+function M.drawPauseMenu(selectedIndex, isLevelSelect, enteredFromPortal)
   -- Semi-transparent overlay
   love.graphics.setColor(0, 0, 0, 0.7)
   love.graphics.rectangle("fill", 0, 0, 800, 600)
@@ -1589,7 +1726,8 @@ function M.drawPauseMenu(selectedIndex, isLevelSelect)
   if isLevelSelect then
     options = {"Resume", "Options", "Exit to Station"}
   else
-    options = {"Resume", "Restart Level", "Options", "Return to Map", "Return to Station"}
+    local mapOption = enteredFromPortal and "Exit to Portal" or "Return to Map"
+    options = {"Resume", "Restart Level", "Options", mapOption, "Return to Station"}
   end
   local startY = 250
 
