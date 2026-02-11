@@ -1,4 +1,5 @@
 local M = {}
+local screen = require("starfox.screen")
 
 local SPEED = 250
 local INERTIA = 0.9
@@ -9,9 +10,9 @@ local DODGE_WINDOW = 0.15
 local DODGE_COOLDOWN = 1.0
 
 function M.new(startFromPortal)
-  local startY = startFromPortal and 650 or 500
+  local startY = startFromPortal and (screen.HEIGHT + 50) or (screen.HEIGHT - 100)
   return {
-    x = 400,
+    x = screen.WIDTH / 2,
     y = startY,
     vx = 0,
     vy = 0,
@@ -59,8 +60,8 @@ function M.update(player, dt)
     -- Automatically fly upward from bottom to normal position
     player.y = player.y - 150 * dt
 
-    if player.portalEntryTimer <= 0 or player.y <= 500 then
-      player.y = 500
+    if player.portalEntryTimer <= 0 or player.y <= (screen.HEIGHT - 100) then
+      player.y = screen.HEIGHT - 100
       player.portalEntryActive = false
       player.portalEntryTimer = 0
     end
@@ -72,8 +73,8 @@ function M.update(player, dt)
   player.vx = player.vx * INERTIA
   player.vy = player.vy * INERTIA
 
-  player.x = math.max(30, math.min(770, player.x))
-  player.y = math.max(100, math.min(570, player.y))
+  player.x = math.max(30, math.min(screen.WIDTH - 30, player.x))
+  player.y = math.max(100, math.min(screen.HEIGHT - 30, player.y))
 
   if player.barrelRolling then
     player.barrelRollTimer = player.barrelRollTimer - dt
@@ -138,7 +139,7 @@ function M.tryDodge(player, direction)
     local dodgeX = direction == "left" and -dodgeDist or dodgeDist
     player.dodgeStartX = player.x
     player.x = player.x + dodgeX
-    player.x = math.max(30, math.min(770, player.x))
+    player.x = math.max(30, math.min(screen.WIDTH - 30, player.x))
     player.dodging = true
     player.dodgeTimer = 0.15
     player.dodgeCooldown = DODGE_COOLDOWN

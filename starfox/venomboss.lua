@@ -1,4 +1,5 @@
 local M = {}
+local screen = require("starfox.screen")
 
 M.boss = nil
 
@@ -13,7 +14,7 @@ end
 
 function M.spawn()
   M.boss = {
-    x = 400,
+    x = screen.WIDTH / 2,
     y = -120,
     width = 140,
     height = 110,
@@ -27,7 +28,7 @@ function M.spawn()
 
     teleporting = false,
     teleportTimer = 4,
-    teleportTargetX = 400,
+    teleportTargetX = screen.WIDTH / 2,
     fadeAlpha = 1,
     fadeIn = false,
 
@@ -110,7 +111,7 @@ end
 function M.startTeleport()
   local b = M.boss
   b.teleporting = true
-  b.teleportTargetX = math.random(100, 700)
+  b.teleportTargetX = math.random(100, screen.WIDTH - 100)
   b.teleportTimer = PHASE_TELEPORT_COOLDOWN[b.phase]
 end
 
@@ -203,7 +204,7 @@ end
 function M.getLaserEndpoint()
   local b = M.boss
   if not b then return 0, 0 end
-  local length = 800
+  local length = 1600
   local startX, startY = b.x, b.y + 50
   return startX + math.cos(b.laserAngle) * length,
          startY + math.sin(b.laserAngle) * length

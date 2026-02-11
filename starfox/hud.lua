@@ -1,5 +1,6 @@
 local M = {}
 
+local screen = require("starfox.screen")
 local player = require("starfox.player")
 local abilities = require("starfox.abilities")
 
@@ -41,7 +42,7 @@ function M.draw(p, levelTime, callout, bossHealth, bossMaxHealth, levelName, por
   end
 
   love.graphics.setColor(1, 1, 1)
-  love.graphics.print("LIVES: " .. p.lives, 400, 10)
+  love.graphics.print("LIVES: " .. p.lives, 420, 10)
 
   -- Determine enemies counter color
   local enemiesColor = {1, 1, 1}  -- Default white
@@ -59,10 +60,10 @@ function M.draw(p, levelTime, callout, bossHealth, bossMaxHealth, levelName, por
 
   love.graphics.setFont(fonts.large)
   love.graphics.setColor(enemiesColor)
-  love.graphics.printf("ENEMIES: " .. p.enemiesDefeated, 600, 10, 190, "right")
+  love.graphics.printf("ENEMIES: " .. p.enemiesDefeated, screen.WIDTH - 200, 10, 190, "right")
 
   love.graphics.setFont(fonts.small)
-  love.graphics.printf(levelName or "CORNERIA", 600, 35, 190, "right")
+  love.graphics.printf(levelName or "CORNERIA", screen.WIDTH - 200, 35, 190, "right")
 
   -- Time counter
   local minutes = math.floor(levelTime / 60)
@@ -70,20 +71,20 @@ function M.draw(p, levelTime, callout, bossHealth, bossMaxHealth, levelName, por
   local timeStr = string.format("%02d:%02d", minutes, seconds)
   love.graphics.setFont(fonts.normal)
   love.graphics.setColor(1, 1, 1)
-  love.graphics.printf(timeStr, 600, 560, 190, "right")
+  love.graphics.printf(timeStr, screen.WIDTH - 200, screen.HEIGHT - 40, 190, "right")
 
   if p.charging and p.chargeLevel > 0 then
     local chargeWidth = 100
     love.graphics.setColor(0.3, 0.3, 0.3)
-    love.graphics.rectangle("fill", 350, 550, chargeWidth, 15)
+    love.graphics.rectangle("fill", 350, screen.HEIGHT - 50, chargeWidth, 15)
 
     love.graphics.setColor(0.3, 0.5, 1)
-    love.graphics.rectangle("fill", 350, 550, chargeWidth * p.chargeLevel, 15)
+    love.graphics.rectangle("fill", 350, screen.HEIGHT - 50, chargeWidth * p.chargeLevel, 15)
 
     love.graphics.setColor(1, 1, 1)
-    love.graphics.rectangle("line", 350, 550, chargeWidth, 15)
+    love.graphics.rectangle("line", 350, screen.HEIGHT - 50, chargeWidth, 15)
 
-    love.graphics.print("CHARGE", 350, 535)
+    love.graphics.print("CHARGE", 350, screen.HEIGHT - 65)
   end
 
   -- Dodge cooldown gauge
@@ -91,19 +92,19 @@ function M.draw(p, levelTime, callout, bossHealth, bossMaxHealth, levelName, por
   local dodgeMax = player.getDodgeCooldownMax()
   local dodgeReady = (dodgeMax - p.dodgeCooldown) / dodgeMax
   love.graphics.setColor(0.3, 0.3, 0.3)
-  love.graphics.rectangle("fill", 10, 550, dodgeWidth, 15)
+  love.graphics.rectangle("fill", 10, screen.HEIGHT - 50, dodgeWidth, 15)
 
   if dodgeReady >= 1 then
     love.graphics.setColor(0.2, 0.8, 0.4)
   else
     love.graphics.setColor(0.6, 0.4, 0.2)
   end
-  love.graphics.rectangle("fill", 10, 550, dodgeWidth * dodgeReady, 15)
+  love.graphics.rectangle("fill", 10, screen.HEIGHT - 50, dodgeWidth * dodgeReady, 15)
 
   love.graphics.setColor(1, 1, 1)
-  love.graphics.rectangle("line", 10, 550, dodgeWidth, 15)
+  love.graphics.rectangle("line", 10, screen.HEIGHT - 50, dodgeWidth, 15)
   love.graphics.setFont(fonts.small)
-  love.graphics.print("DODGE", 10, 535)
+  love.graphics.print("DODGE", 10, screen.HEIGHT - 65)
 
   -- Special ability gauge (drawn right of dodge)
   abilities.drawGauge()
@@ -148,23 +149,23 @@ function M.draw(p, levelTime, callout, bossHealth, bossMaxHealth, levelName, por
   if callout then
     love.graphics.setFont(fonts.normal)
     love.graphics.setColor(0, 0.8, 0)
-    love.graphics.printf(callout.speaker .. ": \"" .. callout.message .. "\"", 50, 570, 700, "center")
+    love.graphics.printf(callout.speaker .. ": \"" .. callout.message .. "\"", 50, screen.HEIGHT - 30, screen.WIDTH - 100, "center")
   end
 
   if bossHealth and bossMaxHealth then
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(fonts.small)
-    love.graphics.printf("BOSS", 300, 50, 200, "center")
+    love.graphics.printf("BOSS", screen.WIDTH / 2 - 100, 50, 200, "center")
 
     local bossBarWidth = 200
     love.graphics.setColor(0.3, 0.3, 0.3)
-    love.graphics.rectangle("fill", 300, 65, bossBarWidth, 15)
+    love.graphics.rectangle("fill", screen.WIDTH / 2 - 100, 65, bossBarWidth, 15)
 
     love.graphics.setColor(1, 0, 0)
-    love.graphics.rectangle("fill", 300, 65, bossBarWidth * (bossHealth / bossMaxHealth), 15)
+    love.graphics.rectangle("fill", screen.WIDTH / 2 - 100, 65, bossBarWidth * (bossHealth / bossMaxHealth), 15)
 
     love.graphics.setColor(1, 1, 1)
-    love.graphics.rectangle("line", 300, 65, bossBarWidth, 15)
+    love.graphics.rectangle("line", screen.WIDTH / 2 - 100, 65, bossBarWidth, 15)
   end
 
   -- Portal counter (only show if portals exist in level)

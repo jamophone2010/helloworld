@@ -1,5 +1,7 @@
 local M = {}
 
+local ui = require("hub.ui")
+
 local SPEED = 100
 local RUN_SPEED_MULTIPLIER = 1.8
 local GRID_SIZE = 32
@@ -96,6 +98,10 @@ function M.tryMove(player, direction, collisionMap, npcs)
   player.moveProgress = 0
 
   return true
+end
+
+function M.draw(player, time)
+  ui.drawPlayer(player, time)
 end
 
 return M

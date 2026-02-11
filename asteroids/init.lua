@@ -610,10 +610,14 @@ function M.updateStationLanding(dt)
     if speed < 30 then
       landingState.landingProgress = landingState.landingProgress + dt
       if landingState.landingProgress >= 1.5 then
-        -- Land - fade to hub Floor 4
+        landingState.landingProgress = 1.5
+        landingState.hovering = false
+        landingState.selectedPad = nil
+        -- Land - fade to appropriate hub based on station type
+        local stationInfo = worldmap.getStationInfo()
         M.startFade(function()
           if M.returnToHub then
-            M.returnToHub()
+            M.returnToHub(stationInfo)
           end
         end)
       end
@@ -1074,7 +1078,7 @@ function M.drawLandingUI()
   love.graphics.rectangle("fill", pad.x - 50, pad.y + 50, 100, 15)
 
   love.graphics.setColor(0.3, 0.9, 0.4)
-  love.graphics.rectangle("fill", pad.x - 50, pad.y + 50, 100 * (landingState.landingProgress / 1.5), 15)
+  love.graphics.rectangle("fill", pad.x - 50, pad.y + 50, math.min(100, 100 * (landingState.landingProgress / 1.5)), 15)
 
   love.graphics.setColor(1, 1, 1)
   love.graphics.rectangle("line", pad.x - 50, pad.y + 50, 100, 15)

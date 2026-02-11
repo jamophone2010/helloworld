@@ -1,7 +1,11 @@
 local currentGame = nil
 local currentMenu = nil
 local hub = require("hub")
+local leucadia = require("leucadia")
+local singularity = require("singularity")
+local mixia = require("mixia")
 local currency = require("hub.currency")
+local currentHubType = "hometown"  -- Track which hub we're in
 local saves = require("menu.saves")
 local mainMenu = require("menu.main_menu")
 local continueMenu = require("menu.continue_menu")
@@ -127,7 +131,7 @@ function switchToGame(gameName)
   end
 end
 
-function returnToHub()
+function returnToHub(stationInfo)
   -- Retrieve credits from casino games before returning
   if currentGame.getCredits then
     hub.setCredits(currentGame.getCredits())
@@ -156,11 +160,73 @@ function returnToHub()
     hub.setPurchasedShips(currentGame.purchasedShips)
   end
 
-  -- Set flag to trigger fade-in when hub loads
-  hub.setFadeInFromStarfox(true)
+  -- Determine which hub to go to
+  -- If stationInfo is provided, we're landing at a station from space
+  -- If nil, we're returning from a game played inside a hub
+  local hubType = currentHubType  -- Default to current hub
+  local freshLanding = false
+  if stationInfo and stationInfo.hubType then
+    hubType = stationInfo.hubType
+    freshLanding = true
+  end
+  currentHubType = hubType
 
-  currentGame = hub
-  hub.returnFromGame()
+  local pauseMenu = require("hub.pause_menu")
+  if hubType == "leucadia" then
+    leucadia.setFadeInFromStarfox(true)
+    currentGame = leucadia
+    if freshLanding then
+      leucadia.load()
+    else
+      leucadia.returnFromGame()
+    end
+    leucadia.returnToAsteroids = function()
+      switchToGame("asteroids")
+      if gameModules.asteroids and gameModules.asteroids.restoreFromPortal then
+        gameModules.asteroids.restoreFromPortal()
+      end
+    end
+    leucadia.switchToGame = switchToGame
+    pauseMenu.returnToShip = leucadia.returnToAsteroids
+  elseif hubType == "singularity" then
+    singularity.setFadeInFromStarfox(true)
+    currentGame = singularity
+    if freshLanding then
+      singularity.load()
+    else
+      singularity.returnFromGame()
+    end
+    singularity.returnToAsteroids = function()
+      switchToGame("asteroids")
+      if gameModules.asteroids and gameModules.asteroids.restoreFromPortal then
+        gameModules.asteroids.restoreFromPortal()
+      end
+    end
+    singularity.switchToGame = switchToGame
+    pauseMenu.returnToShip = singularity.returnToAsteroids
+  elseif hubType == "mixia" then
+    mixia.setFadeInFromStarfox(true)
+    currentGame = mixia
+    if freshLanding then
+      mixia.load()
+    else
+      mixia.returnFromGame()
+    end
+    mixia.returnToAsteroids = function()
+      switchToGame("asteroids")
+      if gameModules.asteroids and gameModules.asteroids.restoreFromPortal then
+        gameModules.asteroids.restoreFromPortal()
+      end
+    end
+    mixia.switchToGame = switchToGame
+    pauseMenu.returnToShip = mixia.returnToAsteroids
+  else
+    -- Default to Hometown Station hub
+    hub.setFadeInFromStarfox(true)
+    currentGame = hub
+    hub.returnFromGame()
+    pauseMenu.returnToShip = nil
+  end
 end
 
 function goToMainMenu()
@@ -225,6 +291,7 @@ function startGameAfterIntro()
   -- Start hub game after intro crawl finishes
   currentMenu = nil
   currentGame = hub
+  currentHubType = "hometown"  -- Starting at Hometown Station
   hub.switchToGame = switchToGame
   hub.load()
   hub.setPlayerName(pendingPlayerName)
@@ -250,6 +317,7 @@ function loadGame(slot, saveData)
   -- Start game
   currentMenu = nil
   currentGame = hub
+  currentHubType = "hometown"  -- Starting at Hometown Station
   hub.switchToGame = switchToGame
   hub.load()
 end
@@ -298,10 +366,12 @@ function love.load()
   -- Set up intro crawl callback
   introCrawl.onComplete = startGameAfterIntro
 
-  -- Set up pause menu callbacks
+  -- Set up pause menu callbacks (use currentGame so they work for all hubs)
   local pauseMenu = require("hub.pause_menu")
   pauseMenu.onResume = function()
-    hub.setPaused(false)
+    if currentGame and currentGame.setPaused then
+      currentGame.setPaused(false)
+    end
   end
   pauseMenu.onOptions = function()
     -- Options functionality can be added later
@@ -312,6 +382,18 @@ function love.load()
   end
   hub.goToMainMenu = goToMainMenu
   hub.setPausedMenu = pauseMenu
+
+  -- Set up Leucadia hub callbacks
+  leucadia.goToMainMenu = goToMainMenu
+  leucadia.switchToGame = switchToGame
+
+  -- Set up Singularity hub callbacks
+  singularity.goToMainMenu = goToMainMenu
+  singularity.switchToGame = switchToGame
+
+  -- Set up Mixia hub callbacks
+  mixia.goToMainMenu = goToMainMenu
+  mixia.switchToGame = switchToGame
 
   -- Start at main menu
   goToMainMenu()
@@ -352,7 +434,7 @@ function love.keypressed(key)
     elseif currentGame == gameModules.lookout and gameModules.lookout then
       selfHandled = true
     end
-    if key == "escape" and currentGame ~= hub and not selfHandled then
+    if key == "escape" and currentGame ~= hub and currentGame ~= leucadia and currentGame ~= singularity and currentGame ~= mixia and not selfHandled then
       returnToHub()
     else
       -- For self-handled non-starfox/non-asteroids games, check if they exited

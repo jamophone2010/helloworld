@@ -20,12 +20,14 @@ local bolse = require("starfox.bolse")
 local rival = require("starfox.rival")
 local maze = require("starfox.maze")
 local venomboss = require("starfox.venomboss")
+local sectorzboss = require("starfox.sectorzboss")
 local targeting = require("starfox.targeting")
 local bossexplosion = require("starfox.bossexplosion")
 local supershot = require("starfox.supershot")
 local ships = require("starfox.ships")
 local abilities = require("starfox.abilities")
 local morseinput = require("starfox.morseinput")
+local screen = require("starfox.screen")
 
 local gameState = {}
 local pendingShopItems = {lives = 0, bombs = 0, health = 0}
@@ -69,6 +71,7 @@ function M.load()
   rival.reset()
   maze.reset()
   venomboss.reset()
+  sectorzboss.reset()
   targeting.reset()
   bossexplosion.reset()
   supershot.reset()
@@ -90,7 +93,7 @@ function M.startGame()
   -- Also set player to normal play position to avoid clamping jump
   gameState.player.portalEntryActive = false
   gameState.player.portalEntryTimer = 0
-  gameState.player.y = 500
+  gameState.player.y = screen.HEIGHT - 100
 
   -- Capture shop items before clearing
   local shopLives = pendingShopItems.lives or 0
@@ -127,6 +130,7 @@ function M.startGame()
   rival.reset()
   maze.reset()
   venomboss.reset()
+  sectorzboss.reset()
   targeting.reset()
   bossexplosion.reset()
   supershot.reset()
@@ -390,6 +394,7 @@ function M.updatePlaying(dt)
   rival.updateLasers(dt)
   maze.update(dt)
   venomboss.update(dt, gameState.player.x, gameState.player.y)
+  sectorzboss.update(dt, gameState.player.x, gameState.player.y)
 
   supershot.update(dt)
 
@@ -429,7 +434,7 @@ function M.updatePlaying(dt)
     end
   end
 
-  local bossVictory = gameState.bossDefeated or finalBossDefeated or mothership.isDefeated() or venomboss.isDefeated()
+  local bossVictory = gameState.bossDefeated or finalBossDefeated or mothership.isDefeated() or venomboss.isDefeated() or sectorzboss.isDefeated()
 
   -- Auto-victory only for levels without boss enemies
   -- Don't auto-complete levels that have/had bosses, motherships, etc.
@@ -438,7 +443,8 @@ function M.updatePlaying(dt)
                        mothership.isActive() or mothership.isDefeated() or
                        bolse.isActive() or
                        rival.isActive() or
-                       venomboss.isActive() or venomboss.isDefeated()
+                       venomboss.isActive() or venomboss.isDefeated() or
+                       sectorzboss.isActive() or sectorzboss.isDefeated()
 
   local allWavesSpawned = gameState.waveIndex > #gameState.levelWaves
   local noEnemiesRemain = #enemies.enemies == 0 and
@@ -448,7 +454,8 @@ function M.updatePlaying(dt)
                           not bolse.isActive() and
                           not rival.isActive() and
                           not mothership.isActive() and
-                          not venomboss.isActive()
+                          not venomboss.isActive() and
+                          not sectorzboss.isActive()
 
   -- Only allow auto-victory if no boss enemies exist/existed in this level
   -- OR if midboss was defeated on Meteo (level 2)
@@ -509,10 +516,10 @@ function M.spawnWaves()
       elseif wave.type == "portal" then
         portals.spawn(wave.x)
       elseif wave.type == "bolsestation" then
-        bolse.spawn(wave.x or 400)
+        bolse.spawn(wave.x or screen.WIDTH / 2)
         gameState.totalEnemiesSpawned = gameState.totalEnemiesSpawned + 7
       elseif wave.type == "rival" then
-        rival.spawn(400, -50, wave.hp, wave.variant)
+        rival.spawn(screen.WIDTH / 2, -50, wave.hp, wave.variant)
         gameState.totalEnemiesSpawned = gameState.totalEnemiesSpawned + 1
       elseif wave.type == "mazestart" then
         maze.activate()
@@ -540,6 +547,11 @@ function M.spawnWaves()
         boss.currentBoss.health = 120
         boss.currentBoss.maxHealth = 120
         boss.currentBoss.score = 1200
+        gameState.totalEnemiesSpawned = gameState.totalEnemiesSpawned + 1
+        wingmen.triggerBossWarning()
+      elseif wave.type == "sectorzboss" then
+        -- Sector Z boss: 7-phase Elden Ring-inspired boss
+        sectorzboss.spawn()
         gameState.totalEnemiesSpawned = gameState.totalEnemiesSpawned + 1
         wingmen.triggerBossWarning()
       end
@@ -648,6 +660,50 @@ function M.handleEnemyShooting()
     weapons.fireEnemyLaser(vb.x, vb.y + 40, gameState.player.x, gameState.player.y)
     weapons.fireEnemyLaser(vb.x - 40, vb.y + 40, gameState.player.x - 50, gameState.player.y)
     weapons.fireEnemyLaser(vb.x + 40, vb.y + 40, gameState.player.x + 50, gameState.player.y)
+  end
+
+  -- Sector Z boss shooting
+  if sectorzboss.isActive() then
+    local projectiles = sectorzboss.getPendingProjectiles()
+    for _, proj in ipairs(projectiles) do
+      if proj.type == "blade" or proj.type == "spread" or proj.type == "sweep" then
+        local vx = math.cos(proj.angle) * proj.speed
+        local vy = math.sin(proj.angle) * proj.speed
+        table.insert(weapons.lasers, {
+          x = proj.x,
+          y = proj.y,
+          vx = vx,
+          vy = vy,
+          damage = proj.damage,
+          width = 8,
+          height = 8,
+          owner = "enemy"
+        })
+      elseif proj.type == "waterfowl" then
+        weapons.fireEnemyLaser(proj.x, proj.y, proj.targetX, proj.targetY)
+      elseif proj.type == "deathBlight" then
+        -- Death Blight: large fast projectile
+        local dx = proj.targetX - proj.x
+        local dy = proj.targetY - proj.y
+        local dist = math.sqrt(dx*dx + dy*dy)
+        if dist > 0 then
+          dx = dx / dist
+          dy = dy / dist
+        else
+          dy = 1
+        end
+        table.insert(weapons.lasers, {
+          x = proj.x,
+          y = proj.y,
+          vx = dx * proj.speed,
+          vy = dy * proj.speed,
+          damage = proj.damage,
+          width = proj.width,
+          height = proj.width,
+          owner = "enemy"
+        })
+      end
+    end
   end
 end
 
@@ -867,7 +923,7 @@ function M.checkSpartanLaserCollisions()
       hitBoss = true
       -- Set beam end position to Venom boss surface
       beam.actualEndY = vb.y + vb.height / 2
-      
+
       -- Spawn fewer, smaller, more colorful explosions
       local explosionIntensity = math.floor(beam.fireTime * 2.5) + 4
       local impactY = beam.actualEndY
@@ -877,11 +933,39 @@ function M.checkSpartanLaserCollisions()
         local color = colors[math.random(1, #colors)]
         particles.spawn(beam.x + offsetX, impactY + math.random(-6, 6), explosionIntensity, color)
       end
-      
+
       if venomboss.damage(damagePerFrame) then
         registerKill(gameState.player, vb.score)
         particles.spawn(vb.x, vb.y, 40, {1, 0.3, 0})
         bossexplosion.start(vb.x, vb.y, vb.width, vb.height)
+        gameState.bossDefeated = true
+        weapons.stopSpartanLaser(gameState.player)
+      end
+    end
+  end
+
+  -- Check Sector Z boss (beam STOPS here with increasing explosions)
+  if not hitBoss and sectorzboss.isActive() then
+    local szb = sectorzboss.boss
+    if math.abs(szb.x - beam.x) < (beam.width + szb.width) / 2 and szb.y < beam.y then
+      hitBoss = true
+      -- Set beam end position to Sector Z boss surface
+      beam.actualEndY = szb.y + szb.height / 2
+
+      -- Spawn crimson explosions (Elden Ring aesthetic)
+      local explosionIntensity = math.floor(beam.fireTime * 3) + 5
+      local impactY = beam.actualEndY
+      local colors = {{1, 0.1, 0.1}, {0.9, 0.2, 0.3}, {1, 0.3, 0.2}, {0.8, 0.1, 0.2}}
+      for j = 1, math.min(math.floor(beam.fireTime * 2) + 1, 5) do
+        local offsetX = (math.random() - 0.5) * beam.width
+        local color = colors[math.random(1, #colors)]
+        particles.spawn(beam.x + offsetX, impactY + math.random(-8, 8), explosionIntensity, color)
+      end
+
+      if sectorzboss.damage(damagePerFrame) then
+        registerKill(gameState.player, szb.score)
+        particles.spawn(szb.x, szb.y, 50, {1, 0.2, 0.2})
+        bossexplosion.start(szb.x, szb.y, szb.width, szb.height)
         gameState.bossDefeated = true
         weapons.stopSpartanLaser(gameState.player)
       end
@@ -1094,6 +1178,24 @@ function M.checkCollisions()
             gameState.bossDefeated = true
           else
             particles.spawn(laser.x, laser.y, 5, {1, 0.5, 0})
+          end
+          if not laser.piercing then
+            table.remove(weapons.lasers, i)
+          end
+        end
+      end
+
+      -- Player lasers vs Sector Z boss
+      if sectorzboss.isActive() then
+        local szb = sectorzboss.boss
+        if M.checkHitRect(laser, szb) then
+          if sectorzboss.damage(laser.damage) then
+            registerKill(gameState.player, szb.score)
+            particles.spawn(szb.x, szb.y, 50, {1, 0.2, 0.2})
+            bossexplosion.start(szb.x, szb.y, szb.width, szb.height)
+            gameState.bossDefeated = true
+          else
+            particles.spawn(laser.x, laser.y, 5, {1, 0.4, 0.4})
           end
           if not laser.piercing then
             table.remove(weapons.lasers, i)
@@ -1389,6 +1491,21 @@ function M.checkCollisions()
         hit = true
       end
     end
+
+    if not hit and sectorzboss.isActive() then
+      local szb = sectorzboss.boss
+      if M.checkHitBox(missile, szb) then
+        if sectorzboss.damage(missile.damage) then
+          registerKill(gameState.player, szb.score)
+          particles.spawn(szb.x, szb.y, 50, {1, 0.2, 0.2})
+          bossexplosion.start(szb.x, szb.y, szb.width, szb.height)
+          gameState.bossDefeated = true
+        end
+        particles.spawn(missile.x, missile.y, 8, {1, 1, 0})
+        table.remove(weapons.missiles, i)
+        hit = true
+      end
+    end
   end
 
   for _, bomb in ipairs(weapons.bombs) do
@@ -1501,6 +1618,20 @@ function M.checkCollisions()
         end
       end
     end
+
+    -- Bomb vs Sector Z boss
+    if sectorzboss.isActive() then
+      local szb = sectorzboss.boss
+      local dist = math.sqrt((bomb.x - szb.x)^2 + (bomb.y - szb.y)^2)
+      if dist < bomb.radius then
+        if sectorzboss.damage(bomb.damage) then
+          registerKill(gameState.player, szb.score)
+          particles.spawn(szb.x, szb.y, 50, {1, 0.2, 0.2})
+          bossexplosion.start(szb.x, szb.y, szb.width, szb.height)
+          gameState.bossDefeated = true
+        end
+      end
+    end
   end
 
   for _, enemy in ipairs(enemies.enemies) do
@@ -1538,6 +1669,34 @@ function M.checkCollisions()
         if not p.invulnerable then
           player.takeDamage(p, 2)
         end
+      end
+    end
+  end
+
+  -- Sector Z boss special mechanics
+  if sectorzboss.isActive() then
+    local p = gameState.player
+
+    -- Gravity Well: pull player toward boss
+    local gx, gy, strength = sectorzboss.getGravityPull()
+    if strength and strength > 0 then
+      local dx = gx - p.x
+      local dy = gy - p.y
+      local dist = math.sqrt(dx*dx + dy*dy)
+      if dist > 1 then
+        local pullX = (dx / dist) * strength * love.timer.getDelta()
+        local pullY = (dy / dist) * strength * love.timer.getDelta()
+        p.x = math.max(30, math.min(screen.WIDTH - 30, p.x + pullX))
+        p.y = math.max(30, math.min(screen.HEIGHT - 30, p.y + pullY))
+      end
+    end
+
+    -- Scarlet Rot zones: DOT damage
+    if not p.invulnerable then
+      local rotDamage = sectorzboss.checkRotZoneDamage(p.x, p.y, 20)
+      if rotDamage > 0 then
+        player.takeDamage(p, rotDamage)
+        particles.spawn(p.x, p.y, 8, {0.8, 0.2, 0.1})
       end
     end
   end
@@ -1621,6 +1780,7 @@ function M.draw()
     ui.drawBoss()
     ui.drawBolseStation()
     ui.drawVenomBoss()
+    ui.drawSectorZBoss()
     ui.drawMaze()
     ui.drawRival()
     ui.drawRivalLasers()
@@ -1654,12 +1814,12 @@ function M.draw()
     ui.drawBackground()
     local fadeAlpha = gameState.fadeTimer / gameState.fadeDuration
     love.graphics.setColor(0, 0, 0, fadeAlpha)
-    love.graphics.rectangle("fill", 0, 0, 800, 600)
+    love.graphics.rectangle("fill", 0, 0, screen.WIDTH, screen.HEIGHT)
   elseif gameState.state == "fadingtostation" then
     ui.drawBackground()
     local fadeAlpha = gameState.fadeTimer / gameState.fadeDuration
     love.graphics.setColor(0, 0, 0, fadeAlpha)
-    love.graphics.rectangle("fill", 0, 0, 800, 600)
+    love.graphics.rectangle("fill", 0, 0, screen.WIDTH, screen.HEIGHT)
   elseif gameState.state == "restarting" then
     -- Draw current game state in background (same as playing state)
     ui.drawBackground()
@@ -1671,6 +1831,7 @@ function M.draw()
     ui.drawBoss()
     ui.drawBolseStation()
     ui.drawVenomBoss()
+    ui.drawSectorZBoss()
     ui.drawMaze()
     ui.drawRival()
     ui.drawRivalLasers()
@@ -1691,7 +1852,7 @@ function M.draw()
     -- White fade overlay
     local fadeAlpha = gameState.fadeTimer / gameState.fadeDuration
     love.graphics.setColor(1, 1, 1, fadeAlpha)
-    love.graphics.rectangle("fill", 0, 0, 800, 600)
+    love.graphics.rectangle("fill", 0, 0, screen.WIDTH, screen.HEIGHT)
   elseif gameState.state == "paused" then
     -- Draw game in background
     ui.drawBackground()
@@ -1703,6 +1864,7 @@ function M.draw()
     ui.drawBoss()
     ui.drawBolseStation()
     ui.drawVenomBoss()
+    ui.drawSectorZBoss()
     ui.drawMaze()
     ui.drawRival()
     ui.drawRivalLasers()
@@ -1733,6 +1895,7 @@ function M.draw()
     ui.drawBoss()
     ui.drawBolseStation()
     ui.drawVenomBoss()
+    ui.drawSectorZBoss()
     ui.drawMaze()
     ui.drawRival()
     ui.drawRivalLasers()

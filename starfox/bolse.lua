@@ -1,6 +1,5 @@
 local M = {}
-
-M.station = nil
+local screen = require("starfox.screen")
 
 function M.reset()
   M.station = nil
@@ -8,7 +7,7 @@ end
 
 function M.spawn(x)
   M.station = {
-    x = x or 400,
+    x = x or screen.WIDTH / 2,
     y = -200,
     targetY = 150,
     width = 250,

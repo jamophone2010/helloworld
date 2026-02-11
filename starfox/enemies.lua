@@ -1,6 +1,5 @@
 local M = {}
-
-M.enemies = {}
+local screen = require("starfox.screen")
 
 function M.reset()
   M.enemies = {}
@@ -118,9 +117,9 @@ function M.update(dt, playerX, playerY, speedScale, attractToPlayer)
 
     enemy.shootTimer = enemy.shootTimer - dt
 
-    if enemy.y > 650 or enemy.y < -50 then
+    if enemy.y > screen.HEIGHT + 50 or enemy.y < -50 then
       -- Count enemies that escaped through the bottom
-      if enemy.y > 650 then
+      if enemy.y > screen.HEIGHT + 50 then
         escapedCount = escapedCount + 1
       end
       table.remove(M.enemies, i)

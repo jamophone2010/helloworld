@@ -1,6 +1,5 @@
 local M = {}
-
-M.currentBoss = nil
+local screen = require("starfox.screen")
 
 function M.reset()
   M.currentBoss = nil
@@ -9,7 +8,7 @@ end
 function M.spawnMidBoss()
   M.currentBoss = {
     type = "midboss",
-    x = 400,
+    x = screen.WIDTH / 2,
     y = -100,
     targetY = 100,
     width = 80,
@@ -28,7 +27,7 @@ end
 function M.spawnFinalBoss()
   M.currentBoss = {
     type = "finalboss",
-    x = 400,
+    x = screen.WIDTH / 2,
     y = -150,
     targetY = 80,
     width = 150,
@@ -49,7 +48,7 @@ end
 function M.spawnArea6Boss()
   M.currentBoss = {
     type = "area6boss",
-    x = 400,
+    x = screen.WIDTH / 2,
     y = -180,
     targetY = 100,
     width = 180,
@@ -95,7 +94,7 @@ function M.update(dt, playerX, playerY)
 
   elseif boss.type == "finalboss" then
     if boss.phase == 1 then
-      boss.x = 400 + math.sin(love.timer.getTime()) * 100
+      boss.x = screen.WIDTH / 2 + math.sin(love.timer.getTime()) * 100
 
       if boss.leftArm.destroyed and boss.rightArm.destroyed then
         boss.phase = 2
@@ -126,7 +125,7 @@ function M.update(dt, playerX, playerY)
   elseif boss.type == "area6boss" then
     if boss.phase == 1 then
       -- Phase 1: Shield generators active
-      boss.x = 400 + math.sin(love.timer.getTime() * 0.8) * 120
+      boss.x = screen.WIDTH / 2 + math.sin(love.timer.getTime() * 0.8) * 120
 
       if boss.attackTimer <= 0 then
         boss.attackTimer = 1.8
@@ -143,7 +142,7 @@ function M.update(dt, playerX, playerY)
 
     elseif boss.phase == 2 then
       -- Phase 2: Core exposed, 4-way spread attacks
-      boss.x = 400 + math.sin(love.timer.getTime() * 1.5) * 80
+      boss.x = screen.WIDTH / 2 + math.sin(love.timer.getTime() * 1.5) * 80
 
       if boss.attackTimer <= 0 then
         boss.attackTimer = 0.6

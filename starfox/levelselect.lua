@@ -1,6 +1,5 @@
 local M = {}
-
--- Progression state (set externally from hub)
+local screen = require("starfox.screen")
 M.hasMegaAntenna = false
 M.hasPowerAmplifier = false
 M.returnToHub = nil -- Callback to return to hub
@@ -116,8 +115,8 @@ function M.load()
   parchmentTexture = {}
   for i = 1, 200 do
     table.insert(parchmentTexture, {
-      x = math.random(800),
-      y = math.random(600),
+      x = math.random(screen.WIDTH),
+      y = math.random(screen.HEIGHT),
       size = math.random(2, 8),
       alpha = math.random() * 0.15 + 0.05
     })
@@ -127,8 +126,8 @@ function M.load()
   decorations.vines = {}
   for i = 1, 40 do
     table.insert(decorations.vines, {
-      x = math.random() < 0.5 and math.random(0, 60) or math.random(740, 800),
-      y = math.random(600),
+      x = math.random() < 0.5 and math.random(0, 60) or math.random(screen.WIDTH - 60, screen.WIDTH),
+      y = math.random(screen.HEIGHT),
       length = math.random(20, 60),
       curve = math.random() * 2 - 1
     })
@@ -182,21 +181,21 @@ function M.navigate(direction)
   local bestScore = math.huge
 
   -- Calculate current position
-  local cx, cy = 400, 300
+  local cx, cy = screen.WIDTH / 2, screen.HEIGHT / 2
   if current.ring ~= "center" then
     local rad = math.rad(current.angle - 90)
-    cx = 400 + math.cos(rad) * currentRing.radius
-    cy = 300 + math.sin(rad) * currentRing.radius
+    cx = screen.WIDTH / 2 + math.cos(rad) * currentRing.radius
+    cy = screen.HEIGHT / 2 + math.sin(rad) * currentRing.radius
   end
 
   for i, loc in ipairs(LOCATIONS) do
     if i ~= selectedIndex then
       local ring = RINGS[loc.ring]
-      local lx, ly = 400, 300
+      local lx, ly = screen.WIDTH / 2, screen.HEIGHT / 2
       if loc.ring ~= "center" then
         local rad = math.rad(loc.angle - 90)
-        lx = 400 + math.cos(rad) * ring.radius
-        ly = 300 + math.sin(rad) * ring.radius
+        lx = screen.WIDTH / 2 + math.cos(rad) * ring.radius
+        ly = screen.HEIGHT / 2 + math.sin(rad) * ring.radius
       end
 
       local dx = lx - cx
@@ -243,11 +242,11 @@ function M.update(dt)
 end
 
 function M.draw()
-  local centerX, centerY = 400, 300
+  local centerX, centerY = screen.WIDTH / 2, screen.HEIGHT / 2
 
   -- Background: aged parchment
   love.graphics.setColor(0.92, 0.87, 0.76)
-  love.graphics.rectangle("fill", 0, 0, 800, 600)
+  love.graphics.rectangle("fill", 0, 0, screen.WIDTH, screen.HEIGHT)
 
   -- Parchment texture spots (age marks)
   for _, spot in ipairs(parchmentTexture) do
@@ -260,23 +259,23 @@ function M.draw()
   for i = 0, 40 do
     local alpha = (40 - i) / 40 * 0.4
     love.graphics.setColor(0.3, 0.2, 0.1, alpha * 0.3)
-    love.graphics.rectangle("line", i, i, 800 - i*2, 600 - i*2)
+    love.graphics.rectangle("line", i, i, screen.WIDTH - i*2, screen.HEIGHT - i*2)
   end
 
   -- Decorative border
   love.graphics.setColor(0.45, 0.35, 0.2)
   love.graphics.setLineWidth(3)
-  love.graphics.rectangle("line", 15, 15, 770, 570)
+  love.graphics.rectangle("line", 15, 15, screen.WIDTH - 30, screen.HEIGHT - 30)
   love.graphics.setLineWidth(1)
-  love.graphics.rectangle("line", 20, 20, 760, 560)
+  love.graphics.rectangle("line", 20, 20, screen.WIDTH - 40, screen.HEIGHT - 40)
 
   -- Corner flourishes
   local flourish = "~*~"
   love.graphics.setColor(0.4, 0.3, 0.15)
   love.graphics.print(flourish, 25, 18)
-  love.graphics.print(flourish, 755, 18)
-  love.graphics.print(flourish, 25, 565)
-  love.graphics.print(flourish, 755, 565)
+  love.graphics.print(flourish, screen.WIDTH - 45, 18)
+  love.graphics.print(flourish, 25, screen.HEIGHT - 35)
+  love.graphics.print(flourish, screen.WIDTH - 45, screen.HEIGHT - 35)
 
   -- Title with LOTR styling
   love.graphics.setColor(0.25, 0.15, 0.05)
@@ -388,20 +387,20 @@ function M.draw()
 
   -- Info panel background
   love.graphics.setColor(0.85, 0.8, 0.7, 0.9)
-  love.graphics.rectangle("fill", 50, 500, 700, 80, 5, 5)
+  love.graphics.rectangle("fill", 50, screen.HEIGHT - 100, screen.WIDTH - 100, 80, 5, 5)
   love.graphics.setColor(0.4, 0.3, 0.2)
-  love.graphics.rectangle("line", 50, 500, 700, 80, 5, 5)
+  love.graphics.rectangle("line", 50, screen.HEIGHT - 100, screen.WIDTH - 100, 80, 5, 5)
 
   -- Selected name
   love.graphics.setColor(0.25, 0.15, 0.05)
   local selName = "~ " .. selected.name .. " ~"
   local selWidth = love.graphics.getFont():getWidth(selName)
-  love.graphics.print(selName, 400 - selWidth/2, 510)
+  love.graphics.print(selName, centerX - selWidth/2, screen.HEIGHT - 90)
 
   -- Description
   love.graphics.setColor(0.4, 0.3, 0.15)
   local descWidth = love.graphics.getFont():getWidth(selected.description)
-  love.graphics.print(selected.description, 400 - descWidth/2, 530)
+  love.graphics.print(selected.description, centerX - descWidth/2, screen.HEIGHT - 70)
 
   -- Access status
   if not accessible then
@@ -409,7 +408,7 @@ function M.draw()
     local ring = RINGS[selected.ring]
     local lockMsg = ring.subtitle
     local lockWidth = love.graphics.getFont():getWidth(lockMsg)
-    love.graphics.print(lockMsg, 400 - lockWidth/2, 550)
+    love.graphics.print(lockMsg, centerX - lockWidth/2, screen.HEIGHT - 50)
   else
     love.graphics.setColor(0.3, 0.5, 0.3)
     local accessMsg = "Press ENTER to embark upon this quest"
@@ -417,27 +416,27 @@ function M.draw()
       accessMsg = "Press ENTER to return to thy haven"
     end
     local accessWidth = love.graphics.getFont():getWidth(accessMsg)
-    love.graphics.print(accessMsg, 400 - accessWidth/2, 550)
+    love.graphics.print(accessMsg, centerX - accessWidth/2, screen.HEIGHT - 50)
   end
 
   -- Progression indicators (top right)
   love.graphics.setColor(0.4, 0.3, 0.15)
-  love.graphics.print("Artifacts:", 650, 75)
+  love.graphics.print("Artifacts:", screen.WIDTH - 200, 75)
 
   if M.hasMegaAntenna then
     love.graphics.setColor(0.6, 0.5, 0.2)
-    love.graphics.print("[Mega Antenna]", 650, 95)
+    love.graphics.print("[Mega Antenna]", screen.WIDTH - 200, 95)
   else
     love.graphics.setColor(0.5, 0.45, 0.4, 0.5)
-    love.graphics.print("[???]", 650, 95)
+    love.graphics.print("[???]", screen.WIDTH - 200, 95)
   end
 
   if M.hasPowerAmplifier then
     love.graphics.setColor(0.6, 0.5, 0.2)
-    love.graphics.print("[Power Amplifier]", 650, 115)
+    love.graphics.print("[Power Amplifier]", screen.WIDTH - 200, 115)
   else
     love.graphics.setColor(0.5, 0.45, 0.4, 0.5)
-    love.graphics.print("[???]", 650, 115)
+    love.graphics.print("[???]", screen.WIDTH - 200, 115)
   end
 
   -- Controls hint (bottom left)
@@ -449,7 +448,7 @@ function M.draw()
   -- Fade overlay
   if fadeAlpha > 0 then
     love.graphics.setColor(0, 0, 0, fadeAlpha)
-    love.graphics.rectangle("fill", 0, 0, 800, 600)
+    love.graphics.rectangle("fill", 0, 0, screen.WIDTH, screen.HEIGHT)
   end
 end
 

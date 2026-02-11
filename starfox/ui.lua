@@ -1,4 +1,5 @@
 local M = {}
+local screen = require("starfox.screen")
 local terrain = require("starfox.terrain")
 local weapons = require("starfox.weapons")
 local enemies = require("starfox.enemies")
@@ -16,6 +17,7 @@ local bolse = require("starfox.bolse")
 local rival = require("starfox.rival")
 local maze = require("starfox.maze")
 local venomboss = require("starfox.venomboss")
+local sectorzboss = require("starfox.sectorzboss")
 local bossexplosion = require("starfox.bossexplosion")
 local supershot = require("starfox.supershot")
 local abilities = require("starfox.abilities")
@@ -77,8 +79,8 @@ function M.drawIntro(timer, levelName, levelId, enemyCount)
     local time = love.timer.getTime()
     for i = 1, 40 do
       local speed = 300 + i * 40
-      local x = 400 + math.sin(i * 0.7 + time * 2) * (150 + i * 3)
-      local y = (timer * speed * 2 + i * 30) % 700 - 50
+      local x = screen.WIDTH / 2 + math.sin(i * 0.7 + time * 2) * (150 + i * 3)
+      local y = (timer * speed * 2 + i * 30) % (screen.HEIGHT + 100) - 50
       local streakLen = 20 + i * 1.5
       local alpha = lineAlpha * (0.3 + (i / 40) * 0.5)
       love.graphics.setColor(0.6, 0.8, 1, alpha)
@@ -92,7 +94,7 @@ function M.drawIntro(timer, levelName, levelId, enemyCount)
   if timer < 1.0 then
     local whiteAlpha = 1.0 - timer
     love.graphics.setColor(1, 1, 1, whiteAlpha)
-    love.graphics.rectangle("fill", 0, 0, 800, 600)
+    love.graphics.rectangle("fill", 0, 0, screen.WIDTH, screen.HEIGHT)
   end
 
   -- IntroTitle overlay
@@ -113,7 +115,7 @@ function M.drawIntro(timer, levelName, levelId, enemyCount)
   if titleAlpha > 0 then
     -- Semi-transparent dark backdrop for readability
     love.graphics.setColor(0, 0, 0, 0.4 * titleAlpha)
-    love.graphics.rectangle("fill", 0, 0, 800, 600)
+    love.graphics.rectangle("fill", 0, 0, screen.WIDTH, screen.HEIGHT)
 
     -- Split stage name into words for stacking
     local words = {}
@@ -135,14 +137,14 @@ function M.drawIntro(timer, levelName, levelId, enemyCount)
     -- Line 1: Stage number
     love.graphics.setFont(fonts.normal)
     love.graphics.setColor(0.8, 0.8, 0.9, titleAlpha)
-    love.graphics.printf("Stage #" .. levelId .. ":", 0, startY, 800, "center")
+    love.graphics.printf("Stage #" .. levelId .. ":", 0, startY, screen.WIDTH, "center")
     startY = startY + stageLineH + 8
 
     -- Line 2 (+3): Stage name - each word stacked
     love.graphics.setFont(fonts.xlarge)
     love.graphics.setColor(1, 1, 1, titleAlpha)
     for _, word in ipairs(words) do
-      love.graphics.printf(word, 0, startY, 800, "center")
+      love.graphics.printf(word, 0, startY, screen.WIDTH, "center")
       startY = startY + nameLineH
     end
     startY = startY + 12
@@ -150,7 +152,7 @@ function M.drawIntro(timer, levelName, levelId, enemyCount)
     -- Last line: Enemy count (blue, smaller)
     love.graphics.setFont(fonts.small)
     love.graphics.setColor(0.4, 0.7, 1, titleAlpha)
-    love.graphics.printf("Enemies Detected = " .. enemyCount, 0, startY, 800, "center")
+    love.graphics.printf("Enemies Detected = " .. enemyCount, 0, startY, screen.WIDTH, "center")
   end
 end
 
@@ -1074,13 +1076,13 @@ function M.drawMaze()
     love.graphics.rectangle("fill", 0, wall.y, wall.gapLeft, wall.height)
 
     -- Right wall section
-    love.graphics.rectangle("fill", wall.gapRight, wall.y, 800 - wall.gapRight, wall.height)
+    love.graphics.rectangle("fill", wall.gapRight, wall.y, screen.WIDTH - wall.gapRight, wall.height)
 
     -- Wall outlines
     love.graphics.setColor(0.5, 0.4, 0.5)
     love.graphics.setLineWidth(2)
     love.graphics.rectangle("line", 0, wall.y, wall.gapLeft, wall.height)
-    love.graphics.rectangle("line", wall.gapRight, wall.y, 800 - wall.gapRight, wall.height)
+    love.graphics.rectangle("line", wall.gapRight, wall.y, screen.WIDTH - wall.gapRight, wall.height)
 
     -- Gap indicators (subtle glow)
     love.graphics.setColor(0.3, 0.6, 0.3, 0.3)
@@ -1171,6 +1173,161 @@ function M.drawVenomBoss()
   love.graphics.printf("ANDROSS MECH", vb.x - 60, vb.y - vb.height/2 - 40, 120, "center")
 end
 
+function M.drawSectorZBoss()
+  local szb = sectorzboss.boss
+  if not szb or not szb.active then return end
+
+  love.graphics.push()
+  love.graphics.translate(szb.x, szb.y)
+
+  local alpha = szb.fadeAlpha or 1
+
+  -- Phase-based color (Elden Ring aesthetic: crimson/gold/black)
+  local phaseColors = {
+    {0.15, 0.1, 0.1},   -- Phase 1: Dark
+    {0.2, 0.1, 0.15},   -- Phase 2: Shadow
+    {0.25, 0.12, 0.1},  -- Phase 3: Void Waves tint
+    {0.2, 0.15, 0.2},   -- Phase 4: Gravity purple
+    {0.3, 0.15, 0.1},   -- Phase 5: Blood red
+    {0.1, 0.1, 0.15},   -- Phase 6: Void Blight dark
+    {0.35, 0.2, 0.1}    -- Phase 7: Void sLAYER gold/crimson
+  }
+  local baseColor = phaseColors[szb.phase] or phaseColors[1]
+
+  -- Main body - menacing dark form
+  love.graphics.setColor(baseColor[1] * alpha, baseColor[2] * alpha, baseColor[3] * alpha, alpha)
+  love.graphics.rectangle("fill", -szb.width/2, -szb.height/2, szb.width, szb.height)
+
+  -- Armored plating
+  love.graphics.setColor(0.1 * alpha, 0.08 * alpha, 0.08 * alpha, alpha)
+  love.graphics.rectangle("fill", -60, -45, 120, 30)
+  love.graphics.rectangle("fill", -70, 5, 140, 35)
+
+  -- Central eye/core - glowing based on phase
+  local coreColors = {
+    {0.8, 0.3, 0.2},   -- Phase 1: Orange
+    {0.6, 0.2, 0.8},   -- Phase 2: Purple (shadow)
+    {1, 0.2, 0.1},     -- Phase 3: Void Waves red
+    {0.5, 0.2, 1},     -- Phase 4: Gravity purple
+    {1, 0.5, 0.3},     -- Phase 5: Waterfowl gold
+    {0.2, 0.1, 0.1},   -- Phase 6: Void Blight black
+    {1, 0.8, 0.2}      -- Phase 7: Void sLAYER gold
+  }
+  local coreColor = coreColors[szb.phase] or coreColors[1]
+
+  -- Pulsing effect in later phases
+  local pulse = 1
+  if szb.phase >= 5 then
+    pulse = 0.7 + math.abs(math.sin(love.timer.getTime() * 6)) * 0.3
+  end
+  if szb.enraged then
+    pulse = 0.5 + math.abs(math.sin(love.timer.getTime() * 10)) * 0.5
+  end
+
+  love.graphics.setColor(coreColor[1] * pulse * alpha, coreColor[2] * pulse * alpha, coreColor[3] * pulse * alpha, alpha)
+  love.graphics.circle("fill", 0, -5, 35)
+
+  -- Core inner glow
+  love.graphics.setColor(1 * alpha, 1 * alpha, 1 * alpha, 0.6 * alpha)
+  love.graphics.circle("fill", 0, -5, 15)
+
+  -- Outer glow during transitions or attacks
+  if szb.phaseTransitioning or szb.enraged then
+    local glowPulse = math.abs(math.sin(love.timer.getTime() * 8))
+    love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], glowPulse * 0.5 * alpha)
+    love.graphics.circle("fill", 0, -5, 55)
+  end
+
+  -- Weapon ports
+  love.graphics.setColor(0.5 * alpha, 0.1 * alpha, 0.1 * alpha, alpha)
+  love.graphics.rectangle("fill", -55, 45, 30, 20)
+  love.graphics.rectangle("fill", 25, 45, 30, 20)
+  love.graphics.rectangle("fill", -15, 50, 30, 15)
+
+  -- Phase indicator wings/appendages
+  if szb.phase >= 3 then
+    love.graphics.setColor(0.6 * alpha, 0.15 * alpha, 0.15 * alpha, alpha * 0.8)
+    love.graphics.polygon("fill", -80, 0, -60, -30, -60, 30)
+    love.graphics.polygon("fill", 80, 0, 60, -30, 60, 30)
+  end
+
+  love.graphics.pop()
+
+  -- Draw rot zones (Void Waves - Phase 3+)
+  if szb.rotZones then
+    for _, zone in ipairs(szb.rotZones) do
+      local zonePulse = 0.3 + math.abs(math.sin(love.timer.getTime() * 3 + zone.x)) * 0.3
+      -- Outer glow
+      love.graphics.setColor(0.8, 0.2, 0.1, zonePulse * 0.3)
+      love.graphics.circle("fill", zone.x, zone.y, zone.radius + 10)
+      -- Inner zone
+      love.graphics.setColor(1, 0.3, 0.1, zonePulse * 0.5)
+      love.graphics.circle("fill", zone.x, zone.y, zone.radius)
+      -- Core
+      love.graphics.setColor(1, 0.5, 0.2, zonePulse * 0.7)
+      love.graphics.circle("fill", zone.x, zone.y, zone.radius * 0.5)
+    end
+  end
+
+  -- Draw gravity well indicator (Phase 4+)
+  if szb.gravityActive then
+    local wellPulse = 0.4 + math.abs(math.sin(love.timer.getTime() * 5)) * 0.4
+    love.graphics.setColor(0.4, 0.2, 0.8, wellPulse * 0.3)
+    love.graphics.circle("line", szb.x, szb.y, 150)
+    love.graphics.circle("line", szb.x, szb.y, 100)
+    love.graphics.circle("line", szb.x, szb.y, 50)
+  end
+
+  -- Attack warning indicators
+  local warning, progress = sectorzboss.getAttackWarning()
+  if warning then
+    love.graphics.setColor(1, 0.2, 0.2, 0.8)
+    love.graphics.setFont(love.graphics.newFont(16))
+    love.graphics.printf("!! " .. warning .. " !!", 0, screen.HEIGHT / 2 - 50, screen.WIDTH, "center")
+    -- Warning bar
+    love.graphics.setColor(0.3, 0.1, 0.1, 0.8)
+    love.graphics.rectangle("fill", screen.WIDTH/2 - 100, screen.HEIGHT/2 - 25, 200, 10)
+    love.graphics.setColor(1, 0.3, 0.1)
+    love.graphics.rectangle("fill", screen.WIDTH/2 - 100, screen.HEIGHT/2 - 25, 200 * progress, 10)
+  end
+
+  -- Health bar (Elden Ring style - large at bottom)
+  local healthPct = szb.health / szb.maxHealth
+  local barWidth = 300
+  local barX = screen.WIDTH/2 - barWidth/2
+  local barY = 30
+
+  -- Background
+  love.graphics.setColor(0.1, 0.1, 0.1, 0.9)
+  love.graphics.rectangle("fill", barX - 2, barY - 2, barWidth + 4, 16)
+
+  -- Health segments (7 phases visible)
+  for i = 1, 7 do
+    local segStart = (i - 1) / 7
+    local segEnd = i / 7
+    if healthPct > segStart then
+      local segWidth = math.min(healthPct, segEnd) - segStart
+      local phaseColor = coreColors[i]
+      love.graphics.setColor(phaseColor[1], phaseColor[2], phaseColor[3])
+      love.graphics.rectangle("fill", barX + segStart * barWidth, barY, segWidth * barWidth, 12)
+    end
+    -- Segment divider
+    love.graphics.setColor(0, 0, 0)
+    love.graphics.rectangle("fill", barX + (i / 7) * barWidth - 1, barY, 2, 12)
+  end
+
+  -- Phase indicator
+  love.graphics.setColor(1, 0.8, 0.4)
+  love.graphics.setFont(love.graphics.newFont(10))
+  love.graphics.printf("PHASE " .. szb.phase .. "/7", barX, barY + 14, barWidth, "center")
+
+  -- Boss name
+  local bossName = szb.enraged and "AGENT OF THE MACHINE - VOID SLAYER" or "AGENT OF THE MACHINE"
+  love.graphics.setColor(1, 0.7, 0.3)
+  love.graphics.setFont(love.graphics.newFont(14))
+  love.graphics.printf(bossName, barX, barY - 20, barWidth, "center")
+end
+
 function M.drawParticles()
   for _, p in ipairs(particles.particles) do
     local alpha = p.life / p.maxLife
@@ -1215,24 +1372,24 @@ function M.drawMenu()
   love.graphics.setBackgroundColor(0, 0, 0)
   love.graphics.setFont(fonts.large)
   love.graphics.setColor(0.3, 0.5, 1)
-  love.graphics.printf("STARFOX 2D", 0, 200, 800, "center")
+  love.graphics.printf("STARFOX 2D", 0, 200, screen.WIDTH, "center")
 
   love.graphics.setFont(fonts.normal)
   love.graphics.setColor(1, 1, 1)
-  love.graphics.printf("CORNERIA", 0, 250, 800, "center")
-  love.graphics.printf("Press SPACE to start", 0, 320, 800, "center")
-  love.graphics.printf("Arrows: Move | SPACE: Shoot | Z: Barrel Roll | X: Bomb", 0, 360, 800, "center")
+  love.graphics.printf("CORNERIA", 0, 250, screen.WIDTH, "center")
+  love.graphics.printf("Press SPACE to start", 0, 320, screen.WIDTH, "center")
+  love.graphics.printf("Arrows: Move | SPACE: Shoot | Z: Barrel Roll | X: Bomb", 0, 360, screen.WIDTH, "center")
 end
 
 function M.drawGameOver(score)
   love.graphics.setFont(fonts.large)
   love.graphics.setColor(1, 0, 0)
-  love.graphics.printf("MISSION FAILED", 0, 200, 800, "center")
+  love.graphics.printf("MISSION FAILED", 0, 200, screen.WIDTH, "center")
 
   love.graphics.setFont(fonts.normal)
   love.graphics.setColor(1, 1, 1)
-  love.graphics.printf("Final Score: " .. score, 0, 280, 800, "center")
-  love.graphics.printf("Press R to retry", 0, 340, 800, "center")
+  love.graphics.printf("Final Score: " .. score, 0, 280, screen.WIDTH, "center")
+  love.graphics.printf("Press R to retry", 0, 340, screen.WIDTH, "center")
 end
 
 function M.startVictoryAnimation(enemiesDefeated, totalEnemies, notesEarned)
@@ -1405,17 +1562,17 @@ function M.drawVictory(enemiesDefeated, totalEnemies, notesEarned)
 
   love.graphics.setFont(fonts.large)
   love.graphics.setColor(titleColor)
-  love.graphics.printf(title, 0, 150, 800, "center")
+  love.graphics.printf(title, 0, 150, screen.WIDTH, "center")
 
   -- Enemies Defeated line with counting animation
   love.graphics.setFont(fonts.normal)
   love.graphics.setColor(1, 1, 1)
-  love.graphics.printf(string.format("Enemies Defeated: %d / %d (%.1f%%)", dispEnemies, totalEnemies, percentage), 0, 230, 800, "center")
+  love.graphics.printf(string.format("Enemies Defeated: %d / %d (%.1f%%)", dispEnemies, totalEnemies, percentage), 0, 230, screen.WIDTH, "center")
 
   -- Rank (show only after counting done)
   if victoryState.countPhase ~= "counting" then
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("Rank: " .. rank, 0, 260, 800, "center")
+    love.graphics.printf("Rank: " .. rank, 0, 260, screen.WIDTH, "center")
   end
 
   -- Notes Earned with pulse animation
@@ -1432,7 +1589,7 @@ function M.drawVictory(enemiesDefeated, totalEnemies, notesEarned)
     love.graphics.setColor(1, 1, 0)
   end
   love.graphics.setFont(fonts.normal)
-  love.graphics.printf(string.format("Notes Earned: %d", dispNotes), -400, -10, 800, "center")
+  love.graphics.printf(string.format("Notes Earned: %d", dispNotes), -400, -10, screen.WIDTH, "center")
   love.graphics.pop()
 
   -- Draw medal bonuses
@@ -1444,7 +1601,7 @@ function M.drawVictory(enemiesDefeated, totalEnemies, notesEarned)
   if victoryState.countPhase == "done" then
     love.graphics.setFont(fonts.normal)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("Press R to continue", 0, 520, 800, "center")
+    love.graphics.printf("Press R to continue", 0, 520, screen.WIDTH, "center")
   end
 end
 
@@ -1662,27 +1819,27 @@ function M.drawWarp(score)
 
   love.graphics.setFont(fonts.large)
   love.graphics.setColor(0.4, 0.8, 1)
-  love.graphics.printf("WARP ZONE!", 0, 180, 800, "center")
+  love.graphics.printf("WARP ZONE!", 0, 180, screen.WIDTH, "center")
 
   love.graphics.setFont(fonts.normal)
   love.graphics.setColor(0.6, 0.9, 1)
-  love.graphics.printf("All 7 portals collected!", 0, 240, 800, "center")
+  love.graphics.printf("All 7 portals collected!", 0, 240, screen.WIDTH, "center")
 
   love.graphics.setColor(1, 1, 1)
-  love.graphics.printf("Final Score: " .. score, 0, 300, 800, "center")
-  love.graphics.printf("SECRET PATH UNLOCKED", 0, 340, 800, "center")
-  love.graphics.printf("Press R to continue", 0, 400, 800, "center")
+  love.graphics.printf("Final Score: " .. score, 0, 300, screen.WIDTH, "center")
+  love.graphics.printf("SECRET PATH UNLOCKED", 0, 340, screen.WIDTH, "center")
+  love.graphics.printf("Press R to continue", 0, 400, screen.WIDTH, "center")
 end
 
 function M.drawPostLevelMenu(selectedIndex)
   -- Semi-transparent overlay
   love.graphics.setColor(0, 0, 0, 0.8)
-  love.graphics.rectangle("fill", 0, 0, 800, 600)
+  love.graphics.rectangle("fill", 0, 0, screen.WIDTH, screen.HEIGHT)
 
   -- Title
   love.graphics.setFont(fonts.large)
   love.graphics.setColor(0.3, 0.5, 1)
-  love.graphics.printf("MISSION COMPLETE", 0, 150, 800, "center")
+  love.graphics.printf("MISSION COMPLETE", 0, 150, screen.WIDTH, "center")
 
   -- Menu options
   love.graphics.setFont(fonts.normal)
@@ -1692,17 +1849,17 @@ function M.drawPostLevelMenu(selectedIndex)
   for i, option in ipairs(options) do
     if i == selectedIndex then
       love.graphics.setColor(1, 1, 0)
-      love.graphics.printf("> " .. option .. " <", 0, startY + (i - 1) * 50, 800, "center")
+      love.graphics.printf("> " .. option .. " <", 0, startY + (i - 1) * 50, screen.WIDTH, "center")
     else
       love.graphics.setColor(0.7, 0.7, 0.7)
-      love.graphics.printf(option, 0, startY + (i - 1) * 50, 800, "center")
+      love.graphics.printf(option, 0, startY + (i - 1) * 50, screen.WIDTH, "center")
     end
   end
 
   -- Instructions
   love.graphics.setFont(fonts.small)
   love.graphics.setColor(0.5, 0.5, 0.5)
-  love.graphics.printf("Arrows: Navigate | ENTER: Select", 0, 450, 800, "center")
+  love.graphics.printf("Arrows: Navigate | ENTER: Select", 0, 450, screen.WIDTH, "center")
 end
 
 function M.drawLevelSelect()
@@ -1713,12 +1870,12 @@ end
 function M.drawPauseMenu(selectedIndex, isLevelSelect, enteredFromPortal)
   -- Semi-transparent overlay
   love.graphics.setColor(0, 0, 0, 0.7)
-  love.graphics.rectangle("fill", 0, 0, 800, 600)
+  love.graphics.rectangle("fill", 0, 0, screen.WIDTH, screen.HEIGHT)
 
   -- Title
   love.graphics.setFont(fonts.large)
   love.graphics.setColor(0.3, 0.5, 1)
-  love.graphics.printf("PAUSED", 0, 150, 800, "center")
+  love.graphics.printf("PAUSED", 0, 150, screen.WIDTH, "center")
 
   -- Menu options
   love.graphics.setFont(fonts.normal)
@@ -1734,38 +1891,38 @@ function M.drawPauseMenu(selectedIndex, isLevelSelect, enteredFromPortal)
   for i, option in ipairs(options) do
     if i == selectedIndex then
       love.graphics.setColor(1, 1, 0)
-      love.graphics.printf("> " .. option .. " <", 0, startY + (i - 1) * 40, 800, "center")
+      love.graphics.printf("> " .. option .. " <", 0, startY + (i - 1) * 40, screen.WIDTH, "center")
     else
       love.graphics.setColor(0.7, 0.7, 0.7)
-      love.graphics.printf(option, 0, startY + (i - 1) * 40, 800, "center")
+      love.graphics.printf(option, 0, startY + (i - 1) * 40, screen.WIDTH, "center")
     end
   end
 
   -- Instructions
   love.graphics.setFont(fonts.small)
   love.graphics.setColor(0.5, 0.5, 0.5)
-  love.graphics.printf("Arrows: Navigate | ENTER: Select | ESC: Resume", 0, 450, 800, "center")
+  love.graphics.printf("Arrows: Navigate | ENTER: Select | ESC: Resume", 0, 450, screen.WIDTH, "center")
 end
 
 function M.drawOptionsMenu()
   -- Semi-transparent overlay
   love.graphics.setColor(0, 0, 0, 0.7)
-  love.graphics.rectangle("fill", 0, 0, 800, 600)
+  love.graphics.rectangle("fill", 0, 0, screen.WIDTH, screen.HEIGHT)
 
   -- Title
   love.graphics.setFont(fonts.large)
   love.graphics.setColor(0.3, 0.5, 1)
-  love.graphics.printf("OPTIONS", 0, 200, 800, "center")
+  love.graphics.printf("OPTIONS", 0, 200, screen.WIDTH, "center")
 
   -- Placeholder text
   love.graphics.setFont(fonts.normal)
   love.graphics.setColor(0.7, 0.7, 0.7)
-  love.graphics.printf("Options menu coming soon...", 0, 280, 800, "center")
+  love.graphics.printf("Options menu coming soon...", 0, 280, screen.WIDTH, "center")
 
   -- Instructions
   love.graphics.setFont(fonts.small)
   love.graphics.setColor(0.5, 0.5, 0.5)
-  love.graphics.printf("ESC: Back", 0, 450, 800, "center")
+  love.graphics.printf("ESC: Back", 0, 450, screen.WIDTH, "center")
 end
 
 return M

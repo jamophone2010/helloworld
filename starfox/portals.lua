@@ -1,6 +1,5 @@
 local M = {}
-
-M.portals = {}
+local screen = require("starfox.screen")
 M.collected = 0
 M.totalRequired = 7
 M.warpTriggered = false
@@ -37,7 +36,7 @@ function M.update(dt)
     portal.pulse = portal.pulse + dt * 4
 
     -- Remove if off screen
-    if portal.y > 650 then
+    if portal.y > screen.HEIGHT + 50 then
       table.remove(M.portals, i)
     end
   end

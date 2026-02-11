@@ -1,4 +1,5 @@
 local M = {}
+local screen = require("starfox.screen")
 
 M.scrollOffset = 0
 M.scrollSpeed = 100
@@ -11,8 +12,8 @@ function M.reset()
 
   for i = 1, 100 do
     table.insert(M.stars, {
-      x = math.random(800),
-      y = math.random(600),
+      x = math.random(screen.WIDTH),
+      y = math.random(screen.HEIGHT),
       speed = math.random(20, 80),
       size = math.random(1, 2)
     })
@@ -27,9 +28,9 @@ function M.update(dt)
   for _, star in ipairs(M.stars) do
     star.y = star.y + star.speed * dt
 
-    if star.y > 600 then
+    if star.y > screen.HEIGHT then
       star.y = 0
-      star.x = math.random(800)
+      star.x = math.random(screen.WIDTH)
     end
   end
 end

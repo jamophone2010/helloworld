@@ -1,71 +1,71 @@
 local M = {}
 
 M.CORNERIA = {
-  {time = 2, type = "wave", formation = "v", x = 400, count = 5},
-  {time = 8, type = "wave", formation = "line", x = 400, count = 4},
-  {time = 15, type = "wave", formation = "v", x = 300, count = 5},
-  {time = 20, type = "wave", formation = "v", x = 500, count = 5},
+  {time = 2, type = "wave", formation = "v", x = 683, count = 5},
+  {time = 8, type = "wave", formation = "line", x = 683, count = 4},
+  {time = 15, type = "wave", formation = "v", x = 512, count = 5},
+  {time = 20, type = "wave", formation = "v", x = 854, count = 5},
   {time = 25, type = "callout", message = "triggerEnemyWarning"},
-  {time = 30, type = "turret", x = 200},
-  {time = 32, type = "turret", x = 600},
-  {time = 35, type = "wave", formation = "line", x = 400, count = 6},
-  {time = 40, type = "turret", x = 400},
+  {time = 30, type = "turret", x = 341},
+  {time = 32, type = "turret", x = 1025},
+  {time = 35, type = "wave", formation = "line", x = 683, count = 6},
+  {time = 40, type = "turret", x = 683},
   {time = 45, type = "callout", message = "triggerBossWarning"},
   {time = 47, type = "midboss"},
-  {time = 65, type = "wave", formation = "v", x = 400, count = 7},
-  {time = 70, type = "turret", x = 150},
-  {time = 70, type = "turret", x = 650},
-  {time = 75, type = "wave", formation = "wave", x = 400, count = 8},
+  {time = 65, type = "wave", formation = "v", x = 683, count = 7},
+  {time = 70, type = "turret", x = 256},
+  {time = 70, type = "turret", x = 1110},
+  {time = 75, type = "wave", formation = "wave", x = 683, count = 8},
   {time = 80, type = "callout", message = "triggerCover"},
-  {time = 85, type = "wave", formation = "v", x = 300, count = 5},
-  {time = 85, type = "wave", formation = "v", x = 500, count = 5},
+  {time = 85, type = "wave", formation = "v", x = 512, count = 5},
+  {time = 85, type = "wave", formation = "v", x = 854, count = 5},
   {time = 95, type = "callout", message = "triggerBossWarning"},
   {time = 100, type = "finalboss"}
 }
 
 M.AREA6 = {
   -- Intense opening - wave after wave
-  {time = 2, type = "wave", formation = "v", x = 400, count = 7},
-  {time = 5, type = "wave", formation = "line", x = 400, count = 6},
-  {time = 8, type = "capitalship", x = 400},
-  {time = 9, type = "wave", formation = "v", x = 300, count = 5},
-  {time = 12, type = "wave", formation = "v", x = 500, count = 5},
+  {time = 2, type = "wave", formation = "v", x = 683, count = 7},
+  {time = 5, type = "wave", formation = "line", x = 683, count = 6},
+  {time = 8, type = "capitalship", x = 683},
+  {time = 9, type = "wave", formation = "v", x = 512, count = 5},
+  {time = 12, type = "wave", formation = "v", x = 854, count = 5},
   {time = 15, type = "callout", message = "triggerEnemyWarning"},
-  {time = 16, type = "wave", formation = "wave", x = 400, count = 8},
-  {time = 19, type = "turret", x = 150},
-  {time = 19, type = "turret", x = 650},
-  {time = 22, type = "wave", formation = "line", x = 400, count = 7},
+  {time = 16, type = "wave", formation = "wave", x = 683, count = 8},
+  {time = 19, type = "turret", x = 256},
+  {time = 19, type = "turret", x = 1110},
+  {time = 22, type = "wave", formation = "line", x = 683, count = 7},
 
   -- Second capital ship wave
-  {time = 25, type = "capitalship", x = 300},
-  {time = 26, type = "wave", formation = "v", x = 500, count = 6},
-  {time = 29, type = "wave", formation = "v", x = 200, count = 5},
-  {time = 29, type = "wave", formation = "v", x = 600, count = 5},
-  {time = 32, type = "turret", x = 400},
-  {time = 35, type = "wave", formation = "wave", x = 400, count = 8},
+  {time = 25, type = "capitalship", x = 512},
+  {time = 26, type = "wave", formation = "v", x = 854, count = 6},
+  {time = 29, type = "wave", formation = "v", x = 341, count = 5},
+  {time = 29, type = "wave", formation = "v", x = 1025, count = 5},
+  {time = 32, type = "turret", x = 683},
+  {time = 35, type = "wave", formation = "wave", x = 683, count = 8},
   {time = 38, type = "callout", message = "triggerCover"},
-  {time = 40, type = "wave", formation = "line", x = 300, count = 6},
-  {time = 40, type = "wave", formation = "line", x = 500, count = 6},
+  {time = 40, type = "wave", formation = "line", x = 512, count = 6},
+  {time = 40, type = "wave", formation = "line", x = 854, count = 6},
 
   -- Third capital ship - flanking
-  {time = 45, type = "capitalship", x = 200},
-  {time = 46, type = "capitalship", x = 600},
-  {time = 48, type = "wave", formation = "v", x = 400, count = 8},
-  {time = 51, type = "turret", x = 200},
-  {time = 51, type = "turret", x = 400},
-  {time = 51, type = "turret", x = 600},
-  {time = 54, type = "wave", formation = "wave", x = 400, count = 9},
-  {time = 57, type = "wave", formation = "v", x = 300, count = 6},
-  {time = 57, type = "wave", formation = "v", x = 500, count = 6},
+  {time = 45, type = "capitalship", x = 341},
+  {time = 46, type = "capitalship", x = 1025},
+  {time = 48, type = "wave", formation = "v", x = 683, count = 8},
+  {time = 51, type = "turret", x = 341},
+  {time = 51, type = "turret", x = 683},
+  {time = 51, type = "turret", x = 1025},
+  {time = 54, type = "wave", formation = "wave", x = 683, count = 9},
+  {time = 57, type = "wave", formation = "v", x = 512, count = 6},
+  {time = 57, type = "wave", formation = "v", x = 854, count = 6},
 
   -- Final push before boss
   {time = 60, type = "callout", message = "triggerEnemyWarning"},
-  {time = 62, type = "capitalship", x = 400},
-  {time = 63, type = "wave", formation = "line", x = 400, count = 8},
-  {time = 66, type = "wave", formation = "v", x = 400, count = 7},
-  {time = 69, type = "wave", formation = "wave", x = 400, count = 10},
-  {time = 72, type = "wave", formation = "v", x = 250, count = 5},
-  {time = 72, type = "wave", formation = "v", x = 550, count = 5},
+  {time = 62, type = "capitalship", x = 683},
+  {time = 63, type = "wave", formation = "line", x = 683, count = 8},
+  {time = 66, type = "wave", formation = "v", x = 683, count = 7},
+  {time = 69, type = "wave", formation = "wave", x = 683, count = 10},
+  {time = 72, type = "wave", formation = "v", x = 427, count = 5},
+  {time = 72, type = "wave", formation = "v", x = 940, count = 5},
 
   -- Area 6 Boss
   {time = 75, type = "callout", message = "triggerBossWarning"},
@@ -74,15 +74,15 @@ M.AREA6 = {
 
 M.MACBETH = {
   -- 7 groups of enemies in different formations
-  {time = 2, type = "wave", formation = "v", x = 350, count = 6},
-  {time = 8, type = "wave", formation = "line", x = 400, count = 7},
-  {time = 14, type = "wave", formation = "wave", x = 400, count = 8},
+  {time = 2, type = "wave", formation = "v", x = 598, count = 6},
+  {time = 8, type = "wave", formation = "line", x = 683, count = 7},
+  {time = 14, type = "wave", formation = "wave", x = 683, count = 8},
   {time = 20, type = "callout", message = "triggerRivalWarning"},
   {time = 22, type = "rival", hp = 35, variant = "teleport"},
-  {time = 28, type = "wave", formation = "v", x = 300, count = 5},
-  {time = 34, type = "wave", formation = "v", x = 500, count = 5},
-  {time = 40, type = "wave", formation = "line", x = 400, count = 6},
-  {time = 50, type = "wave", formation = "v", x = 400, count = 7},
+  {time = 28, type = "wave", formation = "v", x = 512, count = 5},
+  {time = 34, type = "wave", formation = "v", x = 854, count = 5},
+  {time = 40, type = "wave", formation = "line", x = 683, count = 6},
+  {time = 50, type = "wave", formation = "v", x = 683, count = 7},
   {time = 58, type = "callout", message = "triggerBossWarning"},
   {time = 60, type = "finalboss"}
 }
@@ -90,22 +90,22 @@ M.MACBETH = {
 M.SECTORY = {
   -- Sector Y: Continuous waves of 10 enemies in a line every 5 seconds
   -- This level has infinite special attacks enabled
-  {time = 2, type = "wave", formation = "line", x = 400, count = 10},
-  {time = 7, type = "wave", formation = "line", x = 400, count = 10},
-  {time = 12, type = "wave", formation = "line", x = 400, count = 10},
-  {time = 17, type = "wave", formation = "line", x = 400, count = 10},
-  {time = 22, type = "wave", formation = "line", x = 400, count = 10},
-  {time = 27, type = "wave", formation = "line", x = 400, count = 10},
-  {time = 32, type = "wave", formation = "line", x = 400, count = 10},
-  {time = 37, type = "wave", formation = "line", x = 400, count = 10},
-  {time = 42, type = "wave", formation = "line", x = 400, count = 10},
-  {time = 47, type = "wave", formation = "line", x = 400, count = 10},
-  {time = 52, type = "wave", formation = "line", x = 400, count = 10},
-  {time = 57, type = "wave", formation = "line", x = 400, count = 10},
-  {time = 62, type = "wave", formation = "line", x = 400, count = 10},
-  {time = 67, type = "wave", formation = "line", x = 400, count = 10},
-  {time = 72, type = "wave", formation = "line", x = 400, count = 10},
-  {time = 77, type = "wave", formation = "line", x = 400, count = 10},
+  {time = 2, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 7, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 12, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 17, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 22, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 27, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 32, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 37, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 42, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 47, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 52, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 57, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 62, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 67, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 72, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 77, type = "wave", formation = "line", x = 683, count = 10},
   {time = 82, type = "callout", message = "triggerBossWarning"},
   {time = 87, type = "finalboss"}
 }
@@ -116,74 +116,74 @@ M.KATINA = {
   {time = 2, type = "allies"},
 
   -- Mothership descends
-  {time = 5, type = "mothership", x = 400},
+  {time = 5, type = "mothership", x = 683},
 
   -- Initial enemy waves
-  {time = 8, type = "wave", formation = "v", x = 400, count = 5},
-  {time = 12, type = "wave", formation = "line", x = 300, count = 4},
-  {time = 12, type = "wave", formation = "line", x = 500, count = 4},
+  {time = 8, type = "wave", formation = "v", x = 683, count = 5},
+  {time = 12, type = "wave", formation = "line", x = 512, count = 4},
+  {time = 12, type = "wave", formation = "line", x = 854, count = 4},
 
   -- Intensifying
-  {time = 18, type = "wave", formation = "v", x = 350, count = 6},
-  {time = 22, type = "wave", formation = "v", x = 450, count = 6},
+  {time = 18, type = "wave", formation = "v", x = 598, count = 6},
+  {time = 22, type = "wave", formation = "v", x = 769, count = 6},
   {time = 25, type = "callout", message = "triggerHelp"},
 
   -- Heavy assault
-  {time = 28, type = "wave", formation = "wave", x = 400, count = 8},
-  {time = 33, type = "wave", formation = "v", x = 300, count = 5},
-  {time = 33, type = "wave", formation = "v", x = 500, count = 5},
+  {time = 28, type = "wave", formation = "wave", x = 683, count = 8},
+  {time = 33, type = "wave", formation = "v", x = 512, count = 5},
+  {time = 33, type = "wave", formation = "v", x = 854, count = 5},
 
   -- Mid-battle callout
   {time = 38, type = "callout", message = "triggerMothershipWarning"},
-  {time = 40, type = "wave", formation = "line", x = 400, count = 6},
+  {time = 40, type = "wave", formation = "line", x = 683, count = 6},
 
   -- Final push
-  {time = 45, type = "wave", formation = "v", x = 400, count = 7},
-  {time = 50, type = "wave", formation = "wave", x = 400, count = 10},
-  {time = 55, type = "wave", formation = "v", x = 300, count = 5},
-  {time = 55, type = "wave", formation = "v", x = 500, count = 5},
+  {time = 45, type = "wave", formation = "v", x = 683, count = 7},
+  {time = 50, type = "wave", formation = "wave", x = 683, count = 10},
+  {time = 55, type = "wave", formation = "v", x = 512, count = 5},
+  {time = 55, type = "wave", formation = "v", x = 854, count = 5},
 
   -- Continuous waves (mothership spawns fighters throughout)
   {time = 60, type = "callout", message = "triggerCover"},
-  {time = 62, type = "wave", formation = "line", x = 400, count = 8},
-  {time = 68, type = "wave", formation = "v", x = 400, count = 6}
+  {time = 62, type = "wave", formation = "line", x = 683, count = 8},
+  {time = 68, type = "wave", formation = "v", x = 683, count = 6}
 }
 
 M.METEO = {
   -- Opening - asteroids and first portal
   {time = 0, type = "callout", message = "triggerWarpRings"},
-  {time = 3, type = "wave", formation = "line", x = 400, count = 4},
-  {time = 5, type = "portal", x = 400},  -- Portal 1
+  {time = 3, type = "wave", formation = "line", x = 683, count = 4},
+  {time = 5, type = "portal", x = 683},  -- Portal 1
 
-  {time = 8, type = "wave", formation = "v", x = 300, count = 5},
-  {time = 10, type = "wave", formation = "v", x = 500, count = 5},
-  {time = 13, type = "portal", x = 250},  -- Portal 2
+  {time = 8, type = "wave", formation = "v", x = 512, count = 5},
+  {time = 10, type = "wave", formation = "v", x = 854, count = 5},
+  {time = 13, type = "portal", x = 427},  -- Portal 2
 
-  {time = 16, type = "wave", formation = "wave", x = 400, count = 6},
-  {time = 20, type = "capitalship", x = 400},
-  {time = 22, type = "portal", x = 550},  -- Portal 3
+  {time = 16, type = "wave", formation = "wave", x = 683, count = 6},
+  {time = 20, type = "capitalship", x = 683},
+  {time = 22, type = "portal", x = 940},  -- Portal 3
 
   -- Mid-section intensifies
-  {time = 25, type = "wave", formation = "v", x = 400, count = 7},
-  {time = 28, type = "wave", formation = "line", x = 300, count = 5},
-  {time = 28, type = "wave", formation = "line", x = 500, count = 5},
-  {time = 32, type = "portal", x = 400},  -- Portal 4
+  {time = 25, type = "wave", formation = "v", x = 683, count = 7},
+  {time = 28, type = "wave", formation = "line", x = 512, count = 5},
+  {time = 28, type = "wave", formation = "line", x = 854, count = 5},
+  {time = 32, type = "portal", x = 683},  -- Portal 4
 
-  {time = 35, type = "wave", formation = "v", x = 350, count = 6},
-  {time = 38, type = "wave", formation = "v", x = 450, count = 6},
-  {time = 40, type = "capitalship", x = 250},
-  {time = 40, type = "capitalship", x = 550},
-  {time = 44, type = "portal", x = 300},  -- Portal 5
+  {time = 35, type = "wave", formation = "v", x = 598, count = 6},
+  {time = 38, type = "wave", formation = "v", x = 769, count = 6},
+  {time = 40, type = "capitalship", x = 427},
+  {time = 40, type = "capitalship", x = 940},
+  {time = 44, type = "portal", x = 512},  -- Portal 5
 
   -- Final stretch
-  {time = 48, type = "wave", formation = "wave", x = 400, count = 8},
-  {time = 52, type = "wave", formation = "v", x = 400, count = 8},
-  {time = 55, type = "portal", x = 500},  -- Portal 6
+  {time = 48, type = "wave", formation = "wave", x = 683, count = 8},
+  {time = 52, type = "wave", formation = "v", x = 683, count = 8},
+  {time = 55, type = "portal", x = 854},  -- Portal 6
 
-  {time = 58, type = "wave", formation = "line", x = 400, count = 6},
-  {time = 60, type = "wave", formation = "v", x = 300, count = 5},
-  {time = 60, type = "wave", formation = "v", x = 500, count = 5},
-  {time = 64, type = "portal", x = 400},  -- Portal 7 (final)
+  {time = 58, type = "wave", formation = "line", x = 683, count = 6},
+  {time = 60, type = "wave", formation = "v", x = 512, count = 5},
+  {time = 60, type = "wave", formation = "v", x = 854, count = 5},
+  {time = 64, type = "portal", x = 683},  -- Portal 7 (final)
 
   -- Normal ending - boss if portals not collected
   {time = 70, type = "callout", message = "triggerBossWarning"},
@@ -192,90 +192,90 @@ M.METEO = {
 
 M.BOLSE = {
   -- Opening fighter waves
-  {time = 2, type = "wave", formation = "v", x = 400, count = 5},
-  {time = 6, type = "wave", formation = "line", x = 400, count = 4},
-  {time = 10, type = "wave", formation = "v", x = 300, count = 5},
-  {time = 10, type = "wave", formation = "v", x = 500, count = 5},
+  {time = 2, type = "wave", formation = "v", x = 683, count = 5},
+  {time = 6, type = "wave", formation = "line", x = 683, count = 4},
+  {time = 10, type = "wave", formation = "v", x = 512, count = 5},
+  {time = 10, type = "wave", formation = "v", x = 854, count = 5},
 
   -- Station appears
   {time = 15, type = "callout", message = "triggerBossWarning"},
   {time = 18, type = "bolsestation"},
 
   -- Continuous fighter support while station active
-  {time = 25, type = "wave", formation = "line", x = 400, count = 4},
-  {time = 32, type = "wave", formation = "v", x = 300, count = 4},
-  {time = 32, type = "wave", formation = "v", x = 500, count = 4},
-  {time = 40, type = "wave", formation = "wave", x = 400, count = 6},
+  {time = 25, type = "wave", formation = "line", x = 683, count = 4},
+  {time = 32, type = "wave", formation = "v", x = 512, count = 4},
+  {time = 32, type = "wave", formation = "v", x = 854, count = 4},
+  {time = 40, type = "wave", formation = "wave", x = 683, count = 6},
 
   -- Rival appears mid-fight
   {time = 45, type = "callout", message = "triggerRivalWarning"},
   {time = 48, type = "rival"},
 
   -- More waves
-  {time = 55, type = "wave", formation = "v", x = 400, count = 5},
-  {time = 62, type = "wave", formation = "line", x = 300, count = 4},
-  {time = 62, type = "wave", formation = "line", x = 500, count = 4},
-  {time = 70, type = "wave", formation = "wave", x = 400, count = 6},
-  {time = 78, type = "wave", formation = "v", x = 400, count = 5},
-  {time = 85, type = "wave", formation = "v", x = 300, count = 4},
-  {time = 85, type = "wave", formation = "v", x = 500, count = 4}
+  {time = 55, type = "wave", formation = "v", x = 683, count = 5},
+  {time = 62, type = "wave", formation = "line", x = 512, count = 4},
+  {time = 62, type = "wave", formation = "line", x = 854, count = 4},
+  {time = 70, type = "wave", formation = "wave", x = 683, count = 6},
+  {time = 78, type = "wave", formation = "v", x = 683, count = 5},
+  {time = 85, type = "wave", formation = "v", x = 512, count = 4},
+  {time = 85, type = "wave", formation = "v", x = 854, count = 4}
 }
 
 M.SECTORX = {
   -- Eerie opening - enemies emerge from darkness
-  {time = 3, type = "wave", formation = "line", x = 400, count = 4},
-  {time = 8, type = "wave", formation = "v", x = 300, count = 5},
-  {time = 12, type = "wave", formation = "v", x = 500, count = 5},
-  {time = 18, type = "wave", formation = "wave", x = 400, count = 6},
-  {time = 25, type = "turret", x = 200},
-  {time = 25, type = "turret", x = 600},
-  {time = 30, type = "wave", formation = "line", x = 400, count = 5},
-  {time = 35, type = "wave", formation = "v", x = 350, count = 6},
-  {time = 35, type = "wave", formation = "v", x = 450, count = 6},
-  {time = 42, type = "capitalship", x = 400},
-  {time = 48, type = "wave", formation = "wave", x = 400, count = 7},
-  {time = 55, type = "wave", formation = "v", x = 300, count = 5},
-  {time = 55, type = "wave", formation = "v", x = 500, count = 5},
-  {time = 62, type = "turret", x = 300},
-  {time = 62, type = "turret", x = 500},
-  {time = 68, type = "wave", formation = "line", x = 400, count = 6},
-  {time = 75, type = "capitalship", x = 250},
-  {time = 75, type = "capitalship", x = 550},
-  {time = 82, type = "wave", formation = "wave", x = 400, count = 8},
+  {time = 3, type = "wave", formation = "line", x = 683, count = 4},
+  {time = 8, type = "wave", formation = "v", x = 512, count = 5},
+  {time = 12, type = "wave", formation = "v", x = 854, count = 5},
+  {time = 18, type = "wave", formation = "wave", x = 683, count = 6},
+  {time = 25, type = "turret", x = 341},
+  {time = 25, type = "turret", x = 1025},
+  {time = 30, type = "wave", formation = "line", x = 683, count = 5},
+  {time = 35, type = "wave", formation = "v", x = 598, count = 6},
+  {time = 35, type = "wave", formation = "v", x = 769, count = 6},
+  {time = 42, type = "capitalship", x = 683},
+  {time = 48, type = "wave", formation = "wave", x = 683, count = 7},
+  {time = 55, type = "wave", formation = "v", x = 512, count = 5},
+  {time = 55, type = "wave", formation = "v", x = 854, count = 5},
+  {time = 62, type = "turret", x = 512},
+  {time = 62, type = "turret", x = 854},
+  {time = 68, type = "wave", formation = "line", x = 683, count = 6},
+  {time = 75, type = "capitalship", x = 427},
+  {time = 75, type = "capitalship", x = 940},
+  {time = 82, type = "wave", formation = "wave", x = 683, count = 8},
   {time = 90, type = "callout", message = "triggerBossWarning"},
   {time = 95, type = "midboss"}
 }
 
 M.VENOM = {
   -- Phase 1: Opening waves
-  {time = 2, type = "wave", formation = "v", x = 400, count = 6},
-  {time = 6, type = "wave", formation = "line", x = 400, count = 5},
-  {time = 10, type = "wave", formation = "v", x = 300, count = 5},
-  {time = 10, type = "wave", formation = "v", x = 500, count = 5},
-  {time = 15, type = "capitalship", x = 400},
-  {time = 18, type = "wave", formation = "wave", x = 400, count = 7},
+  {time = 2, type = "wave", formation = "v", x = 683, count = 6},
+  {time = 6, type = "wave", formation = "line", x = 683, count = 5},
+  {time = 10, type = "wave", formation = "v", x = 512, count = 5},
+  {time = 10, type = "wave", formation = "v", x = 854, count = 5},
+  {time = 15, type = "capitalship", x = 683},
+  {time = 18, type = "wave", formation = "wave", x = 683, count = 7},
 
   -- First Rival Encounter
   {time = 22, type = "callout", message = "triggerRivalWarning"},
   {time = 25, type = "rival", hp = 40},
 
   -- Phase 2: Waves during/after rival
-  {time = 35, type = "wave", formation = "v", x = 400, count = 6},
-  {time = 40, type = "wave", formation = "line", x = 300, count = 4},
-  {time = 40, type = "wave", formation = "line", x = 500, count = 4},
-  {time = 45, type = "capitalship", x = 250},
-  {time = 45, type = "capitalship", x = 550},
-  {time = 50, type = "wave", formation = "wave", x = 400, count = 8},
+  {time = 35, type = "wave", formation = "v", x = 683, count = 6},
+  {time = 40, type = "wave", formation = "line", x = 512, count = 4},
+  {time = 40, type = "wave", formation = "line", x = 854, count = 4},
+  {time = 45, type = "capitalship", x = 427},
+  {time = 45, type = "capitalship", x = 940},
+  {time = 50, type = "wave", formation = "wave", x = 683, count = 8},
 
   -- Second Rival Encounter (boosted HP)
   {time = 55, type = "callout", message = "triggerRivalReturn"},
   {time = 58, type = "rival", hp = 50},
 
   -- Phase 3: Pre-maze waves
-  {time = 68, type = "wave", formation = "v", x = 400, count = 7},
-  {time = 72, type = "wave", formation = "line", x = 400, count = 6},
-  {time = 75, type = "turret", x = 200},
-  {time = 75, type = "turret", x = 600},
+  {time = 68, type = "wave", formation = "v", x = 683, count = 7},
+  {time = 72, type = "wave", formation = "line", x = 683, count = 6},
+  {time = 75, type = "turret", x = 341},
+  {time = 75, type = "turret", x = 1025},
 
   -- Maze Section
   {time = 80, type = "callout", message = "triggerMazeWarning"},
@@ -297,36 +297,36 @@ M.VENOM = {
 
 M.FICHINA = {
   -- Opening - diamond formation
-  {time = 2, type = "wave", formation = "diamond", x = 400, count = 4},
-  {time = 8, type = "wave", formation = "diamond", x = 250, count = 4},
-  {time = 8, type = "wave", formation = "diamond", x = 550, count = 4},
+  {time = 2, type = "wave", formation = "diamond", x = 683, count = 4},
+  {time = 8, type = "wave", formation = "diamond", x = 427, count = 4},
+  {time = 8, type = "wave", formation = "diamond", x = 940, count = 4},
 
   -- Box formations
-  {time = 14, type = "wave", formation = "box", x = 400, count = 5},
-  {time = 20, type = "wave", formation = "box", x = 300, count = 5},
-  {time = 20, type = "wave", formation = "box", x = 500, count = 5},
+  {time = 14, type = "wave", formation = "box", x = 683, count = 5},
+  {time = 20, type = "wave", formation = "box", x = 512, count = 5},
+  {time = 20, type = "wave", formation = "box", x = 854, count = 5},
 
   -- Triangle formations
-  {time = 26, type = "wave", formation = "triangle", x = 400, count = 5},
-  {time = 32, type = "wave", formation = "triangle", x = 350, count = 5},
-  {time = 32, type = "wave", formation = "triangle", x = 450, count = 5},
+  {time = 26, type = "wave", formation = "triangle", x = 683, count = 5},
+  {time = 32, type = "wave", formation = "triangle", x = 598, count = 5},
+  {time = 32, type = "wave", formation = "triangle", x = 769, count = 5},
 
   -- Mixed assault
-  {time = 38, type = "wave", formation = "diamond", x = 400, count = 4},
-  {time = 42, type = "wave", formation = "box", x = 250, count = 5},
-  {time = 42, type = "wave", formation = "box", x = 550, count = 5},
+  {time = 38, type = "wave", formation = "diamond", x = 683, count = 4},
+  {time = 42, type = "wave", formation = "box", x = 427, count = 5},
+  {time = 42, type = "wave", formation = "box", x = 940, count = 5},
 
   -- Intense section
-  {time = 48, type = "wave", formation = "triangle", x = 300, count = 5},
-  {time = 50, type = "wave", formation = "triangle", x = 500, count = 5},
-  {time = 54, type = "wave", formation = "diamond", x = 400, count = 4},
+  {time = 48, type = "wave", formation = "triangle", x = 512, count = 5},
+  {time = 50, type = "wave", formation = "triangle", x = 854, count = 5},
+  {time = 54, type = "wave", formation = "diamond", x = 683, count = 4},
 
   -- Final waves before boss
-  {time = 60, type = "wave", formation = "box", x = 350, count = 5},
-  {time = 62, type = "wave", formation = "box", x = 450, count = 5},
-  {time = 66, type = "wave", formation = "triangle", x = 400, count = 5},
-  {time = 70, type = "wave", formation = "diamond", x = 300, count = 4},
-  {time = 70, type = "wave", formation = "diamond", x = 500, count = 4},
+  {time = 60, type = "wave", formation = "box", x = 598, count = 5},
+  {time = 62, type = "wave", formation = "box", x = 769, count = 5},
+  {time = 66, type = "wave", formation = "triangle", x = 683, count = 5},
+  {time = 70, type = "wave", formation = "diamond", x = 512, count = 4},
+  {time = 70, type = "wave", formation = "diamond", x = 854, count = 4},
 
   -- Boss
   {time = 75, type = "callout", message = "triggerBossWarning"},
@@ -337,26 +337,26 @@ M.FICHINA = {
 -- Guardian of the Near Reaches - defeat to claim the Mega Antenna
 M.WARDEN = {
   -- Opening waves
-  {time = 2, type = "wave", formation = "v", x = 400, count = 5},
-  {time = 6, type = "wave", formation = "line", x = 300, count = 4},
-  {time = 6, type = "wave", formation = "line", x = 500, count = 4},
-  {time = 12, type = "wave", formation = "wave", x = 400, count = 6},
+  {time = 2, type = "wave", formation = "v", x = 683, count = 5},
+  {time = 6, type = "wave", formation = "line", x = 512, count = 4},
+  {time = 6, type = "wave", formation = "line", x = 854, count = 4},
+  {time = 12, type = "wave", formation = "wave", x = 683, count = 6},
 
   -- First turret defense
-  {time = 18, type = "turret", x = 200},
-  {time = 18, type = "turret", x = 600},
-  {time = 22, type = "wave", formation = "v", x = 400, count = 7},
+  {time = 18, type = "turret", x = 341},
+  {time = 18, type = "turret", x = 1025},
+  {time = 22, type = "wave", formation = "v", x = 683, count = 7},
 
   -- Mid-battle intensity
-  {time = 28, type = "wave", formation = "diamond", x = 350, count = 4},
-  {time = 28, type = "wave", formation = "diamond", x = 450, count = 4},
-  {time = 34, type = "capitalship", x = 400},
-  {time = 38, type = "wave", formation = "line", x = 400, count = 6},
+  {time = 28, type = "wave", formation = "diamond", x = 598, count = 4},
+  {time = 28, type = "wave", formation = "diamond", x = 769, count = 4},
+  {time = 34, type = "capitalship", x = 683},
+  {time = 38, type = "wave", formation = "line", x = 683, count = 6},
 
   -- Second turret wave
-  {time = 44, type = "turret", x = 300},
-  {time = 44, type = "turret", x = 500},
-  {time = 48, type = "wave", formation = "wave", x = 400, count = 8},
+  {time = 44, type = "turret", x = 512},
+  {time = 44, type = "turret", x = 854},
+  {time = 48, type = "wave", formation = "wave", x = 683, count = 8},
 
   -- Boss warning and spawn
   {time = 55, type = "callout", message = "triggerBossWarning"},
@@ -367,41 +367,111 @@ M.WARDEN = {
 -- Guardian of the Middle Marches - defeat to claim the Power Amplifier
 M.SENTINEL = {
   -- Intense opening - rapid assault
-  {time = 2, type = "wave", formation = "v", x = 400, count = 6},
-  {time = 5, type = "wave", formation = "line", x = 400, count = 5},
-  {time = 8, type = "wave", formation = "v", x = 300, count = 5},
-  {time = 8, type = "wave", formation = "v", x = 500, count = 5},
+  {time = 2, type = "wave", formation = "v", x = 683, count = 6},
+  {time = 5, type = "wave", formation = "line", x = 683, count = 5},
+  {time = 8, type = "wave", formation = "v", x = 512, count = 5},
+  {time = 8, type = "wave", formation = "v", x = 854, count = 5},
 
   -- Capital ship with escort
-  {time = 14, type = "capitalship", x = 400},
-  {time = 16, type = "wave", formation = "diamond", x = 300, count = 4},
-  {time = 16, type = "wave", formation = "diamond", x = 500, count = 4},
+  {time = 14, type = "capitalship", x = 683},
+  {time = 16, type = "wave", formation = "diamond", x = 512, count = 4},
+  {time = 16, type = "wave", formation = "diamond", x = 854, count = 4},
 
   -- Heavy turret defense
-  {time = 22, type = "turret", x = 150},
-  {time = 22, type = "turret", x = 400},
-  {time = 22, type = "turret", x = 650},
-  {time = 26, type = "wave", formation = "wave", x = 400, count = 8},
+  {time = 22, type = "turret", x = 256},
+  {time = 22, type = "turret", x = 683},
+  {time = 22, type = "turret", x = 1110},
+  {time = 26, type = "wave", formation = "wave", x = 683, count = 8},
 
   -- Dual capital ships
-  {time = 32, type = "capitalship", x = 250},
-  {time = 32, type = "capitalship", x = 550},
-  {time = 36, type = "wave", formation = "v", x = 400, count = 7},
+  {time = 32, type = "capitalship", x = 427},
+  {time = 32, type = "capitalship", x = 940},
+  {time = 36, type = "wave", formation = "v", x = 683, count = 7},
 
   -- Box formation assault
-  {time = 42, type = "wave", formation = "box", x = 350, count = 5},
-  {time = 42, type = "wave", formation = "box", x = 450, count = 5},
-  {time = 48, type = "turret", x = 200},
-  {time = 48, type = "turret", x = 600},
+  {time = 42, type = "wave", formation = "box", x = 598, count = 5},
+  {time = 42, type = "wave", formation = "box", x = 769, count = 5},
+  {time = 48, type = "turret", x = 341},
+  {time = 48, type = "turret", x = 1025},
 
   -- Triangle formation finale
-  {time = 54, type = "wave", formation = "triangle", x = 300, count = 5},
-  {time = 54, type = "wave", formation = "triangle", x = 500, count = 5},
-  {time = 60, type = "wave", formation = "wave", x = 400, count = 10},
+  {time = 54, type = "wave", formation = "triangle", x = 512, count = 5},
+  {time = 54, type = "wave", formation = "triangle", x = 854, count = 5},
+  {time = 60, type = "wave", formation = "wave", x = 683, count = 10},
 
   -- Boss warning and spawn
   {time = 68, type = "callout", message = "triggerBossWarning"},
   {time = 73, type = "sentinelboss"}
+}
+
+-- Sector Z: Extreme difficulty gauntlet before 7-phase Elden Ring boss
+M.SECTORZ = {
+  -- Wave 1: Aggressive opening - no warmup
+  {time = 1, type = "wave", formation = "v", x = 683, count = 8},
+  {time = 3, type = "wave", formation = "line", x = 512, count = 6},
+  {time = 3, type = "wave", formation = "line", x = 854, count = 6},
+
+  -- Wave 2: Triple capital ships
+  {time = 7, type = "capitalship", x = 341},
+  {time = 7, type = "capitalship", x = 683},
+  {time = 7, type = "capitalship", x = 1025},
+  {time = 9, type = "wave", formation = "diamond", x = 512, count = 4},
+  {time = 9, type = "wave", formation = "diamond", x = 854, count = 4},
+
+  -- Wave 3: Turret gauntlet
+  {time = 13, type = "turret", x = 200},
+  {time = 13, type = "turret", x = 400},
+  {time = 13, type = "turret", x = 600},
+  {time = 13, type = "turret", x = 800},
+  {time = 13, type = "turret", x = 1000},
+  {time = 15, type = "wave", formation = "v", x = 683, count = 10},
+
+  -- Wave 4: Flanking assault
+  {time = 19, type = "wave", formation = "triangle", x = 300, count = 5},
+  {time = 19, type = "wave", formation = "triangle", x = 683, count = 5},
+  {time = 19, type = "wave", formation = "triangle", x = 1066, count = 5},
+  {time = 22, type = "wave", formation = "wave", x = 683, count = 12},
+
+  -- Wave 5: Rival encounter
+  {time = 26, type = "callout", message = "triggerRivalWarning"},
+  {time = 28, type = "rival", hp = 60, variant = "teleport"},
+
+  -- Wave 6: Continuous pressure during/after rival
+  {time = 32, type = "wave", formation = "v", x = 512, count = 7},
+  {time = 32, type = "wave", formation = "v", x = 854, count = 7},
+  {time = 36, type = "capitalship", x = 427},
+  {time = 36, type = "capitalship", x = 940},
+
+  -- Wave 7: Box formation assault
+  {time = 40, type = "wave", formation = "box", x = 400, count = 5},
+  {time = 40, type = "wave", formation = "box", x = 683, count = 5},
+  {time = 40, type = "wave", formation = "box", x = 966, count = 5},
+
+  -- Wave 8: Diamond storm
+  {time = 45, type = "wave", formation = "diamond", x = 341, count = 4},
+  {time = 45, type = "wave", formation = "diamond", x = 683, count = 4},
+  {time = 45, type = "wave", formation = "diamond", x = 1025, count = 4},
+  {time = 48, type = "turret", x = 341},
+  {time = 48, type = "turret", x = 683},
+  {time = 48, type = "turret", x = 1025},
+
+  -- Wave 9: Overwhelming numbers
+  {time = 52, type = "wave", formation = "line", x = 683, count = 15},
+  {time = 55, type = "wave", formation = "v", x = 512, count = 8},
+  {time = 55, type = "wave", formation = "v", x = 854, count = 8},
+
+  -- Wave 10: Final gauntlet
+  {time = 60, type = "capitalship", x = 512},
+  {time = 60, type = "capitalship", x = 854},
+  {time = 62, type = "wave", formation = "triangle", x = 512, count = 5},
+  {time = 62, type = "wave", formation = "triangle", x = 854, count = 5},
+  {time = 65, type = "wave", formation = "wave", x = 683, count = 14},
+
+  -- Boss warning - extended for dramatic effect
+  {time = 70, type = "callout", message = "triggerEnemyWarning"},
+  {time = 73, type = "wave", formation = "diamond", x = 683, count = 4},
+  {time = 76, type = "callout", message = "triggerBossWarning"},
+  {time = 80, type = "sectorzboss"}
 }
 
 function M.getEnemyCount(levelId)
@@ -413,7 +483,7 @@ function M.getEnemyCount(levelId)
     elseif wave.type == "turret" or wave.type == "capitalship" or wave.type == "mothership"
         or wave.type == "midboss" or wave.type == "finalboss" or wave.type == "area6boss"
         or wave.type == "rival" or wave.type == "venomboss" or wave.type == "wardenboss"
-        or wave.type == "sentinelboss" then
+        or wave.type == "sentinelboss" or wave.type == "sectorzboss" then
       count = count + 1
     elseif wave.type == "bolsestation" then
       count = count + 7
@@ -433,6 +503,8 @@ function M.getWaves(levelId)
     return M.SECTORX
   elseif levelId == 10 then
     return M.MACBETH
+  elseif levelId == 12 then
+    return M.SECTORZ
   elseif levelId == 13 then
     return M.BOLSE
   elseif levelId == 14 then

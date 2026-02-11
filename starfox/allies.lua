@@ -1,6 +1,5 @@
 local M = {}
-
-M.allies = {}
+local screen = require("starfox.screen")
 
 local ALLY_OFFSETS = {
   {x = -120, y = 40},
@@ -82,8 +81,8 @@ function M.update(dt, playerX, playerY, enemies)
       ally.y = ally.y + (targetY - ally.y) * dt * 1.5
 
       -- Keep in bounds
-      ally.x = math.max(30, math.min(770, ally.x))
-      ally.y = math.max(100, math.min(570, ally.y))
+      ally.x = math.max(30, math.min(screen.WIDTH - 30, ally.x))
+      ally.y = math.max(100, math.min(screen.HEIGHT - 30, ally.y))
 
       -- Shooting logic
       ally.shootTimer = ally.shootTimer - dt

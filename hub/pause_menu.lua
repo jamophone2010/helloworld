@@ -1,6 +1,5 @@
 local M = {}
 
-local menuItems = {"Resume", "Options", "Save", "Exit to Main Menu", "Exit to Desktop"}
 local selectedIndex = 1
 local fonts = {}
 
@@ -8,6 +7,15 @@ M.onResume = nil
 M.onOptions = nil
 M.onSave = nil
 M.onExitToMenu = nil
+M.returnToShip = nil  -- Set for non-hometown hubs to add "Return to Ship" option
+
+local function buildMenuItems()
+  if M.returnToShip then
+    return {"Resume", "Options", "Save", "Return to Ship", "Exit to Main Menu", "Exit to Desktop"}
+  else
+    return {"Resume", "Options", "Save", "Exit to Main Menu", "Exit to Desktop"}
+  end
+end
 
 function M.load()
   fonts.title = love.graphics.newFont(32)
@@ -21,6 +29,8 @@ function M.update(dt)
 end
 
 function M.draw()
+  local menuItems = buildMenuItems()
+
   -- Semi-transparent overlay
   love.graphics.setColor(0, 0, 0, 0.7)
   love.graphics.rectangle("fill", 0, 0, 1366, 768)
@@ -52,6 +62,7 @@ function M.draw()
 end
 
 function M.keypressed(key)
+  local menuItems = buildMenuItems()
   if key == "up" then
     selectedIndex = selectedIndex - 1
     if selectedIndex < 1 then
@@ -67,28 +78,18 @@ function M.keypressed(key)
       M.onResume()
     end
   elseif key == "return" or key == "space" then
-    if selectedIndex == 1 then
-      -- Resume
-      if M.onResume then
-        M.onResume()
-      end
-    elseif selectedIndex == 2 then
-      -- Options
-      if M.onOptions then
-        M.onOptions()
-      end
-    elseif selectedIndex == 3 then
-      -- Save
-      if M.onSave then
-        M.onSave()
-      end
-    elseif selectedIndex == 4 then
-      -- Exit to Main Menu
-      if M.onExitToMenu then
-        M.onExitToMenu()
-      end
-    elseif selectedIndex == 5 then
-      -- Exit to Desktop
+    local item = menuItems[selectedIndex]
+    if item == "Resume" then
+      if M.onResume then M.onResume() end
+    elseif item == "Options" then
+      if M.onOptions then M.onOptions() end
+    elseif item == "Save" then
+      if M.onSave then M.onSave() end
+    elseif item == "Return to Ship" then
+      if M.returnToShip then M.returnToShip() end
+    elseif item == "Exit to Main Menu" then
+      if M.onExitToMenu then M.onExitToMenu() end
+    elseif item == "Exit to Desktop" then
       love.event.quit()
     end
   end

@@ -1,6 +1,5 @@
 local M = {}
-
-M.callouts = {}
+local screen = require("starfox.screen")
 M.wingmen = {}
 
 local CALLOUT_DURATION = 3
@@ -8,8 +7,8 @@ local CALLOUT_DURATION = 3
 function M.reset()
   M.callouts = {}
   M.wingmen = {
-    {name = "Falco", x = 150, y = 520, message = nil},
-    {name = "Slippy", x = 650, y = 520, message = nil}
+    {name = "Falco", x = 150, y = screen.HEIGHT - 80, message = nil},
+    {name = "Slippy", x = screen.WIDTH - 150, y = screen.HEIGHT - 80, message = nil}
   }
 end
 
@@ -29,8 +28,8 @@ function M.update(dt, playerX, playerY)
     wingman.x = wingman.x + (targetX - wingman.x) * dt * 2
     wingman.y = wingman.y + (targetY - wingman.y) * dt * 2
 
-    wingman.x = math.max(30, math.min(770, wingman.x))
-    wingman.y = math.max(100, math.min(570, wingman.y))
+    wingman.x = math.max(30, math.min(screen.WIDTH - 30, wingman.x))
+    wingman.y = math.max(100, math.min(screen.HEIGHT - 30, wingman.y))
   end
 
   for i = #M.callouts, 1, -1 do

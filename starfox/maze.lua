@@ -1,4 +1,5 @@
 local M = {}
+local screen = require("starfox.screen")
 
 M.walls = {}
 M.active = false
@@ -6,15 +7,14 @@ M.active = false
 local SCROLL_SPEED = 100
 local WALL_HEIGHT = 60
 local GAP_WIDTH = 150
-local SCREEN_WIDTH = 800
 
 local PATTERNS = {
-  left = {gapCenter = 175},
-  center = {gapCenter = 400},
-  right = {gapCenter = 625},
-  zigzag_left = {gapCenter = 200},
-  zigzag_right = {gapCenter = 600},
-  narrow = {gapCenter = 400, gapWidth = 100}
+  left = {gapCenter = math.floor(screen.WIDTH * 0.22)},
+  center = {gapCenter = math.floor(screen.WIDTH / 2)},
+  right = {gapCenter = math.floor(screen.WIDTH * 0.78)},
+  zigzag_left = {gapCenter = math.floor(screen.WIDTH * 0.25)},
+  zigzag_right = {gapCenter = math.floor(screen.WIDTH * 0.75)},
+  narrow = {gapCenter = math.floor(screen.WIDTH / 2), gapWidth = 100}
 }
 
 local zigzagState = "left"
@@ -68,7 +68,7 @@ function M.update(dt)
     local wall = M.walls[i]
     wall.y = wall.y + SCROLL_SPEED * dt
 
-    if wall.y > 650 then
+    if wall.y > screen.HEIGHT + 50 then
       table.remove(M.walls, i)
     end
   end

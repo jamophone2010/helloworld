@@ -1,6 +1,5 @@
 local M = {}
-
-M.turrets = {}
+local screen = require("starfox.screen")
 
 function M.reset()
   M.turrets = {}
@@ -26,7 +25,7 @@ function M.update(dt, scrollOffset, playerX, playerY)
 
     turret.y = scrollOffset - turret.terrainY
 
-    turret.active = turret.y > -50 and turret.y < 650
+    turret.active = turret.y > -50 and turret.y < screen.HEIGHT + 50
 
     if turret.active then
       turret.shootTimer = turret.shootTimer - dt
@@ -39,7 +38,7 @@ function M.update(dt, scrollOffset, playerX, playerY)
       end
     end
 
-    if turret.y > 700 then
+    if turret.y > screen.HEIGHT + 100 then
       table.remove(M.turrets, i)
     end
   end

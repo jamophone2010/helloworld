@@ -1,4 +1,5 @@
 local M = {}
+local screen = require("starfox.screen")
 
 local LASER_SPEED = 600
 local LASER_COOLDOWN = 0.15
@@ -63,7 +64,7 @@ function M.update(dt, player)
 
     -- Remove if off-screen or stuck (near-zero velocity)
     local speed = math.sqrt((laser.vx or 0)^2 + laser.vy^2)
-    if laser.y < -20 or laser.y > 620 or laser.x < -20 or laser.x > 820 or speed < 10 then
+    if laser.y < -20 or laser.y > screen.HEIGHT + 20 or laser.x < -20 or laser.x > screen.WIDTH + 20 or speed < 10 then
       table.remove(M.lasers, i)
     end
   end
@@ -110,7 +111,7 @@ function M.update(dt, player)
     m.x = m.x + m.vx*dt
     m.y = m.y + m.vy*dt
 
-    if m.y < -50 or m.y > 650 or m.x < -50 or m.x > 850 then
+    if m.y < -50 or m.y > screen.HEIGHT + 50 or m.x < -50 or m.x > screen.WIDTH + 50 then
       table.remove(M.missiles, i)
     end
     ::continue::
@@ -126,7 +127,7 @@ function M.update(dt, player)
     -- Fade out over lifetime
     p.alpha = 1 - (p.age / p.maxAge)
 
-    if p.age >= p.maxAge or p.y < -20 or p.y > 620 or p.x < -20 or p.x > 820 then
+    if p.age >= p.maxAge or p.y < -20 or p.y > screen.HEIGHT + 20 or p.x < -20 or p.x > screen.WIDTH + 20 then
       table.remove(M.shotgunPellets, i)
     end
   end
@@ -417,7 +418,7 @@ function M.startSpartanLaser(player)
     x = player.x,
     y = player.y,
     width = 10,
-    maxReach = 600,
+    maxReach = screen.HEIGHT,
     active = true,
     fireTime = 0,
     actualEndY = 0  -- Where beam actually ends (0 = top of screen, or boss y position)

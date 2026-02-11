@@ -1,5 +1,6 @@
 local M = {}
 
+local screen = require("starfox.screen")
 local enemies = require("starfox.enemies")
 
 M.mothership = nil
@@ -49,7 +50,7 @@ function M.update(dt, playerX, playerY)
   end
 
   -- Horizontal sway
-  local centerX = 400
+  local centerX = screen.WIDTH / 2
   m.x = centerX + math.sin(m.time * 0.5) * 100
 
   -- Spawn timer

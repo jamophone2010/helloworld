@@ -1,52 +1,51 @@
 local M = {}
-
-M.rival = nil
+local screen = require("starfox.screen")
 M.lasers = nil
 
 local PATTERNS = {
   dive_left = {
-    {x = 100, y = -50},
-    {x = 150, y = 150},
-    {x = 300, y = 300},
-    {x = 500, y = 350},
-    {x = 650, y = 200},
-    {x = 700, y = -50}
+    {x = 171, y = -50},
+    {x = 256, y = 192},
+    {x = 512, y = 384},
+    {x = 854, y = 448},
+    {x = 1110, y = 256},
+    {x = 1196, y = -50}
   },
   dive_right = {
-    {x = 700, y = -50},
-    {x = 650, y = 150},
-    {x = 500, y = 300},
-    {x = 300, y = 350},
-    {x = 150, y = 200},
-    {x = 100, y = -50}
+    {x = 1196, y = -50},
+    {x = 1110, y = 192},
+    {x = 854, y = 384},
+    {x = 512, y = 448},
+    {x = 256, y = 256},
+    {x = 171, y = -50}
   },
   figure8 = {
-    {x = 200, y = 100},
-    {x = 350, y = 180},
-    {x = 500, y = 100},
-    {x = 600, y = 180},
-    {x = 500, y = 280},
-    {x = 350, y = 350},
-    {x = 200, y = 280},
-    {x = 100, y = 180},
-    {x = 200, y = 100}
+    {x = 341, y = 128},
+    {x = 598, y = 230},
+    {x = 854, y = 128},
+    {x = 1025, y = 230},
+    {x = 854, y = 359},
+    {x = 598, y = 448},
+    {x = 341, y = 359},
+    {x = 171, y = 230},
+    {x = 341, y = 128}
   },
   strafe_left = {
-    {x = 850, y = 200},
-    {x = -50, y = 250}
+    {x = screen.WIDTH + 50, y = 256},
+    {x = -50, y = 320}
   },
   strafe_right = {
-    {x = -50, y = 200},
-    {x = 850, y = 250}
+    {x = -50, y = 256},
+    {x = screen.WIDTH + 50, y = 320}
   },
   swoop = {
-    {x = 400, y = -50},
-    {x = 400, y = 200},
-    {x = 200, y = 400},
-    {x = 400, y = 450},
-    {x = 600, y = 400},
-    {x = 400, y = 200},
-    {x = 400, y = -50}
+    {x = 683, y = -50},
+    {x = 683, y = 256},
+    {x = 341, y = 512},
+    {x = 683, y = 576},
+    {x = 1025, y = 512},
+    {x = 683, y = 256},
+    {x = 683, y = -50}
   }
 }
 
@@ -92,7 +91,7 @@ function M.spawn(x, y, overrideHP, variant)
   M.lasers = M.lasers or {}
   if variant == "teleport" then
     M.rival.teleportTimer = 2
-    M.rival.x = 400
+    M.rival.x = screen.WIDTH / 2
     M.rival.y = 200
   else
     M.startPattern("dive_left")
@@ -202,8 +201,8 @@ function M.update(dt, playerX, playerY, playerLasers)
     r.teleportTimer = r.teleportTimer - dt
     if r.teleportTimer <= 0 then
       -- Teleport to random position
-      r.x = math.random(100, 700)
-      r.y = math.random(100, 400)
+      r.x = math.random(100, screen.WIDTH - 100)
+      r.y = math.random(100, screen.HEIGHT - 200)
       r.teleportTimer = r.teleportCooldown
     end
   end
@@ -284,7 +283,7 @@ function M.updateLasers(dt)
     laser.x = laser.x + laser.vx * dt
     laser.y = laser.y + laser.vy * dt
 
-    if laser.x < -50 or laser.x > 850 or laser.y < -50 or laser.y > 650 then
+    if laser.x < -50 or laser.x > screen.WIDTH + 50 or laser.y < -50 or laser.y > screen.HEIGHT + 50 then
       table.remove(M.lasers, i)
     end
   end

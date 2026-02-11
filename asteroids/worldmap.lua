@@ -73,6 +73,48 @@ local function initTiles()
     asteroidDensity = 0.9
   }
 
+  -- Station tile (-2,2): Leucadia Beach Town
+  tiles["-2,2"] = {
+    type = M.TILE_STATION,
+    name = "Leucadia",
+    hubType = "leucadia",  -- Different hub module than hometown
+    color = {0.3, 0.7, 0.9},  -- Ocean blue
+    helipads = {
+      {x = 400, y = 200},  -- Beach landing
+      {x = 600, y = 350},  -- Pier landing
+      {x = 200, y = 400}   -- Town square landing
+    },
+    asteroidDensity = 0  -- No asteroids at station
+  }
+
+  -- Station tile (-3,2): The Singularity - Black hole village
+  tiles["-3,2"] = {
+    type = M.TILE_STATION,
+    name = "The Singularity",
+    hubType = "singularity",  -- Interstellar-inspired cosmic hub
+    color = {0.9, 0.6, 0.2},  -- Warm amber/gold (tesseract colors)
+    helipads = {
+      {x = 683, y = 400},  -- Event horizon platform
+      {x = 400, y = 250},  -- Orbital dock
+      {x = 900, y = 300}   -- Research station
+    },
+    asteroidDensity = 0  -- No asteroids at station
+  }
+
+  -- Station tile (3,2): Mixia - Daylight city planet (Coruscant/Taris style)
+  tiles["3,2"] = {
+    type = M.TILE_STATION,
+    name = "Mixia",
+    hubType = "mixia",  -- Multi-level city planet
+    color = {0.7, 0.8, 0.95},  -- Daylight sky blue
+    helipads = {
+      {x = 683, y = 300},  -- Skyline Terrace pad
+      {x = 400, y = 400},  -- Upper District pad
+      {x = 900, y = 350}   -- Commerce pad
+    },
+    asteroidDensity = 0  -- No asteroids at station
+  }
+
   -- Fill empty tiles with varying asteroid densities
   for x = M.GRID_MIN, M.GRID_MAX do
     for y = M.GRID_MIN, M.GRID_MAX do
@@ -170,6 +212,18 @@ end
 function M.isAtStation()
   local tile = M.getCurrentTile()
   return tile and tile.type == M.TILE_STATION
+end
+
+function M.getStationInfo()
+  local tile = M.getCurrentTile()
+  if tile and tile.type == M.TILE_STATION then
+    return {
+      name = tile.name,
+      hubType = tile.hubType or "hometown",  -- Default to hometown station
+      color = tile.color
+    }
+  end
+  return nil
 end
 
 function M.getHelipads()

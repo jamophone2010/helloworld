@@ -1,5 +1,7 @@
 local M = {}
 
+local ui = require("hub.ui")
+
 local SPEED = 60
 local GRID_SIZE = 32
 local WANDER_MIN_DELAY = 2.0  -- Minimum seconds between moves
@@ -111,6 +113,10 @@ function M.tryRandomMove(npc, collisionMap, allNPCs, player)
   npc.moveProgress = 0
 
   return true
+end
+
+function M.draw(npcObj, time)
+  ui.drawNPC(npcObj, nil, time)
 end
 
 return M
