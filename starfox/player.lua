@@ -5,7 +5,7 @@ local SPEED = 250
 local INERTIA = 0.9
 local BARREL_ROLL_DURATION = 0.5
 local BARREL_ROLL_COOLDOWN = 1.0
-local DODGE_DISTANCE = 100
+local DODGE_DISTANCE = 200
 local DODGE_WINDOW = 0.15
 local DODGE_COOLDOWN = 1.0
 
@@ -49,11 +49,36 @@ function M.new(startFromPortal)
     hasSpecial = false,
     shotgunHeld = false,
     portalEntryTimer = startFromPortal and 1.0 or 0,
-    portalEntryActive = startFromPortal or false
+    portalEntryActive = startFromPortal or false,
+    stunned = false,
+    stunnedTimer = 0,
   }
 end
 
 function M.update(player, dt)
+  -- Handle stun timer
+  if player.stunned then
+    player.stunnedTimer = player.stunnedTimer - dt
+    if player.stunnedTimer <= 0 then
+      player.stunned = false
+      player.stunnedTimer = 0
+    end
+    -- While stunned: no movement, drift to a stop
+    player.vx = player.vx * 0.95
+    player.vy = player.vy * 0.95
+    player.x = player.x + player.vx * dt
+    player.y = player.y + player.vy * dt
+    player.x = math.max(30, math.min(screen.WIDTH - 30, player.x))
+    player.y = math.max(100, math.min(screen.HEIGHT - 30, player.y))
+    -- Still update cooldowns while stunned
+    player.barrelRollCooldown = math.max(0, player.barrelRollCooldown - dt)
+    player.invulnerableTimer = math.max(0, player.invulnerableTimer - dt)
+    player.invulnerable = player.barrelRolling or player.invulnerableTimer > 0
+    player.dodgeCooldown = math.max(0, player.dodgeCooldown - dt)
+    player.laserCooldown = math.max(0, player.laserCooldown - dt)
+    return
+  end
+
   -- Handle portal entry animation
   if player.portalEntryActive then
     player.portalEntryTimer = player.portalEntryTimer - dt
@@ -106,12 +131,14 @@ function M.update(player, dt)
 end
 
 function M.move(player, dx, dy)
+  if player.stunned then return end
   local lateralSpeed = SPEED * (player.speedMultiplier or 1.0)
   player.vx = player.vx + dx * lateralSpeed * 0.1
   player.vy = player.vy + dy * SPEED * 0.1
 end
 
 function M.barrelRoll(player)
+  if player.stunned then return false end
   if player.barrelRollCooldown <= 0 and not player.barrelRolling then
     player.barrelRolling = true
     player.barrelRollTimer = BARREL_ROLL_DURATION
@@ -122,6 +149,7 @@ function M.barrelRoll(player)
 end
 
 function M.tryDodge(player, direction)
+  if player.stunned then return false end
   local currentTime = love.timer.getTime()
   
   -- Check if infinite dodge is active (Lancer/Paladin special abilities)

@@ -16,6 +16,8 @@ local ships = require("starfox.ships")
 local floors = require("hub.floors")
 local elevator = require("hub.elevator")
 local spaceships = require("hub.spaceships")
+local tutorial = require("hub.tutorial")
+local prototypeEvent = require("hub.prototype_event")
 
 local gameState = {}
 
@@ -49,7 +51,7 @@ function M.load()
   gameState.returnPosition = nil
   gameState.returnFloor = nil       -- NEW: track floor when entering game
   gameState.fadeInFromStarfox = false  -- NEW: trigger fade-in if returning from starfox
-  gameState.credits = 1000000
+  gameState.credits = 1000
   gameState.notes = currency.load()
   gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false}
   gameState.paused = false
@@ -118,7 +120,7 @@ function M.spendNotes(amount)
 end
 
 function M.getShopItems() return gameState.shopItems end
-function M.clearShopItems() gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false} end
+function M.clearShopItems() gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false, scan = false} end
 function M.setPaused(paused) gameState.paused = paused end
 function M.getPlayerName() return gameState.playerName end
 function M.setPlayerName(name) gameState.playerName = name or "Player" end
@@ -184,9 +186,80 @@ function M.setupFloorNPCs(floorId)
   local floorDef = floors.getFloor(floorId)
   if floorDef and floorDef.npcs then
     for _, npcData in ipairs(floorDef.npcs) do
-      table.insert(gameState.currentNPCs, npc.new(npcData.name, npcData.x, npcData.y, npcData.dialogue))
+      table.insert(gameState.currentNPCs, npc.new(npcData.name, npcData.x, npcData.y, npcData.dialogue, npcData.gender, npcData))
     end
   end
+  -- Add tutorial Associate NPC if tutorial is active on this floor
+  if tutorial.active and tutorial.getAssociateNPC() then
+    table.insert(gameState.currentNPCs, tutorial.getAssociateNPC())
+  end
+end
+
+function M.startTutorial()
+  -- Start the Associate NPC tutorial on Floor 4
+  tutorial.start(gameState)
+  -- Add Associate to current NPCs
+  if tutorial.getAssociateNPC() then
+    table.insert(gameState.currentNPCs, tutorial.getAssociateNPC())
+  end
+  tutorial.onComplete = function()
+    -- Tutorial finished, remove Associate from NPCs
+    if tutorial.getAssociateNPC() then
+      for i, n in ipairs(gameState.currentNPCs) do
+        if n == tutorial.getAssociateNPC() then
+          table.remove(gameState.currentNPCs, i)
+          break
+        end
+      end
+    end
+    -- After tutorial, start the Prototype breach event
+    -- Associate walks into a building; use a nearby building door as the entry point
+    local floorDef = floors.getFloor(gameState.currentFloor)
+    local doorX, doorY = 10, 5  -- Default fallback
+    if floorDef and floorDef.buildings then
+      for _, b in ipairs(floorDef.buildings) do
+        if b.doorX and b.doorY then
+          doorX, doorY = b.doorX, b.doorY
+          break
+        end
+      end
+    end
+    M.startPrototypeEvent(doorX, doorY)
+  end
+end
+
+function M.startPrototypeEvent(doorX, doorY)
+  local prototype = require("starfox.prototype")
+  if prototype.questStarted then return end
+
+  prototypeEvent.changeFloor = function(floorId)
+    M.changeFloor(floorId)
+    -- Add event NPCs to the floor
+    if prototypeEvent.associateNPC then
+      table.insert(gameState.currentNPCs, prototypeEvent.associateNPC)
+    end
+    if prototypeEvent.directorNPC then
+      table.insert(gameState.currentNPCs, prototypeEvent.directorNPC)
+    end
+    if prototypeEvent.medicNPC then
+      table.insert(gameState.currentNPCs, prototypeEvent.medicNPC)
+    end
+    if prototypeEvent.engineer1NPC then
+      table.insert(gameState.currentNPCs, prototypeEvent.engineer1NPC)
+    end
+    if prototypeEvent.engineer2NPC then
+      table.insert(gameState.currentNPCs, prototypeEvent.engineer2NPC)
+    end
+  end
+
+  prototypeEvent.playerName = gameState.playerName
+
+  prototypeEvent.onComplete = function()
+    -- Event finished, set up the quest in game state
+    gameState.unlockedQuests["the_prototype"] = true
+  end
+
+  prototypeEvent.start(doorX, doorY)
 end
 
 function M.changeFloor(newFloor)
@@ -245,7 +318,7 @@ function M.enterBuilding(buildingId)
   gameState.currentNPCs = {}
   if interior.npcs then
     for _, npcData in ipairs(interior.npcs) do
-      table.insert(gameState.currentNPCs, npc.new(npcData.name, npcData.x, npcData.y, npcData.dialogue))
+      table.insert(gameState.currentNPCs, npc.new(npcData.name, npcData.x, npcData.y, npcData.dialogue, npcData.gender, npcData))
     end
   end
 end
@@ -308,10 +381,23 @@ end
 -- ═══════════════════════════════════════
 
 function M.update(dt)
-  if gameState.paused then return end
+  if gameState.paused then
+    pauseMenu.update(dt)
+    return
+  end
 
   -- Update animation time
   gameState.animationTime = gameState.animationTime + dt
+
+  -- Update tutorial if active
+  if tutorial.active then
+    tutorial.update(dt, gameState)
+  end
+
+  -- Update prototype event if active
+  if prototypeEvent.active then
+    prototypeEvent.update(dt, gameState)
+  end
 
   -- Update elevator if active
   if gameState.elevatorActive then
@@ -480,6 +566,16 @@ function M.draw()
     pauseMenu.draw()
   end
 
+  -- Draw tutorial overlay if active
+  if tutorial.active then
+    tutorial.draw(gameState.animationTime, gameState.camera.x, gameState.camera.y)
+  end
+
+  -- Draw prototype event overlay if active
+  if prototypeEvent.active then
+    prototypeEvent.draw(gameState.animationTime, gameState.camera.x, gameState.camera.y)
+  end
+
   -- Draw building transition fade overlay
   if gameState.transition then
     local alpha = 0
@@ -498,7 +594,34 @@ end
 -- INPUT
 -- ═══════════════════════════════════════
 
+function M.textinput(text)
+  if gameState.paused then
+    pauseMenu.textinput(text)
+  end
+end
+
 function M.keypressed(key)
+  -- Handle tutorial input first
+  if tutorial.active then
+    if tutorial.keypressed(key) then
+      return  -- Tutorial consumed the input
+    end
+    -- If tutorial is blocking (dialogue/choices visible), don't process other input
+    if tutorial.isBlockingInput() then
+      return
+    end
+  end
+
+  -- Handle prototype event input
+  if prototypeEvent.active then
+    if prototypeEvent.keypressed(key) then
+      return
+    end
+    if prototypeEvent.isBlockingInput() then
+      return
+    end
+  end
+
   -- Handle pause menu
   if gameState.paused then
     pauseMenu.keypressed(key)
@@ -528,8 +651,11 @@ function M.keypressed(key)
   end
 
   if key == "e" then
-    -- Elevator
+    -- Elevator - check tutorial intercept first
     if gameState.nearElevator and gameState.location == "floor" then
+      if tutorial.active and tutorial.onElevatorAttempt(gameState) then
+        return  -- Tutorial intercepted the elevator
+      end
       gameState.elevatorActive = true
       elevator.open(gameState.currentFloor, gameState.unlockedQuests)
       audio.playPortal()

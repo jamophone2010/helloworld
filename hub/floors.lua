@@ -34,9 +34,9 @@ M.floors = {
 
     },
     npcs = {
-      {name = "Rogue AI", x = 12, y = 10, dialogue = "I've been down here since the station was built. They forgot about me... but I remember everything."},
-      {name = "Maintenance Droid", x = 18, y = 15, dialogue = "Bzzt... structural integrity at 97.3%. The sub-levels hold secrets older than the station itself."},
-      {name = "Shadow Broker", x = 10, y = 14, dialogue = "Information is the real currency. Credits come and go, but knowledge... that's power."},
+      {name = "Rogue AI", x = 12, y = 10, dialogue = "I've been down here since the station was built. They forgot about me... but I remember everything.", gender = "male"},
+      {name = "Maintenance Droid", x = 18, y = 15, dialogue = "Bzzt... structural integrity at 97.3%. The sub-levels hold secrets older than the station itself.", gender = "male"},
+      {name = "Shadow Broker", x = 10, y = 14, dialogue = "Information is the real currency. Credits come and go, but knowledge... that's power.", gender = "male", design = 5},
     },
     paths = {
       -- Open area below buildings (doors at y=7 connect to y=8)
@@ -68,11 +68,11 @@ M.floors = {
        color = {0.2, 0.2, 0.25}, neonColor = {0.4, 0.8, 1.0}},
     },
     npcs = {
-      {name = "Dockworker Pete", x = 8, y = 10, dialogue = "These crates aren't gonna move themselves! ...Actually, the droids do most of it. I just supervise."},
-      {name = "Dockworker Maya", x = 20, y = 8, dialogue = "We got a fresh shipment of Tibanna gas from the outer rim. That stuff powers the best weapons."},
-      {name = "Foreman Briggs", x = 14, y = 8, dialogue = "Keep the aisles clear! Last week someone left a crate of thermal detonators in the walkway."},
-      {name = "Cargo Droid CX-7", x = 12, y = 12, dialogue = "Inventory scan: 4,237 crates. 12 unaccounted for. This is... concerning."},
-      {name = "Stowaway Kid", x = 25, y = 12, dialogue = "Shh! Don't tell anyone I'm here. I snuck aboard at the last port. This station is amazing!"},
+      {name = "Dockworker Pete", x = 8, y = 10, dialogue = "These crates aren't gonna move themselves! ...Actually, the droids do most of it. I just supervise.", gender = "male"},
+      {name = "Dockworker Maya", x = 20, y = 8, dialogue = "We got a fresh shipment of Tibanna gas from the outer rim. That stuff powers the best weapons.", gender = "female", design = 6},
+      {name = "Foreman Briggs", x = 14, y = 8, dialogue = "Keep the aisles clear! Last week someone left a crate of thermal detonators in the walkway.", gender = "male", design = 3},
+      {name = "Cargo Droid CX-7", x = 12, y = 12, dialogue = "Inventory scan: 4,237 crates. 12 unaccounted for. This is... concerning.", gender = "male"},
+      {name = "Stowaway Kid", x = 25, y = 12, dialogue = "Shh! Don't tell anyone I'm here. I snuck aboard at the last port. This station is amazing!", gender = "male"},
     },
     paths = {
       -- Main corridor between building rows
@@ -123,11 +123,11 @@ M.floors = {
        color = {0.3, 0.15, 0.0}, neonColor = {1.0, 0.5, 0.0}},
     },
     npcs = {
-      {name = "Neon Barker", x = 10, y = 9, dialogue = "Step right up! The Casino's hot tonight! Triple jackpot on the slots!"},
-      {name = "Window Shopper", x = 20, y = 9, dialogue = "Have you seen the new Phantom ship at the Shipbuilder? Sleek as a shadow..."},
-      {name = "Street Musician", x = 17, y = 20, dialogue = "♪ Across the stars we fly, through nebulae on high... ♪ Tips appreciated!"},
-      {name = "Security Guard", x = 12, y = 12, dialogue = "Keep it civil on the Commerce Deck. We've had some... rowdy customers lately."},
-      {name = "Tourist", x = 24, y = 10, dialogue = "I came here all the way from the Andromeda sector! Your Cantina has the best Bantha milk."},
+      {name = "Neon Barker", x = 10, y = 9, dialogue = "Step right up! The Casino's hot tonight! Triple jackpot on the slots!", gender = "male"},
+      {name = "Window Shopper", x = 20, y = 9, dialogue = "Have you seen the new Phantom ship at the Shipbuilder? Sleek as a shadow...", gender = "female", design = 3},
+      {name = "Street Musician", x = 17, y = 20, dialogue = "♪ Across the stars we fly, through nebulae on high... ♪ Tips appreciated!", gender = "male", design = 2},
+      {name = "Security Guard", x = 12, y = 12, dialogue = "Keep it civil on the Commerce Deck. We've had some... rowdy customers lately.", gender = "male", design = 3},
+      {name = "Tourist", x = 24, y = 10, dialogue = "I came here all the way from the Andromeda sector! Your Cantina has the best Bantha milk.", gender = "female", design = 3},
     },
     paths = {
       -- Main corridor between building rows
@@ -171,11 +171,11 @@ M.floors = {
        color = {0.2, 0.15, 0.1}, neonColor = {1.0, 0.8, 0.3}},
     },
     npcs = {
-      {name = "Resident Yuki", x = 10, y = 9, dialogue = "I love living on the station. The view from my apartment at night... you can see three nebulae."},
-      {name = "Chef Marco", x = 22, y = 9, dialogue = "I make the best carbonara this side of the Milky Way. Beethoven would approve — he appreciated fine things."},
-      {name = "Professor Lin", x = 17, y = 20, dialogue = "Did you know Bach composed over 1,000 works? Music is the mathematics of the soul."},
-      {name = "Mysterious Stranger", x = 8, y = 12, dialogue = "There are levels of this station most people never see. Deep below... and high above. Complete my task and I'll show you."},
-      {name = "Kid with a Dog", x = 28, y = 11, dialogue = "My dog Cosmo loves chasing the cargo droids on Floor 1! Don't tell the Foreman."},
+      {name = "Resident Yuki", x = 10, y = 9, dialogue = "I love living on the station. The view from my apartment at night... you can see three nebulae.", gender = "female"},
+      {name = "Chef Marco", x = 22, y = 9, dialogue = "I make the best carbonara this side of the Milky Way. Beethoven would approve — he appreciated fine things.", gender = "male"},
+      {name = "Professor Lin", x = 17, y = 20, dialogue = "Did you know Bach composed over 1,000 works? Music is the mathematics of the soul.", gender = "female", design = 4},
+      {name = "Mysterious Stranger", x = 8, y = 12, dialogue = "There are levels of this station most people never see. Deep below... and high above. Complete my task and I'll show you.", gender = "male", design = 5},
+      {name = "Kid with a Dog", x = 28, y = 11, dialogue = "My dog Cosmo loves chasing the cargo droids on Floor 1! Don't tell the Foreman.", gender = "male"},
     },
     paths = {
       -- Main corridor between building rows
@@ -213,11 +213,11 @@ M.floors = {
        color = {0.2, 0.1, 0.1}, neonColor = {1.0, 0.2, 0.2}},
     },
     npcs = {
-      {name = "Deck Chief Ramos", x = 12, y = 9, dialogue = "All pilots report to the flight deck! We've got bogeys on the long-range scanners."},
-      {name = "Mechanic Torque", x = 20, y = 9, dialogue = "Your ship's in good shape. But if you want the REAL upgrades, talk to the Shipbuilder on Floor 2."},
-      {name = "Pilot Ace", x = 8, y = 12, dialogue = "I've flown every route from Corneria to Venom. Sector Y is where the real dogfighters earn their wings."},
-      {name = "Navigation Droid", x = 30, y = 10, dialogue = "Plotting course... Warning: Asteroid density in Sector X exceeds safe parameters by 340%."},
-      {name = "Recruit", x = 22, y = 12, dialogue = "Is it true the Phantom can phase through walls? I heard the test pilot went invisible for a whole minute!"},
+      {name = "Deck Chief Ramos", x = 12, y = 9, dialogue = "All pilots report to the flight deck! We've got bogeys on the long-range scanners.", gender = "male", design = 3},
+      {name = "Mechanic Torque", x = 20, y = 9, dialogue = "Your ship's in good shape. But if you want the REAL upgrades, talk to the Shipbuilder on Floor 2.", gender = "male", design = 6},
+      {name = "Pilot Ace", x = 8, y = 12, dialogue = "I've flown every route from Corneria to Venom. Sector Y is where the real dogfighters earn their wings.", gender = "male"},
+      {name = "Navigation Droid", x = 30, y = 10, dialogue = "Plotting course... Warning: Asteroid density in Sector X exceeds safe parameters by 340%.", gender = "male"},
+      {name = "Recruit", x = 22, y = 12, dialogue = "Is it true the Phantom can phase through walls? I heard the test pilot went invisible for a whole minute!", gender = "female", design = 5},
     },
     paths = {
       -- Main corridor between building rows
@@ -254,10 +254,10 @@ M.floors = {
        color = {0.1, 0.08, 0.25}, neonColor = {0.4, 0.2, 0.8}},
     },
     npcs = {
-      {name = "Piano Robot", x = 12, y = 8, dialogue = "♪ Clair de Lune, by Claude Debussy. A piece that captures the essence of moonlight on still water. ♪"},
-      {name = "Astronomer Vega", x = 18, y = 8, dialogue = "That spiral galaxy out there... NGC 4414. Forty million light-years away. And yet, here we are, looking at it."},
-      {name = "Philosopher Sage", x = 10, y = 15, dialogue = "Mozart said 'The music is not in the notes, but in the silence between.' Wise words for a pilot too."},
-      {name = "Old Captain", x = 20, y = 15, dialogue = "I've seen the edge of the galaxy. It's not an edge at all — it's a beginning. Chopin understood beginnings."},
+      {name = "Piano Robot", x = 12, y = 8, dialogue = "♪ Clair de Lune, by Claude Debussy. A piece that captures the essence of moonlight on still water. ♪", gender = "male"},
+      {name = "Astronomer Vega", x = 18, y = 8, dialogue = "That spiral galaxy out there... NGC 4414. Forty million light-years away. And yet, here we are, looking at it.", gender = "female", design = 4},
+      {name = "Philosopher Sage", x = 10, y = 15, dialogue = "Mozart said 'The music is not in the notes, but in the silence between.' Wise words for a pilot too.", gender = "male", design = 4},
+      {name = "Old Captain", x = 20, y = 15, dialogue = "I've seen the edge of the galaxy. It's not an edge at all — it's a beginning. Chopin understood beginnings.", gender = "male"},
     },
     paths = {
       -- Main corridor between building rows
@@ -288,8 +288,8 @@ M.floors = {
        color = {0.15, 0.15, 0.15}, neonColor = {1.0, 1.0, 1.0}},
     },
     npcs = {
-      {name = "Station Commander", x = 12, y = 8, dialogue = "You've proven yourself worthy of the highest level. Few ever reach the Apex. Welcome, pilot."},
-      {name = "Ancient Hologram", x = 8, y = 8, dialogue = "I am the echo of this station's first captain. Vivaldi's Four Seasons played at our maiden voyage. What a day..."},
+      {name = "Station Commander", x = 12, y = 8, dialogue = "You've proven yourself worthy of the highest level. Few ever reach the Apex. Welcome, pilot.", gender = "female", design = 2},
+      {name = "Ancient Hologram", x = 8, y = 8, dialogue = "I am the echo of this station's first captain. Vivaldi's Four Seasons played at our maiden voyage. What a day...", gender = "male"},
     },
     paths = {
       -- Open area below buildings (doors at y=6 connect to y=7)

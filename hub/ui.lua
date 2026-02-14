@@ -497,8 +497,42 @@ function M.drawPlayer(player, time)
 end
 
 -- ═══════════════════════════════════════════════════════
--- POKEMON EMERALD-STYLE NPC SPRITE
+-- POKEMON EMERALD-STYLE NPC SPRITE (Multi-Design System)
 -- ═══════════════════════════════════════════════════════
+
+-- Design definitions for varied NPC appearances
+-- Male designs: 1-6, Female designs: 1-6
+-- Each NPC auto-selects a design from their name hash, or use npcObj.design to override
+local NPC_DESIGNS = {
+  male = {
+    -- Design 1: Standard guy - short hair, regular build
+    {hair = "short", body = "regular", accessory = "none", shoe = "boots"},
+    -- Design 2: Spiky punk - tall spiky hair, slim
+    {hair = "spiky", body = "slim", accessory = "none", shoe = "boots"},
+    -- Design 3: Military buzz - buzz cut, broad shoulders
+    {hair = "buzz", body = "broad", accessory = "none", shoe = "heavy"},
+    -- Design 4: Scientist - messy hair, lab coat
+    {hair = "messy", body = "regular", accessory = "glasses", shoe = "shoes"},
+    -- Design 5: Slick exec - slicked back, suit-ready
+    {hair = "slicked", body = "slim", accessory = "none", shoe = "shoes"},
+    -- Design 6: Rugged explorer - bandana, muscular
+    {hair = "bandana", body = "broad", accessory = "none", shoe = "heavy"},
+  },
+  female = {
+    -- Design 1: Long flowing hair, fitted silhouette, earrings
+    {hair = "long_flowing", body = "curvy", accessory = "earrings", shoe = "heels"},
+    -- Design 2: High ponytail, athletic build
+    {hair = "ponytail_high", body = "athletic", accessory = "none", shoe = "boots"},
+    -- Design 3: Bob cut with bangs, petite
+    {hair = "bob", body = "petite", accessory = "earrings", shoe = "heels"},
+    -- Design 4: Bun updo, elegant, glasses
+    {hair = "bun", body = "slim", accessory = "glasses", shoe = "heels"},
+    -- Design 5: Twin tails, youthful look
+    {hair = "twintails", body = "petite", accessory = "none", shoe = "shoes"},
+    -- Design 6: Side-swept long hair, bold silhouette
+    {hair = "side_swept", body = "curvy", accessory = "earrings", shoe = "boots"},
+  }
+}
 
 function M.drawNPC(npcObj, neonColor, time)
   time = time or 0
@@ -506,6 +540,7 @@ function M.drawNPC(npcObj, neonColor, time)
   local nx = npcObj.x * gs + gs / 2
   local ny = npcObj.y * gs + gs / 2
   local dir = npcObj.direction or "down"
+  local isFemale = (npcObj.gender == "female")
 
   -- Special rendering for Piano Robot with Steinway grand piano
   if npcObj.name == "Piano Robot" then
@@ -525,174 +560,915 @@ function M.drawNPC(npcObj, neonColor, time)
     bob = math.sin(time * 1.5 + npcObj.x * 2) * 1
   end
 
-  -- Body color (varies by NPC - use a hash of name for color variation)
+  -- Name hash for procedural variation
   local nameHash = 0
   for i = 1, #(npcObj.name or "NPC") do
     nameHash = nameHash + string.byte(npcObj.name, i)
   end
-  local bodyR = 0.4 + (nameHash % 60) / 100
-  local bodyG = 0.3 + ((nameHash * 7) % 50) / 100
-  local bodyB = 0.3 + ((nameHash * 13) % 60) / 100
-  local hairR = (nameHash % 80) / 255 + 0.1
-  local hairG = ((nameHash * 3) % 80) / 255 + 0.1
-  local hairB = ((nameHash * 7) % 80) / 255 + 0.1
+
+  -- Pick design (explicit or auto from hash)
+  local genderKey = isFemale and "female" or "male"
+  local designList = NPC_DESIGNS[genderKey]
+  local designIdx = npcObj.design or ((nameHash % #designList) + 1)
+  local design = designList[designIdx] or designList[1]
+
+  -- ── Color palette ──
+  local bodyR, bodyG, bodyB
+  if npcObj.outfit == "suit" then
+    bodyR, bodyG, bodyB = 0.12, 0.12, 0.15
+  elseif npcObj.outfit == "labcoat" then
+    bodyR, bodyG, bodyB = 0.88, 0.88, 0.9
+  elseif npcObj.outfit == "uniform" then
+    bodyR = 0.25 + (nameHash % 20) / 100
+    bodyG = 0.3 + ((nameHash * 3) % 20) / 100
+    bodyB = 0.45 + ((nameHash * 5) % 20) / 100
+  elseif isFemale then
+    -- More vibrant palette for female NPCs
+    local palettes = {
+      {0.7, 0.25, 0.35},  -- rose
+      {0.3, 0.5, 0.7},    -- sky blue
+      {0.55, 0.3, 0.65},  -- purple
+      {0.2, 0.55, 0.5},   -- teal
+      {0.75, 0.45, 0.2},  -- amber
+      {0.4, 0.6, 0.35},   -- sage green
+    }
+    local pal = palettes[(nameHash % #palettes) + 1]
+    bodyR, bodyG, bodyB = pal[1], pal[2], pal[3]
+  else
+    bodyR = 0.4 + (nameHash % 60) / 100
+    bodyG = 0.3 + ((nameHash * 7) % 50) / 100
+    bodyB = 0.3 + ((nameHash * 13) % 60) / 100
+  end
+
+  -- Hair color palettes (more variety)
+  local hairPalettes = {
+    {0.12, 0.08, 0.05},   -- dark brown/black
+    {0.55, 0.35, 0.15},   -- chestnut
+    {0.75, 0.6, 0.3},     -- blonde
+    {0.3, 0.15, 0.1},     -- auburn
+    {0.15, 0.12, 0.1},    -- near-black
+    {0.6, 0.25, 0.15},    -- red
+    {0.4, 0.25, 0.18},    -- medium brown
+    {0.8, 0.75, 0.6},     -- platinum
+  }
+  local hairPal = hairPalettes[(nameHash % #hairPalettes) + 1]
+  local hairR, hairG, hairB = hairPal[1], hairPal[2], hairPal[3]
+
+  -- Skin tone variation
+  local skinTones = {
+    {0.92, 0.78, 0.65},  -- light
+    {0.85, 0.7, 0.55},   -- medium light
+    {0.72, 0.55, 0.4},   -- medium
+    {0.55, 0.38, 0.25},  -- medium dark
+    {0.4, 0.28, 0.18},   -- dark
+  }
+  local skinPal = skinTones[((nameHash * 3) % #skinTones) + 1]
+  local skinR, skinG, skinB = skinPal[1], skinPal[2], skinPal[3]
+
+  -- Eye color for females (more visible)
+  local eyeR, eyeG, eyeB = 0.1, 0.1, 0.15
+  if isFemale then
+    local eyeColors = {
+      {0.15, 0.25, 0.4},  -- blue
+      {0.2, 0.35, 0.15},  -- green
+      {0.3, 0.18, 0.1},   -- brown
+      {0.25, 0.2, 0.35},  -- violet
+    }
+    local ec = eyeColors[((nameHash * 11) % #eyeColors) + 1]
+    eyeR, eyeG, eyeB = ec[1], ec[2], ec[3]
+  end
+
+  -- Shoe color
+  local shoeR, shoeG, shoeB = 0.3, 0.2, 0.2
+  if design.shoe == "heels" then
+    shoeR, shoeG, shoeB = 0.25, 0.12, 0.12
+  elseif design.shoe == "heavy" then
+    shoeR, shoeG, shoeB = 0.22, 0.2, 0.18
+  end
+
+  -- Lip color for females
+  local lipR, lipG, lipB = skinR + 0.12, skinG - 0.05, skinB - 0.08
+
+  -- Accessory color (glasses frame, earrings)
+  local accR, accG, accB = 0.7, 0.6, 0.3  -- gold-ish
 
   -- Shadow
   love.graphics.setColor(0, 0, 0, 0.3)
   love.graphics.ellipse("fill", nx, ny + 12, 9, 4)
 
-  if dir == "left" then
-    -- === LEFT-FACING NPC ===
-    -- Feet
-    love.graphics.setColor(0.3, 0.2, 0.2)
-    love.graphics.rectangle("fill", nx - 3, ny + 7 + bob + footOffset, 4, 4)
-    love.graphics.rectangle("fill", nx - 1, ny + 8 + bob, 4, 3)
+  -- ══════════════════════════════════════
+  -- HELPER: Draw body shape by design
+  -- ══════════════════════════════════════
 
-    -- Legs
-    love.graphics.setColor(0.35, 0.25, 0.2)
+  local function drawFeet_front()
+    love.graphics.setColor(shoeR, shoeG, shoeB)
+    if design.shoe == "heels" and isFemale then
+      -- Smaller pointed heels
+      love.graphics.rectangle("fill", nx - 5, ny + 8 + bob, 3, 4)
+      love.graphics.rectangle("fill", nx + 2, ny + 8 + bob + footOffset, 3, 4)
+      -- Heel accent
+      love.graphics.setColor(shoeR * 0.7, shoeG * 0.7, shoeB * 0.7)
+      love.graphics.rectangle("fill", nx - 5, ny + 11 + bob, 1, 2)
+      love.graphics.rectangle("fill", nx + 4, ny + 11 + bob + footOffset, 1, 2)
+    elseif design.shoe == "heavy" then
+      -- Thick heavy boots
+      love.graphics.rectangle("fill", nx - 6, ny + 6 + bob, 5, 5)
+      love.graphics.rectangle("fill", nx + 1, ny + 6 + bob + footOffset, 5, 5)
+      -- Boot strap
+      love.graphics.setColor(shoeR * 1.3, shoeG * 1.3, shoeB * 1.3)
+      love.graphics.rectangle("fill", nx - 6, ny + 7 + bob, 5, 1)
+      love.graphics.rectangle("fill", nx + 1, ny + 7 + bob + footOffset, 5, 1)
+    else
+      love.graphics.rectangle("fill", nx - 5, ny + 7 + bob, 4, 4)
+      love.graphics.rectangle("fill", nx + 1, ny + 7 + bob + footOffset, 4, 4)
+    end
+  end
+
+  local function drawLegs_front()
+    if isFemale and (design.body == "curvy" or design.body == "athletic") then
+      -- Slimmer, more shaped legs
+      love.graphics.setColor(0.3, 0.22, 0.18)
+      love.graphics.rectangle("fill", nx - 4, ny + 2 + bob, 3, 6)
+      love.graphics.rectangle("fill", nx + 1, ny + 2 + bob, 3, 6)
+    else
+      love.graphics.setColor(0.35, 0.25, 0.2)
+      love.graphics.rectangle("fill", nx - 4, ny + 2 + bob, 4, 6)
+      love.graphics.rectangle("fill", nx + 1, ny + 2 + bob, 4, 6)
+    end
+  end
+
+  local function drawBody_front()
+    love.graphics.setColor(bodyR, bodyG, bodyB)
+    if isFemale then
+      if design.body == "curvy" then
+        -- Hourglass: wider bust, narrow waist, wider hips
+        love.graphics.rectangle("fill", nx - 5, ny - 7 + bob, 10, 3)   -- chest
+        love.graphics.rectangle("fill", nx - 4, ny - 4 + bob, 8, 2)    -- waist
+        love.graphics.rectangle("fill", nx - 5, ny - 2 + bob, 10, 4)   -- hips
+        -- Bust line accent
+        love.graphics.setColor(bodyR * 0.85, bodyG * 0.85, bodyB * 0.85)
+        love.graphics.rectangle("fill", nx - 4, ny - 5 + bob, 8, 1)
+      elseif design.body == "athletic" then
+        -- Toned, straight but defined shoulders
+        love.graphics.rectangle("fill", nx - 5, ny - 7 + bob, 10, 3)
+        love.graphics.rectangle("fill", nx - 4, ny - 4 + bob, 8, 3)
+        love.graphics.rectangle("fill", nx - 4, ny - 1 + bob, 8, 3)
+      elseif design.body == "petite" then
+        -- Smaller, narrower frame
+        love.graphics.rectangle("fill", nx - 4, ny - 6 + bob, 8, 3)
+        love.graphics.rectangle("fill", nx - 3, ny - 3 + bob, 6, 2)
+        love.graphics.rectangle("fill", nx - 4, ny - 1 + bob, 8, 3)
+      else -- slim
+        love.graphics.rectangle("fill", nx - 5, ny - 7 + bob, 10, 4)
+        love.graphics.rectangle("fill", nx - 4, ny - 3 + bob, 8, 3)
+        love.graphics.rectangle("fill", nx - 5, ny + 0 + bob, 10, 3)
+      end
+      -- Neckline / collar detail for females
+      love.graphics.setColor(skinR, skinG, skinB)
+      love.graphics.rectangle("fill", nx - 2, ny - 7 + bob, 4, 2)
+    else
+      if design.body == "broad" then
+        -- Wide muscular torso
+        love.graphics.rectangle("fill", nx - 7, ny - 7 + bob, 14, 10)
+        -- Shoulder accents
+        love.graphics.setColor(bodyR * 0.9, bodyG * 0.9, bodyB * 0.9)
+        love.graphics.rectangle("fill", nx - 7, ny - 7 + bob, 14, 2)
+      elseif design.body == "slim" then
+        -- Narrower, taller looking
+        love.graphics.rectangle("fill", nx - 5, ny - 7 + bob, 10, 10)
+      else -- regular
+        love.graphics.rectangle("fill", nx - 6, ny - 7 + bob, 12, 10)
+      end
+      -- Collar for males
+      love.graphics.setColor(bodyR * 1.1, bodyG * 1.1, bodyB * 1.1)
+      love.graphics.rectangle("fill", nx - 3, ny - 7 + bob, 6, 2)
+    end
+  end
+
+  local function drawArms_front()
+    love.graphics.setColor(bodyR * 0.9, bodyG * 0.9, bodyB * 0.9)
+    if isFemale then
+      -- Slimmer arms
+      love.graphics.rectangle("fill", nx - 7, ny - 5 + bob + armSwing, 3, 7)
+      love.graphics.rectangle("fill", nx + 4, ny - 5 + bob - armSwing, 3, 7)
+    else
+      if design.body == "broad" then
+        love.graphics.rectangle("fill", nx - 9, ny - 5 + bob + armSwing, 3, 8)
+        love.graphics.rectangle("fill", nx + 6, ny - 5 + bob - armSwing, 3, 8)
+      else
+        love.graphics.rectangle("fill", nx - 8, ny - 5 + bob + armSwing, 3, 7)
+        love.graphics.rectangle("fill", nx + 5, ny - 5 + bob - armSwing, 3, 7)
+      end
+    end
+    -- Hands
+    love.graphics.setColor(skinR, skinG, skinB)
+    if isFemale then
+      love.graphics.rectangle("fill", nx - 7, ny + 1 + bob + armSwing, 3, 2)
+      love.graphics.rectangle("fill", nx + 4, ny + 1 + bob - armSwing, 3, 2)
+    else
+      if design.body == "broad" then
+        love.graphics.rectangle("fill", nx - 9, ny + 2 + bob + armSwing, 3, 3)
+        love.graphics.rectangle("fill", nx + 6, ny + 2 + bob - armSwing, 3, 3)
+      else
+        love.graphics.rectangle("fill", nx - 8, ny + 1 + bob + armSwing, 3, 3)
+        love.graphics.rectangle("fill", nx + 5, ny + 1 + bob - armSwing, 3, 3)
+      end
+    end
+  end
+
+  local function drawHead_front()
+    -- Head shape
+    love.graphics.setColor(skinR, skinG, skinB)
+    if isFemale then
+      -- Slightly rounder/softer face
+      love.graphics.rectangle("fill", nx - 5, ny - 15 + bob, 10, 9)
+      -- Chin highlight (softer jawline)
+      love.graphics.setColor(skinR + 0.03, skinG + 0.02, skinB + 0.01)
+      love.graphics.rectangle("fill", nx - 3, ny - 8 + bob, 6, 2)
+    else
+      love.graphics.rectangle("fill", nx - 5, ny - 15 + bob, 10, 9)
+      if design.body == "broad" then
+        -- Wider jaw
+        love.graphics.rectangle("fill", nx - 6, ny - 12 + bob, 12, 6)
+      end
+    end
+  end
+
+  local function drawHair_front()
+    love.graphics.setColor(hairR, hairG, hairB)
+    if isFemale then
+      if design.hair == "long_flowing" then
+        -- Voluminous long hair flowing past shoulders
+        love.graphics.rectangle("fill", nx - 7, ny - 19 + bob, 14, 7)   -- top volume
+        love.graphics.rectangle("fill", nx - 7, ny - 13 + bob, 3, 10)   -- left side long
+        love.graphics.rectangle("fill", nx + 5, ny - 13 + bob, 3, 10)   -- right side long
+        -- Wispy ends
+        love.graphics.rectangle("fill", nx - 6, ny - 4 + bob, 2, 3)
+        love.graphics.rectangle("fill", nx + 5, ny - 4 + bob, 2, 3)
+        -- Soft bangs
+        love.graphics.rectangle("fill", nx - 5, ny - 13 + bob, 10, 2)
+      elseif design.hair == "ponytail_high" then
+        -- High ponytail with volume on top
+        love.graphics.rectangle("fill", nx - 6, ny - 18 + bob, 12, 6)
+        -- Ponytail sticking up then falling
+        love.graphics.rectangle("fill", nx - 1, ny - 22 + bob, 4, 5)
+        love.graphics.rectangle("fill", nx + 2, ny - 20 + bob, 3, 3)
+        -- Scrunchie / hair tie
+        love.graphics.setColor(bodyR * 0.8, bodyG * 0.8, bodyB * 1.2)
+        love.graphics.rectangle("fill", nx - 1, ny - 18 + bob, 4, 2)
+        love.graphics.setColor(hairR, hairG, hairB)
+        -- Side wisps
+        love.graphics.rectangle("fill", nx - 5, ny - 13 + bob, 2, 3)
+        love.graphics.rectangle("fill", nx + 4, ny - 13 + bob, 2, 3)
+      elseif design.hair == "bob" then
+        -- Chin-length bob with straight bangs
+        love.graphics.rectangle("fill", nx - 6, ny - 18 + bob, 12, 6)
+        love.graphics.rectangle("fill", nx - 6, ny - 13 + bob, 3, 6)
+        love.graphics.rectangle("fill", nx + 4, ny - 13 + bob, 3, 6)
+        -- Thick straight bangs
+        love.graphics.rectangle("fill", nx - 5, ny - 13 + bob, 10, 3)
+      elseif design.hair == "bun" then
+        -- Elegant updo bun
+        love.graphics.rectangle("fill", nx - 6, ny - 17 + bob, 12, 5)
+        -- Bun on top
+        love.graphics.rectangle("fill", nx - 3, ny - 22 + bob, 6, 6)
+        love.graphics.rectangle("fill", nx - 2, ny - 23 + bob, 4, 3)
+        -- Decorative pin
+        love.graphics.setColor(0.85, 0.7, 0.3)
+        love.graphics.rectangle("fill", nx + 2, ny - 21 + bob, 2, 2)
+        love.graphics.setColor(hairR, hairG, hairB)
+        -- Swept-back sides
+        love.graphics.rectangle("fill", nx - 5, ny - 13 + bob, 2, 3)
+        love.graphics.rectangle("fill", nx + 4, ny - 13 + bob, 2, 3)
+      elseif design.hair == "twintails" then
+        -- Twin tails on each side
+        love.graphics.rectangle("fill", nx - 6, ny - 18 + bob, 12, 6)
+        -- Left tail
+        love.graphics.rectangle("fill", nx - 8, ny - 14 + bob, 3, 10)
+        love.graphics.rectangle("fill", nx - 7, ny - 5 + bob, 2, 4)
+        -- Right tail
+        love.graphics.rectangle("fill", nx + 6, ny - 14 + bob, 3, 10)
+        love.graphics.rectangle("fill", nx + 6, ny - 5 + bob, 2, 4)
+        -- Hair ties
+        love.graphics.setColor(0.9, 0.3, 0.4)
+        love.graphics.rectangle("fill", nx - 8, ny - 14 + bob, 3, 2)
+        love.graphics.rectangle("fill", nx + 6, ny - 14 + bob, 3, 2)
+        love.graphics.setColor(hairR, hairG, hairB)
+        -- Bangs
+        love.graphics.rectangle("fill", nx - 5, ny - 13 + bob, 10, 2)
+      elseif design.hair == "side_swept" then
+        -- Long side-swept hair, dramatic part
+        love.graphics.rectangle("fill", nx - 6, ny - 18 + bob, 12, 6)
+        -- Swept heavily to one side
+        love.graphics.rectangle("fill", nx - 7, ny - 15 + bob, 4, 12)
+        love.graphics.rectangle("fill", nx - 7, ny - 4 + bob, 3, 4)
+        -- Light side
+        love.graphics.rectangle("fill", nx + 4, ny - 13 + bob, 3, 5)
+        -- Dramatic side bang
+        love.graphics.rectangle("fill", nx - 6, ny - 13 + bob, 7, 3)
+      else
+        -- Fallback: shoulder-length with bangs
+        love.graphics.rectangle("fill", nx - 6, ny - 18 + bob, 12, 6)
+        love.graphics.rectangle("fill", nx - 6, ny - 13 + bob, 3, 7)
+        love.graphics.rectangle("fill", nx + 4, ny - 13 + bob, 3, 7)
+        love.graphics.rectangle("fill", nx - 5, ny - 13 + bob, 10, 2)
+      end
+    else
+      if design.hair == "spiky" then
+        -- Tall spiky hair
+        love.graphics.rectangle("fill", nx - 6, ny - 17 + bob, 12, 5)
+        love.graphics.rectangle("fill", nx - 4, ny - 21 + bob, 3, 5)
+        love.graphics.rectangle("fill", nx + 0, ny - 22 + bob, 3, 6)
+        love.graphics.rectangle("fill", nx + 3, ny - 20 + bob, 3, 4)
+      elseif design.hair == "buzz" then
+        -- Very short buzz cut
+        love.graphics.rectangle("fill", nx - 5, ny - 16 + bob, 10, 3)
+      elseif design.hair == "messy" then
+        -- Tousled messy hair
+        love.graphics.rectangle("fill", nx - 7, ny - 18 + bob, 14, 6)
+        love.graphics.rectangle("fill", nx - 6, ny - 13 + bob, 2, 3)
+        love.graphics.rectangle("fill", nx + 5, ny - 14 + bob, 2, 2)
+        love.graphics.rectangle("fill", nx - 3, ny - 19 + bob, 3, 2)
+      elseif design.hair == "slicked" then
+        -- Slicked back, neat
+        love.graphics.rectangle("fill", nx - 5, ny - 17 + bob, 10, 4)
+        love.graphics.rectangle("fill", nx - 5, ny - 14 + bob, 2, 2)
+        love.graphics.rectangle("fill", nx + 4, ny - 14 + bob, 2, 2)
+      elseif design.hair == "bandana" then
+        -- Bandana wrapped around head
+        love.graphics.rectangle("fill", nx - 5, ny - 17 + bob, 10, 3)
+        -- Bandana band
+        love.graphics.setColor(0.7, 0.15, 0.1)
+        love.graphics.rectangle("fill", nx - 6, ny - 15 + bob, 12, 2)
+        -- Bandana knot on side
+        love.graphics.rectangle("fill", nx + 5, ny - 16 + bob, 3, 4)
+        love.graphics.setColor(hairR, hairG, hairB)
+      else
+        -- Default short hair
+        love.graphics.rectangle("fill", nx - 6, ny - 17 + bob, 12, 5)
+      end
+    end
+  end
+
+  local function drawEyes_front()
+    love.graphics.setColor(eyeR, eyeG, eyeB)
+    if isFemale then
+      -- Larger, more expressive eyes
+      love.graphics.rectangle("fill", nx - 4, ny - 12 + bob, 3, 3)
+      love.graphics.rectangle("fill", nx + 1, ny - 12 + bob, 3, 3)
+      -- Eye shine / highlights
+      love.graphics.setColor(1, 1, 1, 0.8)
+      love.graphics.rectangle("fill", nx - 3, ny - 12 + bob, 1, 1)
+      love.graphics.rectangle("fill", nx + 2, ny - 12 + bob, 1, 1)
+      -- Eyelashes (thicker, more defined)
+      love.graphics.setColor(0.05, 0.05, 0.1)
+      love.graphics.rectangle("fill", nx - 5, ny - 13 + bob, 4, 1)
+      love.graphics.rectangle("fill", nx + 1, ny - 13 + bob, 4, 1)
+      -- Lower lash line
+      love.graphics.rectangle("fill", nx - 4, ny - 9 + bob, 3, 1)
+      love.graphics.rectangle("fill", nx + 1, ny - 9 + bob, 3, 1)
+    else
+      love.graphics.rectangle("fill", nx - 3, ny - 11 + bob, 2, 2)
+      love.graphics.rectangle("fill", nx + 2, ny - 11 + bob, 2, 2)
+    end
+  end
+
+  local function drawFaceDetails_front()
+    if isFemale then
+      -- Lips
+      love.graphics.setColor(lipR, lipG, lipB)
+      love.graphics.rectangle("fill", nx - 2, ny - 8 + bob, 4, 1)
+      -- Blush
+      love.graphics.setColor(skinR + 0.15, skinG - 0.02, skinB - 0.05, 0.35)
+      love.graphics.rectangle("fill", nx - 5, ny - 10 + bob, 2, 2)
+      love.graphics.rectangle("fill", nx + 3, ny - 10 + bob, 2, 2)
+    end
+    -- Glasses accessory
+    if design.accessory == "glasses" then
+      love.graphics.setColor(0.3, 0.3, 0.35, 0.9)
+      -- Left lens
+      love.graphics.rectangle("line", nx - 5, ny - 13 + bob, 4, 4)
+      -- Right lens
+      love.graphics.rectangle("line", nx + 1, ny - 13 + bob, 4, 4)
+      -- Bridge
+      love.graphics.rectangle("fill", nx - 1, ny - 12 + bob, 2, 1)
+    end
+    -- Earrings accessory (front view shows small studs)
+    if design.accessory == "earrings" and isFemale then
+      love.graphics.setColor(accR, accG, accB)
+      love.graphics.rectangle("fill", nx - 6, ny - 10 + bob, 2, 2)
+      love.graphics.rectangle("fill", nx + 5, ny - 10 + bob, 2, 2)
+      -- Dangling part
+      love.graphics.setColor(accR, accG, accB, 0.7)
+      love.graphics.rectangle("fill", nx - 5, ny - 8 + bob, 1, 2)
+      love.graphics.rectangle("fill", nx + 5, ny - 8 + bob, 1, 2)
+    end
+  end
+
+  -- ══════════════════════════════════════
+  -- SIDE-VIEW HELPERS
+  -- ══════════════════════════════════════
+
+  local function drawFeet_side(facingLeft)
+    love.graphics.setColor(shoeR, shoeG, shoeB)
+    if design.shoe == "heels" and isFemale then
+      if facingLeft then
+        love.graphics.rectangle("fill", nx - 4, ny + 8 + bob + footOffset, 3, 4)
+        love.graphics.rectangle("fill", nx - 2, ny + 9 + bob, 3, 3)
+        love.graphics.setColor(shoeR * 0.7, shoeG * 0.7, shoeB * 0.7)
+        love.graphics.rectangle("fill", nx - 1, ny + 11 + bob + footOffset, 1, 2)
+      else
+        love.graphics.rectangle("fill", nx + 1, ny + 8 + bob + footOffset, 3, 4)
+        love.graphics.rectangle("fill", nx - 1, ny + 9 + bob, 3, 3)
+        love.graphics.setColor(shoeR * 0.7, shoeG * 0.7, shoeB * 0.7)
+        love.graphics.rectangle("fill", nx, ny + 11 + bob + footOffset, 1, 2)
+      end
+    elseif design.shoe == "heavy" then
+      if facingLeft then
+        love.graphics.rectangle("fill", nx - 4, ny + 7 + bob + footOffset, 5, 5)
+        love.graphics.rectangle("fill", nx - 2, ny + 8 + bob, 5, 4)
+      else
+        love.graphics.rectangle("fill", nx - 1, ny + 7 + bob + footOffset, 5, 5)
+        love.graphics.rectangle("fill", nx - 3, ny + 8 + bob, 5, 4)
+      end
+    else
+      if facingLeft then
+        love.graphics.rectangle("fill", nx - 3, ny + 7 + bob + footOffset, 4, 4)
+        love.graphics.rectangle("fill", nx - 1, ny + 8 + bob, 4, 3)
+      else
+        love.graphics.rectangle("fill", nx - 1, ny + 7 + bob + footOffset, 4, 4)
+        love.graphics.rectangle("fill", nx - 3, ny + 8 + bob, 4, 3)
+      end
+    end
+  end
+
+  local function drawLegs_side(facingLeft)
+    if isFemale and (design.body == "curvy" or design.body == "athletic") then
+      love.graphics.setColor(0.3, 0.22, 0.18)
+    else
+      love.graphics.setColor(0.35, 0.25, 0.2)
+    end
     love.graphics.rectangle("fill", nx - 2, ny + 2 + bob, 5, 6)
+  end
 
-    -- Body (side view)
+  local function drawBody_side(facingLeft)
     love.graphics.setColor(bodyR, bodyG, bodyB)
-    love.graphics.rectangle("fill", nx - 4, ny - 7 + bob, 8, 10)
+    if isFemale then
+      if design.body == "curvy" then
+        -- Side profile: bust and hip visible
+        if facingLeft then
+          love.graphics.rectangle("fill", nx - 4, ny - 7 + bob, 7, 3)
+          love.graphics.rectangle("fill", nx - 3, ny - 4 + bob, 5, 2)
+          love.graphics.rectangle("fill", nx - 4, ny - 2 + bob, 7, 4)
+          -- Bust silhouette
+          love.graphics.setColor(bodyR * 0.9, bodyG * 0.9, bodyB * 0.9)
+          love.graphics.rectangle("fill", nx - 5, ny - 6 + bob, 2, 3)
+        else
+          love.graphics.rectangle("fill", nx - 3, ny - 7 + bob, 7, 3)
+          love.graphics.rectangle("fill", nx - 2, ny - 4 + bob, 5, 2)
+          love.graphics.rectangle("fill", nx - 3, ny - 2 + bob, 7, 4)
+          love.graphics.setColor(bodyR * 0.9, bodyG * 0.9, bodyB * 0.9)
+          love.graphics.rectangle("fill", nx + 3, ny - 6 + bob, 2, 3)
+        end
+      elseif design.body == "athletic" then
+        love.graphics.rectangle("fill", nx - 3, ny - 7 + bob, 7, 10)
+      elseif design.body == "petite" then
+        love.graphics.rectangle("fill", nx - 3, ny - 6 + bob, 6, 9)
+      else
+        love.graphics.rectangle("fill", nx - 3, ny - 7 + bob, 7, 10)
+      end
+      -- Neckline
+      love.graphics.setColor(skinR, skinG, skinB)
+      if facingLeft then
+        love.graphics.rectangle("fill", nx - 2, ny - 7 + bob, 3, 2)
+      else
+        love.graphics.rectangle("fill", nx - 1, ny - 7 + bob, 3, 2)
+      end
+    else
+      if design.body == "broad" then
+        love.graphics.rectangle("fill", nx - 4, ny - 7 + bob, 9, 10)
+      elseif design.body == "slim" then
+        love.graphics.rectangle("fill", nx - 4, ny - 7 + bob, 7, 10)
+      else
+        love.graphics.rectangle("fill", nx - 4, ny - 7 + bob, 8, 10)
+      end
+    end
+  end
 
-    -- Arm (one visible)
+  local function drawArm_side(facingLeft)
     love.graphics.setColor(bodyR * 0.9, bodyG * 0.9, bodyB * 0.9)
-    love.graphics.rectangle("fill", nx - 1, ny - 5 + bob + armSwing, 3, 7)
-    -- Hand
-    love.graphics.setColor(0.88, 0.73, 0.58)
-    love.graphics.rectangle("fill", nx - 1, ny + 1 + bob + armSwing, 3, 3)
+    if isFemale then
+      love.graphics.rectangle("fill", nx - 1, ny - 5 + bob + armSwing, 3, 6)
+      love.graphics.setColor(skinR, skinG, skinB)
+      love.graphics.rectangle("fill", nx - 1, ny + 0 + bob + armSwing, 3, 2)
+    else
+      if facingLeft then
+        love.graphics.rectangle("fill", nx - 1, ny - 5 + bob + armSwing, 3, 7)
+      else
+        love.graphics.rectangle("fill", nx - 2, ny - 5 + bob + armSwing, 3, 7)
+      end
+      love.graphics.setColor(skinR, skinG, skinB)
+      if facingLeft then
+        love.graphics.rectangle("fill", nx - 1, ny + 1 + bob + armSwing, 3, 3)
+      else
+        love.graphics.rectangle("fill", nx - 2, ny + 1 + bob + armSwing, 3, 3)
+      end
+    end
+  end
 
-    -- Head (side profile)
-    love.graphics.setColor(0.9, 0.76, 0.6)
+  local function drawHead_side(facingLeft)
+    love.graphics.setColor(skinR, skinG, skinB)
     love.graphics.rectangle("fill", nx - 4, ny - 15 + bob, 8, 9)
     -- Nose
-    love.graphics.setColor(0.86, 0.72, 0.56)
-    love.graphics.rectangle("fill", nx - 6, ny - 12 + bob, 3, 3)
+    love.graphics.setColor(skinR - 0.04, skinG - 0.04, skinB - 0.04)
+    if facingLeft then
+      love.graphics.rectangle("fill", nx - 6, ny - 12 + bob, 3, 3)
+    else
+      love.graphics.rectangle("fill", nx + 3, ny - 12 + bob, 3, 3)
+    end
+    -- Lips for female (side)
+    if isFemale then
+      love.graphics.setColor(lipR, lipG, lipB)
+      if facingLeft then
+        love.graphics.rectangle("fill", nx - 5, ny - 9 + bob, 3, 1)
+      else
+        love.graphics.rectangle("fill", nx + 2, ny - 9 + bob, 3, 1)
+      end
+      -- Blush
+      love.graphics.setColor(skinR + 0.15, skinG - 0.02, skinB - 0.05, 0.3)
+      if facingLeft then
+        love.graphics.rectangle("fill", nx - 3, ny - 10 + bob, 2, 2)
+      else
+        love.graphics.rectangle("fill", nx + 1, ny - 10 + bob, 2, 2)
+      end
+    end
+  end
 
-    -- Hair
+  local function drawHair_side(facingLeft)
     love.graphics.setColor(hairR, hairG, hairB)
-    love.graphics.rectangle("fill", nx - 3, ny - 17 + bob, 8, 5)
-    love.graphics.rectangle("fill", nx + 2, ny - 13 + bob, 3, 3)
+    local behindX = facingLeft and 1 or -1  -- direction hair falls behind
 
-    -- Eye
-    love.graphics.setColor(0.1, 0.1, 0.15)
-    love.graphics.rectangle("fill", nx - 3, ny - 11 + bob, 2, 2)
+    if isFemale then
+      if design.hair == "long_flowing" then
+        love.graphics.rectangle("fill", nx - 3, ny - 18 + bob, 8, 6)
+        -- Long hair falling behind
+        local bx = facingLeft and nx + 2 or nx - 5
+        love.graphics.rectangle("fill", bx, ny - 13 + bob, 4, 12)
+        love.graphics.rectangle("fill", bx + behindX, ny - 2 + bob, 3, 4)
+        -- Front wisps
+        local fx = facingLeft and nx - 4 or nx + 2
+        love.graphics.rectangle("fill", fx, ny - 14 + bob, 2, 4)
+      elseif design.hair == "ponytail_high" then
+        love.graphics.rectangle("fill", nx - 3, ny - 18 + bob, 8, 6)
+        -- High ponytail
+        local bx = facingLeft and nx + 3 or nx - 5
+        love.graphics.rectangle("fill", bx, ny - 20 + bob, 3, 4)
+        love.graphics.rectangle("fill", bx, ny - 17 + bob, 3, 12)
+        love.graphics.rectangle("fill", bx + behindX, ny - 6 + bob, 2, 4)
+        -- Scrunchie
+        love.graphics.setColor(bodyR * 0.8, bodyG * 0.8, bodyB * 1.2)
+        love.graphics.rectangle("fill", bx, ny - 17 + bob, 3, 2)
+      elseif design.hair == "bob" then
+        love.graphics.rectangle("fill", nx - 3, ny - 18 + bob, 8, 6)
+        -- Chin-length on both sides
+        local bx = facingLeft and nx + 2 or nx - 4
+        love.graphics.rectangle("fill", bx, ny - 13 + bob, 3, 6)
+        -- Bang on visible side
+        local fx = facingLeft and nx - 4 or nx + 2
+        love.graphics.rectangle("fill", fx, ny - 14 + bob, 4, 5)
+      elseif design.hair == "bun" then
+        love.graphics.rectangle("fill", nx - 3, ny - 17 + bob, 8, 5)
+        -- Bun on back of head
+        local bx = facingLeft and nx + 3 or nx - 6
+        love.graphics.rectangle("fill", bx, ny - 17 + bob, 4, 5)
+        love.graphics.rectangle("fill", bx + (facingLeft and 0 or 1), ny - 18 + bob, 3, 3)
+        -- Pin
+        love.graphics.setColor(0.85, 0.7, 0.3)
+        love.graphics.rectangle("fill", bx + 1, ny - 18 + bob, 2, 2)
+      elseif design.hair == "twintails" then
+        love.graphics.rectangle("fill", nx - 3, ny - 18 + bob, 8, 6)
+        -- Visible twin tail (one in front, one behind)
+        local bx = facingLeft and nx + 2 or nx - 5
+        love.graphics.rectangle("fill", bx, ny - 14 + bob, 3, 10)
+        love.graphics.rectangle("fill", bx + behindX, ny - 5 + bob, 2, 4)
+        -- Hair tie
+        love.graphics.setColor(0.9, 0.3, 0.4)
+        love.graphics.rectangle("fill", bx, ny - 14 + bob, 3, 2)
+      elseif design.hair == "side_swept" then
+        love.graphics.rectangle("fill", nx - 3, ny - 18 + bob, 8, 6)
+        -- Heavy sweep to one side
+        local bx = facingLeft and nx + 2 or nx - 6
+        love.graphics.rectangle("fill", bx, ny - 15 + bob, 4, 12)
+        love.graphics.rectangle("fill", bx + behindX, ny - 4 + bob, 3, 4)
+        -- Dramatic side bang covering one eye
+        local fx = facingLeft and nx - 5 or nx + 1
+        love.graphics.rectangle("fill", fx, ny - 14 + bob, 5, 5)
+      else
+        love.graphics.rectangle("fill", nx - 3, ny - 18 + bob, 8, 6)
+        local bx = facingLeft and nx + 3 or nx - 6
+        love.graphics.rectangle("fill", bx, ny - 14 + bob, 3, 8)
+      end
+    else
+      if design.hair == "spiky" then
+        love.graphics.rectangle("fill", nx - 3, ny - 17 + bob, 8, 5)
+        love.graphics.rectangle("fill", nx - 2, ny - 21 + bob, 3, 5)
+        love.graphics.rectangle("fill", nx + 1, ny - 20 + bob, 3, 4)
+      elseif design.hair == "buzz" then
+        love.graphics.rectangle("fill", nx - 3, ny - 16 + bob, 8, 3)
+      elseif design.hair == "messy" then
+        love.graphics.rectangle("fill", nx - 4, ny - 18 + bob, 10, 6)
+        love.graphics.rectangle("fill", nx - 3, ny - 19 + bob, 3, 2)
+        local bx = facingLeft and nx + 3 or nx - 5
+        love.graphics.rectangle("fill", bx, ny - 13 + bob, 2, 3)
+      elseif design.hair == "slicked" then
+        love.graphics.rectangle("fill", nx - 3, ny - 17 + bob, 8, 4)
+        local bx = facingLeft and nx + 2 or nx - 5
+        love.graphics.rectangle("fill", bx, ny - 13 + bob, 3, 3)
+      elseif design.hair == "bandana" then
+        love.graphics.rectangle("fill", nx - 3, ny - 17 + bob, 8, 3)
+        love.graphics.setColor(0.7, 0.15, 0.1)
+        love.graphics.rectangle("fill", nx - 4, ny - 15 + bob, 10, 2)
+        local knotX = facingLeft and nx - 5 or nx + 5
+        love.graphics.rectangle("fill", knotX, ny - 16 + bob, 3, 4)
+      else
+        love.graphics.rectangle("fill", nx - 3, ny - 17 + bob, 8, 5)
+        local bx = facingLeft and nx + 2 or nx - 5
+        love.graphics.rectangle("fill", bx, ny - 13 + bob, 3, 3)
+      end
+    end
+  end
 
+  local function drawEye_side(facingLeft)
+    love.graphics.setColor(eyeR, eyeG, eyeB)
+    if isFemale then
+      -- Larger eye with lashes
+      if facingLeft then
+        love.graphics.rectangle("fill", nx - 3, ny - 12 + bob, 3, 2)
+        love.graphics.setColor(1, 1, 1, 0.7)
+        love.graphics.rectangle("fill", nx - 2, ny - 12 + bob, 1, 1)
+        love.graphics.setColor(0.05, 0.05, 0.1)
+        love.graphics.rectangle("fill", nx - 4, ny - 13 + bob, 4, 1)
+      else
+        love.graphics.rectangle("fill", nx + 1, ny - 12 + bob, 3, 2)
+        love.graphics.setColor(1, 1, 1, 0.7)
+        love.graphics.rectangle("fill", nx + 2, ny - 12 + bob, 1, 1)
+        love.graphics.setColor(0.05, 0.05, 0.1)
+        love.graphics.rectangle("fill", nx + 1, ny - 13 + bob, 4, 1)
+      end
+    else
+      if facingLeft then
+        love.graphics.rectangle("fill", nx - 3, ny - 11 + bob, 2, 2)
+      else
+        love.graphics.rectangle("fill", nx + 1, ny - 11 + bob, 2, 2)
+      end
+    end
+    -- Glasses side view
+    if design.accessory == "glasses" then
+      love.graphics.setColor(0.3, 0.3, 0.35, 0.9)
+      if facingLeft then
+        love.graphics.rectangle("line", nx - 5, ny - 13 + bob, 5, 4)
+      else
+        love.graphics.rectangle("line", nx, ny - 13 + bob, 5, 4)
+      end
+    end
+    -- Earring side view
+    if design.accessory == "earrings" and isFemale then
+      love.graphics.setColor(accR, accG, accB)
+      local ex = facingLeft and nx + 3 or nx - 4
+      love.graphics.rectangle("fill", ex, ny - 9 + bob, 2, 2)
+      love.graphics.setColor(accR, accG, accB, 0.7)
+      love.graphics.rectangle("fill", ex, ny - 7 + bob, 1, 2)
+    end
+  end
+
+  -- ══════════════════════════════════════
+  -- BACK-VIEW HELPERS
+  -- ══════════════════════════════════════
+
+  local function drawFeet_back()
+    love.graphics.setColor(shoeR, shoeG, shoeB)
+    if design.shoe == "heels" and isFemale then
+      love.graphics.rectangle("fill", nx - 5, ny + 8 + bob, 3, 4)
+      love.graphics.rectangle("fill", nx + 2, ny + 8 + bob + footOffset, 3, 4)
+      love.graphics.setColor(shoeR * 0.7, shoeG * 0.7, shoeB * 0.7)
+      love.graphics.rectangle("fill", nx - 4, ny + 11 + bob, 1, 2)
+      love.graphics.rectangle("fill", nx + 3, ny + 11 + bob + footOffset, 1, 2)
+    elseif design.shoe == "heavy" then
+      love.graphics.rectangle("fill", nx - 6, ny + 6 + bob, 5, 5)
+      love.graphics.rectangle("fill", nx + 1, ny + 6 + bob + footOffset, 5, 5)
+    else
+      love.graphics.rectangle("fill", nx - 5, ny + 7 + bob, 4, 4)
+      love.graphics.rectangle("fill", nx + 1, ny + 7 + bob + footOffset, 4, 4)
+    end
+  end
+
+  local function drawLegs_back()
+    if isFemale and (design.body == "curvy" or design.body == "athletic") then
+      love.graphics.setColor(0.3, 0.22, 0.18)
+      love.graphics.rectangle("fill", nx - 4, ny + 2 + bob, 3, 6)
+      love.graphics.rectangle("fill", nx + 1, ny + 2 + bob, 3, 6)
+    else
+      love.graphics.setColor(0.35, 0.25, 0.2)
+      love.graphics.rectangle("fill", nx - 4, ny + 2 + bob, 4, 6)
+      love.graphics.rectangle("fill", nx + 1, ny + 2 + bob, 4, 6)
+    end
+  end
+
+  local function drawBody_back()
+    love.graphics.setColor(bodyR, bodyG, bodyB)
+    if isFemale then
+      if design.body == "curvy" then
+        love.graphics.rectangle("fill", nx - 5, ny - 7 + bob, 10, 3)
+        love.graphics.rectangle("fill", nx - 4, ny - 4 + bob, 8, 2)
+        love.graphics.rectangle("fill", nx - 5, ny - 2 + bob, 10, 4)
+      elseif design.body == "athletic" then
+        love.graphics.rectangle("fill", nx - 5, ny - 7 + bob, 10, 3)
+        love.graphics.rectangle("fill", nx - 4, ny - 4 + bob, 8, 6)
+      elseif design.body == "petite" then
+        love.graphics.rectangle("fill", nx - 4, ny - 6 + bob, 8, 3)
+        love.graphics.rectangle("fill", nx - 3, ny - 3 + bob, 6, 5)
+      else
+        love.graphics.rectangle("fill", nx - 5, ny - 7 + bob, 10, 4)
+        love.graphics.rectangle("fill", nx - 4, ny - 3 + bob, 8, 3)
+        love.graphics.rectangle("fill", nx - 5, ny + 0 + bob, 10, 3)
+      end
+    else
+      if design.body == "broad" then
+        love.graphics.rectangle("fill", nx - 7, ny - 7 + bob, 14, 10)
+      elseif design.body == "slim" then
+        love.graphics.rectangle("fill", nx - 5, ny - 7 + bob, 10, 10)
+      else
+        love.graphics.rectangle("fill", nx - 6, ny - 7 + bob, 12, 10)
+      end
+    end
+  end
+
+  local function drawArms_back()
+    love.graphics.setColor(bodyR * 0.9, bodyG * 0.9, bodyB * 0.9)
+    if isFemale then
+      love.graphics.rectangle("fill", nx - 7, ny - 5 + bob + armSwing, 3, 7)
+      love.graphics.rectangle("fill", nx + 4, ny - 5 + bob - armSwing, 3, 7)
+    else
+      if design.body == "broad" then
+        love.graphics.rectangle("fill", nx - 9, ny - 5 + bob + armSwing, 3, 8)
+        love.graphics.rectangle("fill", nx + 6, ny - 5 + bob - armSwing, 3, 8)
+      else
+        love.graphics.rectangle("fill", nx - 8, ny - 5 + bob + armSwing, 3, 7)
+        love.graphics.rectangle("fill", nx + 5, ny - 5 + bob - armSwing, 3, 7)
+      end
+    end
+    -- Hands
+    love.graphics.setColor(skinR, skinG, skinB)
+    if isFemale then
+      love.graphics.rectangle("fill", nx - 7, ny + 1 + bob + armSwing, 3, 2)
+      love.graphics.rectangle("fill", nx + 4, ny + 1 + bob - armSwing, 3, 2)
+    else
+      if design.body == "broad" then
+        love.graphics.rectangle("fill", nx - 9, ny + 2 + bob + armSwing, 3, 3)
+        love.graphics.rectangle("fill", nx + 6, ny + 2 + bob - armSwing, 3, 3)
+      else
+        love.graphics.rectangle("fill", nx - 8, ny + 1 + bob + armSwing, 3, 3)
+        love.graphics.rectangle("fill", nx + 5, ny + 1 + bob - armSwing, 3, 3)
+      end
+    end
+  end
+
+  local function drawHair_back()
+    love.graphics.setColor(hairR, hairG, hairB)
+    if isFemale then
+      if design.hair == "long_flowing" then
+        love.graphics.rectangle("fill", nx - 6, ny - 18 + bob, 12, 6)
+        love.graphics.rectangle("fill", nx - 5, ny - 13 + bob, 10, 9)
+        -- Long flowing down back
+        love.graphics.rectangle("fill", nx - 4, ny - 5 + bob, 8, 6)
+        love.graphics.rectangle("fill", nx - 3, ny + 0 + bob, 6, 3)
+      elseif design.hair == "ponytail_high" then
+        love.graphics.rectangle("fill", nx - 6, ny - 18 + bob, 12, 6)
+        love.graphics.rectangle("fill", nx - 5, ny - 13 + bob, 10, 7)
+        -- Ponytail cascading down center
+        love.graphics.rectangle("fill", nx - 2, ny - 21 + bob, 4, 4)
+        love.graphics.rectangle("fill", nx - 2, ny - 7 + bob, 4, 8)
+        -- Hair tie
+        love.graphics.setColor(bodyR * 0.8, bodyG * 0.8, bodyB * 1.2)
+        love.graphics.rectangle("fill", nx - 2, ny - 7 + bob, 4, 2)
+      elseif design.hair == "bob" then
+        love.graphics.rectangle("fill", nx - 6, ny - 18 + bob, 12, 6)
+        love.graphics.rectangle("fill", nx - 5, ny - 13 + bob, 10, 6)
+        -- Clean bob edge
+        love.graphics.setColor(hairR * 0.9, hairG * 0.9, hairB * 0.9)
+        love.graphics.rectangle("fill", nx - 5, ny - 8 + bob, 10, 1)
+      elseif design.hair == "bun" then
+        love.graphics.rectangle("fill", nx - 5, ny - 15 + bob, 10, 9)
+        love.graphics.rectangle("fill", nx - 6, ny - 17 + bob, 12, 5)
+        -- Prominent bun
+        love.graphics.rectangle("fill", nx - 3, ny - 22 + bob, 6, 7)
+        love.graphics.rectangle("fill", nx - 2, ny - 23 + bob, 4, 3)
+        -- Hair pin
+        love.graphics.setColor(0.85, 0.7, 0.3)
+        love.graphics.rectangle("fill", nx + 2, ny - 21 + bob, 2, 2)
+        love.graphics.rectangle("fill", nx - 3, ny - 20 + bob, 2, 2)
+      elseif design.hair == "twintails" then
+        love.graphics.rectangle("fill", nx - 6, ny - 18 + bob, 12, 6)
+        love.graphics.rectangle("fill", nx - 5, ny - 13 + bob, 10, 5)
+        -- Two tails
+        love.graphics.rectangle("fill", nx - 7, ny - 9 + bob, 3, 10)
+        love.graphics.rectangle("fill", nx + 5, ny - 9 + bob, 3, 10)
+        -- Hair ties
+        love.graphics.setColor(0.9, 0.3, 0.4)
+        love.graphics.rectangle("fill", nx - 7, ny - 9 + bob, 3, 2)
+        love.graphics.rectangle("fill", nx + 5, ny - 9 + bob, 3, 2)
+      elseif design.hair == "side_swept" then
+        love.graphics.rectangle("fill", nx - 6, ny - 18 + bob, 12, 6)
+        love.graphics.rectangle("fill", nx - 5, ny - 13 + bob, 10, 9)
+        -- Asymmetric: one side longer
+        love.graphics.rectangle("fill", nx - 6, ny - 5 + bob, 4, 6)
+        love.graphics.rectangle("fill", nx + 3, ny - 5 + bob, 3, 3)
+      else
+        love.graphics.rectangle("fill", nx - 5, ny - 15 + bob, 10, 9)
+        love.graphics.rectangle("fill", nx - 6, ny - 18 + bob, 12, 6)
+        love.graphics.rectangle("fill", nx - 4, ny - 7 + bob, 8, 6)
+        love.graphics.setColor(bodyR * 0.8, bodyG * 0.8, bodyB * 0.8)
+        love.graphics.rectangle("fill", nx - 2, ny - 8 + bob, 4, 2)
+      end
+    else
+      if design.hair == "spiky" then
+        love.graphics.rectangle("fill", nx - 6, ny - 17 + bob, 12, 5)
+        love.graphics.rectangle("fill", nx - 5, ny - 15 + bob, 10, 9)
+        love.graphics.rectangle("fill", nx - 3, ny - 20 + bob, 3, 4)
+        love.graphics.rectangle("fill", nx + 1, ny - 19 + bob, 3, 3)
+      elseif design.hair == "buzz" then
+        love.graphics.rectangle("fill", nx - 5, ny - 15 + bob, 10, 8)
+        love.graphics.rectangle("fill", nx - 5, ny - 16 + bob, 10, 3)
+      elseif design.hair == "messy" then
+        love.graphics.rectangle("fill", nx - 6, ny - 18 + bob, 12, 6)
+        love.graphics.rectangle("fill", nx - 5, ny - 15 + bob, 10, 9)
+        love.graphics.rectangle("fill", nx - 5, ny - 19 + bob, 3, 2)
+        love.graphics.rectangle("fill", nx + 3, ny - 19 + bob, 3, 2)
+      elseif design.hair == "slicked" then
+        love.graphics.rectangle("fill", nx - 5, ny - 17 + bob, 10, 4)
+        love.graphics.rectangle("fill", nx - 5, ny - 15 + bob, 10, 9)
+      elseif design.hair == "bandana" then
+        love.graphics.rectangle("fill", nx - 5, ny - 15 + bob, 10, 9)
+        love.graphics.rectangle("fill", nx - 5, ny - 17 + bob, 10, 3)
+        love.graphics.setColor(0.7, 0.15, 0.1)
+        love.graphics.rectangle("fill", nx - 6, ny - 15 + bob, 12, 2)
+        -- Knot at back
+        love.graphics.rectangle("fill", nx - 1, ny - 14 + bob, 3, 4)
+      else
+        love.graphics.rectangle("fill", nx - 5, ny - 15 + bob, 10, 9)
+        love.graphics.rectangle("fill", nx - 6, ny - 17 + bob, 12, 5)
+      end
+    end
+    -- Earrings from behind
+    if design.accessory == "earrings" and isFemale then
+      love.graphics.setColor(accR, accG, accB)
+      love.graphics.rectangle("fill", nx - 6, ny - 10 + bob, 2, 2)
+      love.graphics.rectangle("fill", nx + 5, ny - 10 + bob, 2, 2)
+    end
+  end
+
+  -- ══════════════════════════════════════
+  -- DRAW BASED ON DIRECTION
+  -- ══════════════════════════════════════
+
+  if dir == "left" then
+    drawFeet_side(true)
+    drawLegs_side(true)
+    drawBody_side(true)
+    drawArm_side(true)
+    drawHead_side(true)
+    drawHair_side(true)
+    drawEye_side(true)
   elseif dir == "right" then
-    -- === RIGHT-FACING NPC ===
-    -- Feet
-    love.graphics.setColor(0.3, 0.2, 0.2)
-    love.graphics.rectangle("fill", nx - 1, ny + 7 + bob + footOffset, 4, 4)
-    love.graphics.rectangle("fill", nx - 3, ny + 8 + bob, 4, 3)
-
-    -- Legs
-    love.graphics.setColor(0.35, 0.25, 0.2)
-    love.graphics.rectangle("fill", nx - 3, ny + 2 + bob, 5, 6)
-
-    -- Body (side view)
-    love.graphics.setColor(bodyR, bodyG, bodyB)
-    love.graphics.rectangle("fill", nx - 4, ny - 7 + bob, 8, 10)
-
-    -- Arm (one visible)
-    love.graphics.setColor(bodyR * 0.9, bodyG * 0.9, bodyB * 0.9)
-    love.graphics.rectangle("fill", nx - 2, ny - 5 + bob + armSwing, 3, 7)
-    -- Hand
-    love.graphics.setColor(0.88, 0.73, 0.58)
-    love.graphics.rectangle("fill", nx - 2, ny + 1 + bob + armSwing, 3, 3)
-
-    -- Head (side profile)
-    love.graphics.setColor(0.9, 0.76, 0.6)
-    love.graphics.rectangle("fill", nx - 4, ny - 15 + bob, 8, 9)
-    -- Nose
-    love.graphics.setColor(0.86, 0.72, 0.56)
-    love.graphics.rectangle("fill", nx + 3, ny - 12 + bob, 3, 3)
-
-    -- Hair
-    love.graphics.setColor(hairR, hairG, hairB)
-    love.graphics.rectangle("fill", nx - 5, ny - 17 + bob, 8, 5)
-    love.graphics.rectangle("fill", nx - 5, ny - 13 + bob, 3, 3)
-
-    -- Eye
-    love.graphics.setColor(0.1, 0.1, 0.15)
-    love.graphics.rectangle("fill", nx + 1, ny - 11 + bob, 2, 2)
-
+    drawFeet_side(false)
+    drawLegs_side(false)
+    drawBody_side(false)
+    drawArm_side(false)
+    drawHead_side(false)
+    drawHair_side(false)
+    drawEye_side(false)
   elseif dir == "up" then
-    -- === UP-FACING NPC (back view) ===
-    -- Feet
-    love.graphics.setColor(0.3, 0.2, 0.2)
-    love.graphics.rectangle("fill", nx - 5, ny + 7 + bob, 4, 4)
-    love.graphics.rectangle("fill", nx + 1, ny + 7 + bob + footOffset, 4, 4)
-
-    -- Legs
-    love.graphics.setColor(0.35, 0.25, 0.2)
-    love.graphics.rectangle("fill", nx - 4, ny + 2 + bob, 4, 6)
-    love.graphics.rectangle("fill", nx + 1, ny + 2 + bob, 4, 6)
-
-    -- Body
-    love.graphics.setColor(bodyR, bodyG, bodyB)
-    love.graphics.rectangle("fill", nx - 6, ny - 7 + bob, 12, 10)
-
-    -- Arms
-    love.graphics.setColor(bodyR * 0.9, bodyG * 0.9, bodyB * 0.9)
-    love.graphics.rectangle("fill", nx - 8, ny - 5 + bob + armSwing, 3, 7)
-    love.graphics.rectangle("fill", nx + 5, ny - 5 + bob - armSwing, 3, 7)
-
-    -- Hands
-    love.graphics.setColor(0.88, 0.73, 0.58)
-    love.graphics.rectangle("fill", nx - 8, ny + 1 + bob + armSwing, 3, 3)
-    love.graphics.rectangle("fill", nx + 5, ny + 1 + bob - armSwing, 3, 3)
-
-    -- Head (back - more hair)
-    love.graphics.setColor(hairR, hairG, hairB)
-    love.graphics.rectangle("fill", nx - 5, ny - 15 + bob, 10, 9)
-    love.graphics.rectangle("fill", nx - 6, ny - 17 + bob, 12, 5)
-
-  else
-    -- === DOWN-FACING NPC (front view, default) ===
-    -- Feet
-    love.graphics.setColor(0.3, 0.2, 0.2)
-    love.graphics.rectangle("fill", nx - 5, ny + 7 + bob, 4, 4)
-    love.graphics.rectangle("fill", nx + 1, ny + 7 + bob + footOffset, 4, 4)
-
-    -- Legs
-    love.graphics.setColor(0.35, 0.25, 0.2)
-    love.graphics.rectangle("fill", nx - 4, ny + 2 + bob, 4, 6)
-    love.graphics.rectangle("fill", nx + 1, ny + 2 + bob, 4, 6)
-
-    -- Body
-    love.graphics.setColor(bodyR, bodyG, bodyB)
-    love.graphics.rectangle("fill", nx - 6, ny - 7 + bob, 12, 10)
-
-    -- Arms
-    love.graphics.setColor(bodyR * 0.9, bodyG * 0.9, bodyB * 0.9)
-    love.graphics.rectangle("fill", nx - 8, ny - 5 + bob + armSwing, 3, 7)
-    love.graphics.rectangle("fill", nx + 5, ny - 5 + bob - armSwing, 3, 7)
-
-    -- Hands
-    love.graphics.setColor(0.88, 0.73, 0.58)
-    love.graphics.rectangle("fill", nx - 8, ny + 1 + bob + armSwing, 3, 3)
-    love.graphics.rectangle("fill", nx + 5, ny + 1 + bob - armSwing, 3, 3)
-
-    -- Head
-    love.graphics.setColor(0.9, 0.76, 0.6)
-    love.graphics.rectangle("fill", nx - 5, ny - 15 + bob, 10, 9)
-
-    -- Hair
-    love.graphics.setColor(hairR, hairG, hairB)
-    love.graphics.rectangle("fill", nx - 6, ny - 17 + bob, 12, 5)
-
-    -- Eyes
-    love.graphics.setColor(0.1, 0.1, 0.15)
-    love.graphics.rectangle("fill", nx - 3, ny - 11 + bob, 2, 2)
-    love.graphics.rectangle("fill", nx + 2, ny - 11 + bob, 2, 2)
+    drawFeet_back()
+    drawLegs_back()
+    drawBody_back()
+    drawArms_back()
+    drawHair_back()
+  else -- "down" (front view, default)
+    drawFeet_front()
+    drawLegs_front()
+    drawBody_front()
+    drawArms_front()
+    drawHead_front()
+    drawHair_front()
+    drawEyes_front()
+    drawFaceDetails_front()
   end
 
   -- Name tag (small, above NPC, with neon tint)
   if neonColor then
     love.graphics.setFont(fonts.tiny)
     love.graphics.setColor(neonColor[1], neonColor[2], neonColor[3], 0.8)
-    love.graphics.printf(npcObj.name, nx - 40, ny - 24 + bob, 80, "center")
+    love.graphics.printf(npcObj.name, nx - 40, ny - 28 + bob, 80, "center")
   end
 end
 

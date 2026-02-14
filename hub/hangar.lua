@@ -1,12 +1,26 @@
 local M = {}
 
 local ships = require("starfox.ships")
+local prototype = require("starfox.prototype")
 local fonts = {}
 local selectedIndex = 1
 local transitionTimer = 0
 local transitionDir = 0 -- -1 left, 1 right, 0 none
 local TRANSITION_DURATION = 0.3
 local shipRotation = 0
+local filteredOrder = {}
+
+-- Build the filtered ship order (hides prototype unless quest complete)
+local function buildFilteredOrder()
+  filteredOrder = {}
+  for _, id in ipairs(ships.order) do
+    if id == "prototype" and not prototype.questComplete then
+      -- Skip: Prototype not yet acquired
+    else
+      table.insert(filteredOrder, id)
+    end
+  end
+end
 
 function M.load()
   fonts.title = love.graphics.newFont(32)
@@ -15,13 +29,19 @@ function M.load()
   fonts.small = love.graphics.newFont(12)
   fonts.shipName = love.graphics.newFont(28)
 
+  -- Build filtered ship list
+  buildFilteredOrder()
+
   -- Find current selection index
   local currentId = ships.getSelected()
-  for i, id in ipairs(ships.order) do
+  for i, id in ipairs(filteredOrder) do
     if id == currentId then
       selectedIndex = i
       break
     end
+  end
+  if selectedIndex > #filteredOrder then
+    selectedIndex = 1
   end
   transitionTimer = 0
   transitionDir = 0
@@ -76,7 +96,7 @@ local function drawShipPreview(def, cx, cy, scale, alpha)
     love.graphics.polygon("fill", -45, 23, -50, 25, -40, 25)
     love.graphics.polygon("fill", 45, 23, 50, 25, 40, 25)
   elseif def.type == "Heavy" then
-    -- Wide, thick wings
+    -- Wide, thick wings with gun pods
     love.graphics.setColor(r * 0.5, g * 0.5, b * 0.5, alpha)
     love.graphics.polygon("fill", -15, 5, -55, 20, -55, 28, -15, 25)
     love.graphics.polygon("fill", 15, 5, 55, 20, 55, 28, 15, 25)
@@ -84,6 +104,27 @@ local function drawShipPreview(def, cx, cy, scale, alpha)
     love.graphics.setColor(r * 0.4, g * 0.4, b * 0.4, 0.5 * alpha)
     love.graphics.polygon("fill", -10, -10, -25, 15, -10, 20)
     love.graphics.polygon("fill", 10, -10, 25, 15, 10, 20)
+    -- Gun pods on wing tips
+    love.graphics.setColor(0.55, 0.55, 0.6, 0.9 * alpha)
+    love.graphics.rectangle("fill", -54, 17, 6, 14)
+    love.graphics.rectangle("fill", 48, 17, 6, 14)
+    love.graphics.setColor(1, 0.7, 0.2, 0.5 * alpha)
+    love.graphics.circle("fill", -51, 17, 2)
+    love.graphics.circle("fill", 51, 17, 2)
+  elseif def.type == "Experimental" then
+    -- Angular stealth wings with glowing vents
+    love.graphics.setColor(r * 0.5, g * 0.5, b * 0.5, alpha)
+    love.graphics.polygon("fill", -15, -5, -45, 18, -35, 30, -15, 20)
+    love.graphics.polygon("fill", 15, -5, 45, 18, 35, 30, 15, 20)
+    -- Glowing cyber-vents
+    local ventPulse = math.sin(love.timer.getTime() * 6) * 0.3 + 0.7
+    love.graphics.setColor(ar, ag, ab, ventPulse * 0.7 * alpha)
+    for v = 0, 3 do
+      local vy = -20 + v * 10
+      love.graphics.rectangle("fill", -3, vy, 6, 4)
+    end
+    love.graphics.setColor(ar, ag, ab, ventPulse * 0.1 * alpha)
+    love.graphics.circle("fill", 0, 0, 30)
   else
     -- Balanced wings
     love.graphics.setColor(r * 0.5, g * 0.5, b * 0.5, alpha)
@@ -155,7 +196,7 @@ function M.draw()
   love.graphics.setColor(0.5, 0.5, 0.6)
   love.graphics.printf("SELECT YOUR SHIP", 0, 68, screenW, "center")
 
-  local def = ships.defs[ships.order[selectedIndex]]
+  local def = ships.defs[filteredOrder[selectedIndex]]
   local slideOffset = 0
   if transitionTimer > 0 then
     local t = transitionTimer / TRANSITION_DURATION
@@ -164,12 +205,12 @@ function M.draw()
 
   -- Draw adjacent ship previews (dimmed)
   local prevIdx = selectedIndex - 1
-  if prevIdx < 1 then prevIdx = #ships.order end
+  if prevIdx < 1 then prevIdx = #filteredOrder end
   local nextIdx = selectedIndex + 1
-  if nextIdx > #ships.order then nextIdx = 1 end
+  if nextIdx > #filteredOrder then nextIdx = 1 end
 
-  local prevDef = ships.defs[ships.order[prevIdx]]
-  local nextDef = ships.defs[ships.order[nextIdx]]
+  local prevDef = ships.defs[filteredOrder[prevIdx]]
+  local nextDef = ships.defs[filteredOrder[nextIdx]]
 
   drawShipPreview(prevDef, screenW * 0.15 + slideOffset, screenH * 0.38, 1.5, 0.25)
   drawShipPreview(nextDef, screenW * 0.85 + slideOffset, screenH * 0.38, 1.5, 0.25)
@@ -255,7 +296,7 @@ function M.draw()
 
   -- Ship counter dots
   local dotY = screenH * 0.55
-  local totalDots = #ships.order
+  local totalDots = #filteredOrder
   local dotSpacing = 20
   local dotsStartX = screenW * 0.5 - (totalDots - 1) * dotSpacing * 0.5
   for i = 1, totalDots do
@@ -270,7 +311,7 @@ function M.draw()
 
   -- Currently equipped indicator
   local currentId = ships.getSelected()
-  if ships.order[selectedIndex] == currentId then
+  if filteredOrder[selectedIndex] == currentId then
     love.graphics.setFont(fonts.normal)
     love.graphics.setColor(0.3, 1, 0.3)
     love.graphics.printf("[ EQUIPPED ]", 0, panelY + panelH + 10, screenW, "center")
@@ -294,20 +335,20 @@ function M.keypressed(key)
   elseif key == "left" then
     selectedIndex = selectedIndex - 1
     if selectedIndex < 1 then
-      selectedIndex = #ships.order
+      selectedIndex = #filteredOrder
     end
     transitionTimer = TRANSITION_DURATION
     transitionDir = 1
   elseif key == "right" then
     selectedIndex = selectedIndex + 1
-    if selectedIndex > #ships.order then
+    if selectedIndex > #filteredOrder then
       selectedIndex = 1
     end
     transitionTimer = TRANSITION_DURATION
     transitionDir = -1
   elseif key == "e" then
     -- Equip selected ship
-    local id = ships.order[selectedIndex]
+    local id = filteredOrder[selectedIndex]
     ships.setSelected(id)
     -- Also store in hub
     local ok, hub = pcall(require, "hub")

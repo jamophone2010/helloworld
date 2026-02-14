@@ -2,8 +2,13 @@ local M = {}
 local reel = require("slotmachine.reel")
 local symbols = require("slotmachine.symbols")
 
-local REEL_X_POSITIONS = {200, 360, 520}
-local REEL_Y = 150
+-- Centered for 1366x768
+local SCREEN_W = 1366
+local MACHINE_W = 470
+local MACHINE_CENTER_X = SCREEN_W / 2
+local REEL_X_START = MACHINE_CENTER_X - MACHINE_W / 2
+local REEL_X_POSITIONS = {REEL_X_START, REEL_X_START + 160, REEL_X_START + 320}
+local REEL_Y = 180
 
 function M.new()
   local machine = {
@@ -41,7 +46,7 @@ function M.update(machine, dt)
 
   elseif machine.state == "payout" then
     machine.payoutTimer = machine.payoutTimer + dt
-    if machine.payoutTimer >= 5.0 then
+    if machine.payoutTimer >= 8.0 then
       machine.state = "idle"
       machine.payoutTimer = 0
     end

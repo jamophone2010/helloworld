@@ -70,87 +70,86 @@ M.zones = {
 
 -- Star path connections between zones (walkable bridges in the void)
 M.starPaths = {
-  -- Horizontal paths
-  {x1 = 16, y1 = 9, x2 = 18, y2 = 10, glow = {0.95, 0.65, 0.2}},   -- Tesseract to Event Horizon
-  {x1 = 28, y1 = 9, x2 = 30, y2 = 10, glow = {0.8, 0.5, 0.25}},    -- Event Horizon to Time Archives
-  {x1 = 16, y1 = 25, x2 = 18, y2 = 26, glow = {1.0, 0.5, 0.1}},    -- Orbital to Event Horizon
-  {x1 = 28, y1 = 25, x2 = 30, y2 = 26, glow = {0.9, 0.7, 0.3}},    -- Event Horizon to Quantum
+  -- Horizontal paths at y=14 (where tesseract/time_archives meet event_horizon)
+  {x1 = 16, y1 = 13, x2 = 18, y2 = 15, glow = {0.95, 0.65, 0.2}},   -- Tesseract to Event Horizon
+  {x1 = 28, y1 = 13, x2 = 30, y2 = 15, glow = {0.8, 0.5, 0.25}},    -- Event Horizon to Time Archives
+  -- Horizontal paths at y=22 (where event_horizon meets orbital/quantum)
+  {x1 = 16, y1 = 21, x2 = 18, y2 = 23, glow = {1.0, 0.5, 0.1}},     -- Orbital to Event Horizon
+  {x1 = 28, y1 = 21, x2 = 30, y2 = 23, glow = {0.9, 0.7, 0.3}},     -- Event Horizon to Quantum
   -- Vertical paths
   {x1 = 10, y1 = 14, x2 = 11, y2 = 22, glow = {1.0, 0.85, 0.4}},   -- Tesseract to Orbital
   {x1 = 36, y1 = 14, x2 = 37, y2 = 22, glow = {0.95, 0.6, 0.2}},   -- Time Archives to Quantum
-  -- Diagonal approach paths
-  {x1 = 21, y1 = 22, x2 = 24, y2 = 24, glow = {0.9, 0.65, 0.25}},  -- Event Horizon south extension
 }
 
 -- Buildings floating on platforms
 M.buildings = {
   -- Event Horizon Plaza (center)
-  {name = "Horizon Observatory", x = 19, y = 15, w = 4, h = 3, doorX = 20, doorY = 17, interior = "observatory",
+  {name = "Horizon Observatory", x = 19, y = 15, w = 4, h = 3, doorX = 20, doorY = 18, interior = "observatory",
    color = {0.2, 0.15, 0.1}, glowColor = {0.95, 0.65, 0.2}},
-  {name = "Singularity Cafe", x = 24, y = 15, w = 4, h = 3, doorX = 25, doorY = 17, interior = "cafe",
+  {name = "Singularity Cafe", x = 24, y = 15, w = 4, h = 3, doorX = 25, doorY = 18, interior = "cafe",
    color = {0.25, 0.18, 0.12}, glowColor = {1.0, 0.85, 0.4}},
-  {name = "Gravity Well Inn", x = 19, y = 19, w = 5, h = 3, doorX = 21, doorY = 21, interior = "inn",
+  {name = "Gravity Well Inn", x = 19, y = 19, w = 5, h = 3, doorX = 21, doorY = 22, interior = "inn",
    color = {0.18, 0.12, 0.08}, glowColor = {0.8, 0.5, 0.25}},
 
   -- The Tesseract (northwest)
-  {name = "Time Library", x = 6, y = 6, w = 5, h = 4, doorX = 8, doorY = 9, interior = "time_library",
+  {name = "Time Library", x = 6, y = 6, w = 5, h = 4, doorX = 8, doorY = 10, interior = "time_library",
    color = {0.15, 0.1, 0.06}, glowColor = {1.0, 0.85, 0.4}},
-  {name = "Bookshelf Tower", x = 12, y = 6, w = 3, h = 4, doorX = 13, doorY = 9, interior = "bookshelf_tower",
+  {name = "Bookshelf Tower", x = 12, y = 6, w = 3, h = 4, doorX = 13, doorY = 10, interior = "bookshelf_tower",
    color = {0.12, 0.08, 0.05}, glowColor = {0.95, 0.7, 0.3}},
-  {name = "Memory Bank", x = 8, y = 11, w = 4, h = 3, doorX = 9, doorY = 13, interior = "memory_bank",
+  {name = "Memory Bank", x = 8, y = 11, w = 4, h = 3, doorX = 9, doorY = 14, interior = "memory_bank",
    color = {0.14, 0.1, 0.07}, glowColor = {0.9, 0.6, 0.2}},
 
   -- Time Archives (northeast)
-  {name = "Chronos Research", x = 31, y = 6, w = 5, h = 4, doorX = 33, doorY = 9, interior = "chronos_lab",
+  {name = "Chronos Research", x = 31, y = 6, w = 5, h = 4, doorX = 33, doorY = 10, interior = "chronos_lab",
    color = {0.13, 0.09, 0.05}, glowColor = {0.8, 0.5, 0.25}},
-  {name = "Temporal Shop", x = 37, y = 6, w = 4, h = 4, doorX = 38, doorY = 9, interior = "temporal_shop",
+  {name = "Temporal Shop", x = 37, y = 6, w = 4, h = 4, doorX = 38, doorY = 10, interior = "temporal_shop",
    color = {0.16, 0.11, 0.07}, glowColor = {0.95, 0.65, 0.2}},
-  {name = "Infinity Archives", x = 33, y = 11, w = 5, h = 3, doorX = 35, doorY = 13, interior = "infinity_archives",
+  {name = "Infinity Archives", x = 33, y = 11, w = 5, h = 3, doorX = 35, doorY = 14, interior = "infinity_archives",
    color = {0.11, 0.08, 0.04}, glowColor = {1.0, 0.75, 0.35}},
 
   -- Orbital Ring (southwest)
-  {name = "Mission Control", x = 6, y = 23, w = 5, h = 4, doorX = 8, doorY = 26, interior = "mission_control",
+  {name = "Mission Control", x = 6, y = 23, w = 5, h = 4, doorX = 8, doorY = 27, interior = "mission_control",
    color = {0.1, 0.12, 0.15}, glowColor = {1.0, 0.5, 0.1}},
-  {name = "Hangar Bay", x = 12, y = 23, w = 4, h = 4, doorX = 13, doorY = 26, interior = "hangar",
+  {name = "Hangar Bay", x = 12, y = 23, w = 4, h = 4, doorX = 13, doorY = 27, interior = "hangar",
    color = {0.12, 0.1, 0.08}, glowColor = {0.9, 0.55, 0.15}},
-  {name = "Supply Depot", x = 8, y = 28, w = 4, h = 2, doorX = 9, doorY = 29, interior = "supply_depot",
+  {name = "Supply Depot", x = 8, y = 28, w = 4, h = 2, doorX = 9, doorY = 30, interior = "supply_depot",
    color = {0.15, 0.12, 0.1}, glowColor = {0.85, 0.5, 0.2}},
 
   -- Quantum District (southeast)
-  {name = "Quantum Lab", x = 31, y = 23, w = 5, h = 4, doorX = 33, doorY = 26, interior = "quantum_lab",
+  {name = "Quantum Lab", x = 31, y = 23, w = 5, h = 4, doorX = 33, doorY = 27, interior = "quantum_lab",
    color = {0.12, 0.1, 0.06}, glowColor = {0.9, 0.7, 0.3}},
-  {name = "Probability Bar", x = 37, y = 23, w = 4, h = 4, doorX = 38, doorY = 26, interior = "probability_bar",
+  {name = "Probability Bar", x = 37, y = 23, w = 4, h = 4, doorX = 38, doorY = 27, interior = "probability_bar",
    color = {0.18, 0.14, 0.1}, glowColor = {1.0, 0.8, 0.4}},
-  {name = "Entanglement Hub", x = 33, y = 28, w = 5, h = 2, doorX = 35, doorY = 29, interior = "entanglement_hub",
+  {name = "Entanglement Hub", x = 33, y = 28, w = 5, h = 2, doorX = 35, doorY = 30, interior = "entanglement_hub",
    color = {0.1, 0.08, 0.05}, glowColor = {0.95, 0.6, 0.25}},
 }
 
 -- NPCs floating on platforms
 M.npcs = {
   -- Event Horizon Plaza
-  {name = "Dr. Thorne", x = 22, y = 18, dialogue = "The black hole bends not just light, but time itself. We exist in its shadow.", zone = "event_horizon"},
-  {name = "Cosmic Wanderer", x = 26, y = 20, dialogue = "I've seen the singularity's heart. There are no words... only equations.", zone = "event_horizon"},
-  {name = "Station Keeper", x = 20, y = 20, dialogue = "Welcome to The Singularity. Time moves differently here. Don't be alarmed.", zone = "event_horizon"},
+  {name = "Dr. Thorne", x = 22, y = 18, dialogue = "The black hole bends not just light, but time itself. We exist in its shadow.", zone = "event_horizon", gender = "male"},
+  {name = "Cosmic Wanderer", x = 26, y = 20, dialogue = "I've seen the singularity's heart. There are no words... only equations.", zone = "event_horizon", gender = "male"},
+  {name = "Station Keeper", x = 20, y = 20, dialogue = "Welcome to The Singularity. Time moves differently here. Don't be alarmed.", zone = "event_horizon", gender = "female", design = 6},
 
   -- The Tesseract
-  {name = "Archivist TARS", x = 9, y = 8, dialogue = "Honesty setting: 95%. These books contain messages across time.", zone = "tesseract"},
-  {name = "Time Librarian", x = 14, y = 8, dialogue = "Every moment is a book. Every choice, a page. We catalog them all.", zone = "tesseract"},
-  {name = "Memory Keeper", x = 10, y = 12, dialogue = "Your memories are safe here. They exist in all times simultaneously.", zone = "tesseract"},
+  {name = "Archivist TARS", x = 7, y = 10, dialogue = "Honesty setting: 95%. These books contain messages across time.", zone = "tesseract", gender = "male"},
+  {name = "Time Librarian", x = 14, y = 11, dialogue = "Every moment is a book. Every choice, a page. We catalog them all.", zone = "tesseract", gender = "female", design = 4},
+  {name = "Memory Keeper", x = 11, y = 14, dialogue = "Your memories are safe here. They exist in all times simultaneously.", zone = "tesseract", gender = "female", design = 1},
 
   -- Time Archives
-  {name = "Chronologist", x = 34, y = 8, dialogue = "We study causality loops here. The future has already happened... somewhere.", zone = "time_archives"},
-  {name = "Temporal Merchant", x = 39, y = 10, dialogue = "I sell moments. Frozen instants from across the cosmos. Interested?", zone = "time_archives"},
-  {name = "Infinity Sage", x = 36, y = 12, dialogue = "Infinity is not a number. It's a direction. The black hole knows this.", zone = "time_archives"},
+  {name = "Chronologist", x = 34, y = 10, dialogue = "We study causality loops here. The future has already happened... somewhere.", zone = "time_archives", gender = "male"},
+  {name = "Temporal Merchant", x = 40, y = 11, dialogue = "I sell moments. Frozen instants from across the cosmos. Interested?", zone = "time_archives", gender = "male"},
+  {name = "Infinity Sage", x = 37, y = 14, dialogue = "Infinity is not a number. It's a direction. The black hole knows this.", zone = "time_archives", gender = "female", design = 1},
 
   -- Orbital Ring
-  {name = "Commander Endurance", x = 9, y = 25, dialogue = "Ready to launch, pilot? The missions await beyond the event horizon.", zone = "orbital_ring"},
-  {name = "Docking Chief", x = 14, y = 25, dialogue = "Your ship is secured. The gravitational lensing makes landing... interesting.", zone = "orbital_ring"},
-  {name = "Cargo Specialist", x = 10, y = 29, dialogue = "Supplies from across the galaxy. Time dilation keeps them fresh forever.", zone = "orbital_ring"},
+  {name = "Commander Endurance", x = 8, y = 27, dialogue = "Ready to launch, pilot? The missions await beyond the event horizon.", zone = "orbital_ring", gender = "male"},
+  {name = "Docking Chief", x = 14, y = 28, dialogue = "Your ship is secured. The gravitational lensing makes landing... interesting.", zone = "orbital_ring", gender = "male"},
+  {name = "Cargo Specialist", x = 11, y = 30, dialogue = "Supplies from across the galaxy. Time dilation keeps them fresh forever.", zone = "orbital_ring", gender = "female", design = 6},
 
   -- Quantum District
-  {name = "Dr. Uncertainty", x = 34, y = 25, dialogue = "Am I here? Am I there? The answer is yes. Quantum superposition is beautiful.", zone = "quantum_district"},
-  {name = "Probability Bartender", x = 39, y = 25, dialogue = "What are the odds you'd visit today? 100%. Now that you're here.", zone = "quantum_district"},
-  {name = "Entanglement Expert", x = 36, y = 29, dialogue = "Every particle here is connected to one light-years away. We're never alone.", zone = "quantum_district"},
+  {name = "Dr. Uncertainty", x = 34, y = 27, dialogue = "Am I here? Am I there? The answer is yes. Quantum superposition is beautiful.", zone = "quantum_district", gender = "female", design = 5},
+  {name = "Probability Bartender", x = 40, y = 28, dialogue = "What are the odds you'd visit today? 100%. Now that you're here.", zone = "quantum_district", gender = "male"},
+  {name = "Entanglement Expert", x = 37, y = 30, dialogue = "Every particle here is connected to one light-years away. We're never alone.", zone = "quantum_district", gender = "female", design = 3},
 }
 
 -- Background stars (generated procedurally)
@@ -158,7 +157,7 @@ M.backgroundStars = {}
 
 -- Gravitational lensing rings around black hole (visual effect)
 M.blackHolePos = {x = 22, y = 2}  -- Black hole position (above the village)
-M.blackHoleRadius = 80  -- Visual size
+M.blackHoleRadius = 220  -- Visual size (Interstellar-scale)
 
 -- Spawn point
 M.spawnPoint = {x = 22, y = 18}  -- Center of Event Horizon Plaza
@@ -258,9 +257,12 @@ function M.createCollisionMap()
         end
       end
     end
-    -- Door is walkable
+    -- Door is walkable (and tile above it on the building wall)
     if map[b.doorY] then
       map[b.doorY][b.doorX] = false
+    end
+    if map[b.doorY - 1] then
+      map[b.doorY - 1][b.doorX] = false
     end
   end
 

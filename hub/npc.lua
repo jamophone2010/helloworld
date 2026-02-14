@@ -7,8 +7,8 @@ local GRID_SIZE = 32
 local WANDER_MIN_DELAY = 2.0  -- Minimum seconds between moves
 local WANDER_MAX_DELAY = 5.0  -- Maximum seconds between moves
 
-function M.new(name, x, y, dialogue)
-  return {
+function M.new(name, x, y, dialogue, gender, extras)
+  local obj = {
     name = name,
     x = x,
     y = y,
@@ -17,6 +17,7 @@ function M.new(name, x, y, dialogue)
     targetX = x,
     targetY = y,
     dialogue = dialogue,
+    gender = gender or "male",  -- default male, set explicitly per NPC
     width = 24,
     height = 24,
     direction = "down",
@@ -25,6 +26,15 @@ function M.new(name, x, y, dialogue)
     wanderTimer = math.random() * WANDER_MAX_DELAY,
     canWander = name ~= "Piano Robot"  -- Piano Robot stays seated
   }
+  -- Copy extra fields (outfit, design, etc.)
+  if extras then
+    for k, v in pairs(extras) do
+      if obj[k] == nil then
+        obj[k] = v
+      end
+    end
+  end
+  return obj
 end
 
 function M.update(npc, dt, collisionMap, allNPCs, player)

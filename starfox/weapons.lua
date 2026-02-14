@@ -297,7 +297,7 @@ function M.fireEnemyLaser(x, y, targetX, targetY)
     y = y,
     vx = dx * 300,
     vy = dy * 300,
-    damage = 5,
+    damage = 10,
     width = 6,
     height = 6,
     owner = "enemy"
@@ -353,12 +353,13 @@ function M.fireConvertedAllyLaser(x, y, targetX, targetY)
   })
 end
 
-function M.mirrorProjectiles(playerX, playerY, shieldRadius, isPaladinShield)
+function M.mirrorProjectiles(playerX, playerY, shieldRadius, isPaladinShield, laserList)
   local EDGE_THRESHOLD = 10  -- Distance from edge to detect collision
   local REFLECTED_SPEED = 600  -- Same as normal shot (LASER_SPEED)
+  local lasers = laserList or M.lasers
 
-  for _, laser in ipairs(M.lasers) do
-    if laser.owner == "enemy" and not laser.mirrored then
+  for _, laser in ipairs(lasers) do
+    if (laser.owner == "enemy" or laser.owner == "prototype" or laser.owner == "prototype_emp") and not laser.mirrored then
       local dx = laser.x - playerX
       local dy = laser.y - playerY
       local dist = math.sqrt(dx*dx + dy*dy)
@@ -398,6 +399,13 @@ function M.mirrorProjectiles(playerX, playerY, shieldRadius, isPaladinShield)
           laser.x = playerX + normalX * (shieldRadius + EDGE_THRESHOLD + 5)
           laser.y = playerY + normalY * (shieldRadius + EDGE_THRESHOLD + 5)
 
+          -- Mark as reflected; prototype projectiles keep their type for collision detection
+          if laser.owner == "prototype" or laser.owner == "prototype_emp" then
+            laser.reflected = true
+            if laser.owner == "prototype_emp" then
+              laser.isEmp = true
+            end
+          end
           laser.owner = "player"
           laser.mirrored = true
         end

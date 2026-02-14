@@ -7,6 +7,10 @@ local bets = require("roulette.bets")
 local credits = require("roulette.credits")
 local audio = require("roulette.audio")
 local ui = require("roulette.ui")
+local winFx = require("casino_win_fx")
+
+local SCREEN_W = 1366
+local SCREEN_H = 768
 
 local gameState = {}
 
@@ -25,6 +29,7 @@ function M.load(startingCredits)
   gameState.payout = 0
   gameState.payoutTimer = 0
   gameState.history = {}
+  gameState.lastTotalBet = 0
 
   audio.load()
   ui.load()
@@ -37,6 +42,7 @@ end
 function M.update(dt)
   wheel.update(gameState.wheel, dt)
   ball.update(gameState.ball, dt)
+  winFx.update(dt)
 
   if gameState.state == "spinning" then
     if wheel.isStopped(gameState.wheel) then
@@ -57,8 +63,10 @@ function M.update(dt)
 
       gameState.payout = totalPayout
       if totalPayout > 0 then
+        local creditsBeforeWin = gameState.bank.balance
         credits.add(gameState.bank, totalPayout)
         audio.playWin()
+        winFx.startWin(totalPayout, gameState.lastTotalBet, creditsBeforeWin, SCREEN_W / 2, SCREEN_H / 2 - 50)
       end
 
       gameState.state = "payout"
@@ -67,7 +75,8 @@ function M.update(dt)
 
   elseif gameState.state == "payout" then
     gameState.payoutTimer = gameState.payoutTimer + dt
-    if gameState.payoutTimer >= 3.0 then
+    local minTime = winFx.isActive() and winFx.getTier() * 1.0 or 3.0
+    if gameState.payoutTimer >= minTime and not winFx.isActive() then
       bets.clear(gameState.bets)
       gameState.state = "betting"
       gameState.result = nil
@@ -90,34 +99,66 @@ function M.update(dt)
 end
 
 function M.draw()
-  love.graphics.setBackgroundColor(0.05, 0.15, 0.05)
+  love.graphics.setBackgroundColor(0.02, 0.08, 0.03)
 
+  -- Apply screen shake
+  local shakeX, shakeY = winFx.getScreenShake()
+  love.graphics.push()
+  love.graphics.translate(shakeX, shakeY)
+
+  -- Glow behind game elements
+  winFx.drawGlow()
+
+  ui.drawTable(gameState.table)
+  ui.drawBets(gameState.bets, gameState.table)
   ui.drawWheel(gameState.wheel)
   if gameState.ball.phase ~= "idle" then
     ui.drawBall(gameState.ball, gameState.wheel)
   end
 
-  ui.drawTable(gameState.table)
-  ui.drawBets(gameState.bets, gameState.table)
   ui.drawUI(gameState.bank, gameState.state, gameState.result, gameState.history, gameState.table, gameState.payout)
 
-  if gameState.state == "payout" and gameState.payout > 0 then
-    love.graphics.setFont(love.graphics.newFont(32))
-    love.graphics.setColor(1, 1, 0)
-    love.graphics.print("Winner!", 150, 450)
-    love.graphics.setFont(love.graphics.newFont(28))
-    love.graphics.print(gameState.payout, 150, 490)
+  -- Win FX particles and text on top
+  winFx.drawParticles()
+  if winFx.isActive() then
+    winFx.drawWinText(SCREEN_W / 2, SCREEN_H / 2 - 80)
   end
+
+  love.graphics.pop()
 end
 
 function M.keypressed(key)
-  if key == "space" and gameState.state == "betting" then
-    local totalBet = bets.getTotalBetAmount(gameState.bets)
-    if totalBet > 0 then
-      wheel.spin(gameState.wheel)
-      ball.spin(gameState.ball, gameState.wheel.targetPocket, #wheel.POCKETS)
-      gameState.state = "spinning"
-      audio.playSpin()
+  if key == "space" then
+    if winFx.isActive() then
+      winFx.skip()
+      return
+    end
+    if gameState.state == "payout" and not winFx.isActive() then
+      bets.clear(gameState.bets)
+      gameState.state = "betting"
+      gameState.result = nil
+      gameState.payout = 0
+      gameState.wheel.phase = "idle"
+      gameState.wheel.spinning = false
+      gameState.wheel.velocity = 0
+      gameState.wheel.timer = 0
+      gameState.wheel.targetPocket = nil
+      gameState.ball.phase = "idle"
+      gameState.ball.spinning = false
+      gameState.ball.velocity = 0
+      gameState.ball.timer = 0
+      gameState.ball.finalPocket = nil
+      return
+    end
+    if gameState.state == "betting" then
+      local totalBet = bets.getTotalBetAmount(gameState.bets)
+      if totalBet > 0 then
+        gameState.lastTotalBet = totalBet
+        wheel.spin(gameState.wheel)
+        ball.spin(gameState.ball, gameState.wheel.targetPocket, #wheel.POCKETS)
+        gameState.state = "spinning"
+        audio.playSpin()
+      end
     end
   elseif key == "up" then
     credits.nextChip(gameState.bank)

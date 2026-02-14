@@ -150,6 +150,7 @@ function M.updatePhase()
   for i = 7, 1, -1 do
     if b.health <= PHASE_THRESHOLDS[i] then
       b.phase = i
+      break
     end
   end
 

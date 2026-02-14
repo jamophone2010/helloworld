@@ -1,5 +1,6 @@
 local M = {}
 local screen = require("starfox.screen")
+local prototype = require("starfox.prototype")
 M.hasMegaAntenna = false
 M.hasPowerAmplifier = false
 M.returnToHub = nil -- Callback to return to hub
@@ -45,8 +46,8 @@ local LOCATIONS = {
    description = "Return to the safety of thy haven"},
 
   -- Inner Ring (Blue Path) - 4 levels evenly spaced
-  {id = 1, name = "Cakewalk Corner", ring = "inner", angle = 0,
-   description = "Where journeys begin, the homeworld awaits"},
+  {id = 1, name = "Newton's Nebula", ring = "inner", angle = 0,
+   description = "A swirling nebula of cosmic dust, where journeys begin"},
   {id = 2, name = "Asteroid Alley", ring = "inner", angle = 90,
    description = "An asteroid field of ancient stone and starlight"},
   {id = 4, name = "Fortuna", ring = "inner", angle = 180,
@@ -92,7 +93,19 @@ local LOCATIONS = {
   {id = 17, name = "Venom II", ring = "outer", angle = 280,
    description = "The shadow of evil, doubled in might"},
   {id = 18, name = "Venom", ring = "outer", angle = 320,
-   description = "The dark throne, where Andross awaits"}
+   description = "The dark throne, where Andross awaits"},
+
+  -- Endgame Raid
+  {id = 21, name = "Synesthesia Installation", ring = "outer", angle = 335, isRaid = true,
+   description = "Endgame raid: Fly through the heatsink fins and circuit board to the GPU Core Architect"},
+  {id = 22, name = "Megalith of Memories", ring = "outer", angle = 345, isRaid = true,
+   description = "Endgame raid: Navigate RAM corridors and hard drive sectors to the spinning Core"},
+  {id = 23, name = "Distant Dynamo", ring = "outer", angle = 355, isRaid = true,
+   description = "Endgame raid: Fly through the power supply cables to the PSU Overlord"},
+  {id = 25, name = "Logician's Lament", ring = "outer", angle = 10, isRaid = true,
+   description = "Endgame raid: Navigate PCB layers through vias to face The Logician at the CPU die"},
+  {id = 26, name = "The Machine", ring = "outer", angle = 20, isRaid = true,
+   description = "Ultimate raid: Face the 21-phase ancient Machine at the edge of the nebula — Elden Ring difficulty"}
 }
 
 local selectedIndex = 1
@@ -444,6 +457,46 @@ function M.draw()
   love.graphics.print("Arrow keys: Navigate", 60, 75)
   love.graphics.print("ENTER: Select", 60, 95)
   love.graphics.print("ESC: Return", 60, 115)
+
+  -- Prototype beacon on the map
+  if prototype.prototypeOnMap and prototype.questStarted and not prototype.questComplete then
+    -- Find which location the Prototype is near (based on its map position)
+    local protoLocIdx = prototype.prototypeMapSector or 1
+    -- Clamp to valid LOCATIONS range
+    if protoLocIdx < 1 then protoLocIdx = 1 end
+    if protoLocIdx > #LOCATIONS then protoLocIdx = #LOCATIONS end
+
+    local loc = LOCATIONS[protoLocIdx]
+    local ring = RINGS[loc.ring]
+    local bx, by = centerX, centerY
+    if ring.radius > 0 then
+      local rad = math.rad(loc.angle - 90)
+      bx = centerX + math.cos(rad) * ring.radius
+      by = centerY + math.sin(rad) * ring.radius
+    end
+
+    -- Pulsing yellow beacon
+    local time = love.timer.getTime()
+    local pulse = 0.5 + 0.5 * math.sin(time * 4)
+
+    -- Outer ring pulse
+    love.graphics.setColor(1, 0.9, 0.2, 0.15 * pulse)
+    love.graphics.circle("fill", bx, by, 30 + pulse * 10)
+    love.graphics.setColor(1, 0.9, 0.2, 0.3 * pulse)
+    love.graphics.circle("fill", bx, by, 20 + pulse * 5)
+
+    -- Inner beacon dot
+    love.graphics.setColor(1, 0.9, 0.2, 0.8)
+    love.graphics.circle("fill", bx, by, 6)
+    love.graphics.setColor(1, 1, 0.5, pulse)
+    love.graphics.circle("fill", bx, by, 4)
+
+    -- "PROTOTYPE" label
+    love.graphics.setColor(1, 0.9, 0.2, 0.7 + 0.3 * pulse)
+    local label = "PROTOTYPE"
+    local labelW = love.graphics.getFont():getWidth(label)
+    love.graphics.print(label, bx - labelW / 2, by - 25)
+  end
 
   -- Fade overlay
   if fadeAlpha > 0 then

@@ -49,7 +49,7 @@ function M.load()
   -- Currency
   gameState.credits = 1000000
   gameState.notes = currency.load()
-  gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false}
+  gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false, scan = false}
   gameState.paused = false
   gameState.animationTime = 0
 
@@ -97,7 +97,7 @@ function M.spendNotes(amount)
 end
 
 function M.getShopItems() return gameState.shopItems end
-function M.clearShopItems() gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false} end
+function M.clearShopItems() gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false, scan = false} end
 function M.setPaused(paused) gameState.paused = paused end
 
 function M.setFadeInFromStarfox(enable)
@@ -111,7 +111,7 @@ end
 function M.setupOutdoorNPCs()
   gameState.currentNPCs = {}
   for _, npcData in ipairs(areas.npcs) do
-    table.insert(gameState.currentNPCs, npc.new(npcData.name, npcData.x, npcData.y, npcData.dialogue))
+    table.insert(gameState.currentNPCs, npc.new(npcData.name, npcData.x, npcData.y, npcData.dialogue, npcData.gender, npcData))
   end
 end
 
@@ -136,7 +136,7 @@ function M.enterBuilding(buildingId)
   gameState.currentNPCs = {}
   if interior.npcs then
     for _, npcData in ipairs(interior.npcs) do
-      table.insert(gameState.currentNPCs, npc.new(npcData.name, npcData.x, npcData.y, npcData.dialogue))
+      table.insert(gameState.currentNPCs, npc.new(npcData.name, npcData.x, npcData.y, npcData.dialogue, npcData.gender, npcData))
     end
   end
 end
@@ -190,10 +190,13 @@ end
 -- ═══════════════════════════════════════
 
 function M.update(dt)
-  if gameState.paused then return end
+  if gameState.paused then
+    pauseMenu.update(dt)
+    return
+  end
 
   gameState.animationTime = gameState.animationTime + dt
-  gameState.blackHoleRotation = gameState.blackHoleRotation + dt * 0.1
+  gameState.blackHoleRotation = gameState.blackHoleRotation + dt * 0.015
   gameState.gravitationalPulse = gameState.gravitationalPulse + dt * 0.5
 
   player.update(gameState.player, dt, gameState.collisionMap)
@@ -314,7 +317,7 @@ function M.draw()
     M.drawInterior()
   end
 
-  player.draw(gameState.player)
+  player.draw(gameState.player, gameState.animationTime)
 
   for _, npcObj in ipairs(gameState.currentNPCs) do
     npc.draw(npcObj)
@@ -386,47 +389,76 @@ function M.drawBlackHole()
   local bhY = areas.blackHolePos.y * 32 + 16
   local baseRadius = areas.blackHoleRadius
 
-  -- Accretion disk (warm amber rings)
-  local pulse = math.sin(gameState.gravitationalPulse) * 0.15 + 0.85
+  local pulse = math.sin(gameState.gravitationalPulse) * 0.1 + 0.9
 
-  -- Outer glow rings
-  for i = 8, 1, -1 do
-    local ringRadius = baseRadius + i * 15
-    local alpha = (9 - i) / 9 * 0.4 * pulse
-    local warmth = i / 8
-
-    love.graphics.setColor(
-      areas.COLORS.amber[1] * warmth + areas.COLORS.orange[1] * (1 - warmth),
-      areas.COLORS.amber[2] * warmth + areas.COLORS.orange[2] * (1 - warmth),
-      areas.COLORS.amber[3] * warmth,
-      alpha
-    )
-    love.graphics.setLineWidth(3)
-    love.graphics.circle("line", bhX, bhY, ringRadius)
+  -- Distant warm glow halo (Interstellar-style diffuse light)
+  for i = 20, 1, -1 do
+    local glowRadius = baseRadius + i * 25
+    local alpha = (21 - i) / 21 * 0.12 * pulse
+    love.graphics.setColor(1.0, 0.7, 0.25, alpha)
+    love.graphics.circle("fill", bhX, bhY, glowRadius)
   end
 
-  -- Gravitational lensing effect (distorted ring)
-  love.graphics.setColor(areas.COLORS.gold[1], areas.COLORS.gold[2], areas.COLORS.gold[3], 0.6 * pulse)
-  love.graphics.setLineWidth(2)
+  -- Accretion disk - wide, warm, Interstellar-style
   love.graphics.push()
   love.graphics.translate(bhX, bhY)
   love.graphics.rotate(gameState.blackHoleRotation)
-  love.graphics.ellipse("line", 0, 0, baseRadius * 1.3, baseRadius * 0.5)
+
+  -- Outer diffuse accretion glow
+  for i = 12, 1, -1 do
+    local diskRadius = baseRadius * 1.8 - i * 8
+    local alpha = (13 - i) / 13 * 0.35 * pulse
+    love.graphics.setColor(
+      1.0 * (1 - i/24) + 0.95 * (i/24),
+      0.55 * (1 - i/24) + 0.4 * (i/24),
+      0.1 * (1 - i/24) + 0.05 * (i/24),
+      alpha
+    )
+    love.graphics.setLineWidth(6 + i * 2)
+    love.graphics.ellipse("line", 0, 0, diskRadius, diskRadius * 0.35)
+  end
+
+  -- Bright inner accretion ring
+  for i = 6, 1, -1 do
+    local innerR = baseRadius * 1.15 + i * 5
+    local alpha = (7 - i) / 7 * 0.7 * pulse
+    love.graphics.setColor(1.0, 0.85, 0.45, alpha)
+    love.graphics.setLineWidth(4 + i)
+    love.graphics.ellipse("line", 0, 0, innerR, innerR * 0.35)
+  end
+
+  -- Hot white-amber core ring (photon ring)
+  love.graphics.setColor(1.0, 0.95, 0.75, 0.85 * pulse)
+  love.graphics.setLineWidth(3)
+  love.graphics.ellipse("line", 0, 0, baseRadius * 1.05, baseRadius * 1.05 * 0.35)
+
   love.graphics.pop()
 
-  -- Inner accretion ring
-  love.graphics.setColor(areas.COLORS.orange[1], areas.COLORS.orange[2], areas.COLORS.orange[3], 0.7)
-  love.graphics.setLineWidth(4)
-  love.graphics.circle("line", bhX, bhY, baseRadius + 5)
+  -- Gravitational lensing ring (Einstein ring - vertical halo behind the hole)
+  love.graphics.push()
+  love.graphics.translate(bhX, bhY)
+  love.graphics.rotate(gameState.blackHoleRotation * 0.3)
+  for i = 4, 1, -1 do
+    local lensR = baseRadius * 1.15 + i * 3
+    love.graphics.setColor(1.0, 0.9, 0.6, (5 - i) / 5 * 0.4 * pulse)
+    love.graphics.setLineWidth(2 + i)
+    love.graphics.ellipse("line", 0, 0, lensR * 0.4, lensR)
+  end
+  love.graphics.pop()
 
   -- Event horizon (pure black center)
   love.graphics.setColor(0, 0, 0, 1)
   love.graphics.circle("fill", bhX, bhY, baseRadius)
 
-  -- Photon sphere highlight
-  love.graphics.setColor(areas.COLORS.cream[1], areas.COLORS.cream[2], areas.COLORS.cream[3], 0.3)
-  love.graphics.setLineWidth(1)
+  -- Thin bright photon sphere edge
+  love.graphics.setColor(1.0, 0.92, 0.7, 0.55 * pulse)
+  love.graphics.setLineWidth(2)
   love.graphics.circle("line", bhX, bhY, baseRadius)
+
+  -- Subtle inner edge highlight (light bending at the horizon)
+  love.graphics.setColor(1.0, 0.85, 0.5, 0.2 * pulse)
+  love.graphics.setLineWidth(1)
+  love.graphics.circle("line", bhX, bhY, baseRadius - 3)
 end
 
 function M.drawStarPath(path)
@@ -513,12 +545,41 @@ function M.drawBuilding(b)
     love.graphics.rectangle("fill", wx, windowY, 10, 8)
   end
 
-  -- Door (dark with glow frame)
-  love.graphics.setColor(0.05, 0.03, 0.02)
-  love.graphics.rectangle("fill", b.doorX * 32 + 4, b.doorY * 32 - 20, 24, 20)
-  love.graphics.setColor(b.glowColor[1], b.glowColor[2], b.glowColor[3], 0.6)
+  -- Door (Interstellar tesseract-style portal)
+  local doorPx = b.doorX * 32 + 2
+  local doorPy = (b.y + b.h - 1) * 32 + 2
+  local doorW = 28
+  local doorH = 28
+
+  -- Warm glow emanating from doorway
+  for gi = 4, 1, -1 do
+    love.graphics.setColor(b.glowColor[1], b.glowColor[2], b.glowColor[3], 0.08 * (5 - gi) * pulse)
+    love.graphics.rectangle("fill", doorPx - gi * 3, doorPy - gi * 2, doorW + gi * 6, doorH + gi * 4, 2)
+  end
+
+  -- Dark doorway interior
+  love.graphics.setColor(0.02, 0.01, 0.01)
+  love.graphics.rectangle("fill", doorPx, doorPy, doorW, doorH, 2)
+
+  -- Tesseract grid lines inside the doorway (like looking into the tesseract)
+  love.graphics.setColor(b.glowColor[1], b.glowColor[2], b.glowColor[3], 0.15 * pulse)
   love.graphics.setLineWidth(1)
-  love.graphics.rectangle("line", b.doorX * 32 + 4, b.doorY * 32 - 20, 24, 20)
+  for gx = doorPx + 7, doorPx + doorW - 4, 7 do
+    love.graphics.line(gx, doorPy + 2, gx, doorPy + doorH - 2)
+  end
+  for gy = doorPy + 7, doorPy + doorH - 4, 7 do
+    love.graphics.line(doorPx + 2, gy, doorPx + doorW - 2, gy)
+  end
+
+  -- Bright amber door frame
+  love.graphics.setColor(b.glowColor[1], b.glowColor[2], b.glowColor[3], 0.8 * pulse)
+  love.graphics.setLineWidth(2)
+  love.graphics.rectangle("line", doorPx, doorPy, doorW, doorH, 2)
+
+  -- Top lintel accent
+  love.graphics.setColor(b.glowColor[1] * 1.1, b.glowColor[2] * 1.1, b.glowColor[3] * 0.8, 0.9 * pulse)
+  love.graphics.setLineWidth(2)
+  love.graphics.line(doorPx - 2, doorPy, doorPx + doorW + 2, doorPy)
 
   -- Building edge glow
   love.graphics.setColor(b.glowColor[1], b.glowColor[2], b.glowColor[3], 0.5 * pulse)
@@ -658,6 +719,12 @@ end
 -- ═══════════════════════════════════════
 -- INPUT
 -- ═══════════════════════════════════════
+
+function M.textinput(text)
+  if gameState.paused then
+    pauseMenu.textinput(text)
+  end
+end
 
 function M.keypressed(key)
   if gameState.paused then

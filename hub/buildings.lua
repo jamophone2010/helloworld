@@ -17,7 +17,7 @@ M.interiors = {
     width = 16, height = 12,
     exitX = 8, exitY = 11,
     npcs = {
-      {name = "Archivist", x = 8, y = 4, dialogue = "These records predate the station... Handle with care."}
+      {name = "Archivist", x = 8, y = 4, dialogue = "These records predate the station... Handle with care.", gender = "female"}
     }
   },
   reactor_core = {
@@ -25,7 +25,7 @@ M.interiors = {
     width = 14, height = 14,
     exitX = 7, exitY = 13,
     npcs = {
-      {name = "Engineer", x = 7, y = 6, dialogue = "Don't touch anything. One wrong move and this whole deck goes up."}
+      {name = "Engineer", x = 7, y = 6, dialogue = "Don't touch anything. One wrong move and this whole deck goes up.", gender = "male"}
     }
   },
 
@@ -37,8 +37,8 @@ M.interiors = {
     width = 12, height = 10,
     exitX = 6, exitY = 9,
     npcs = {
-      {name = "Dock Master", x = 5, y = 3, dialogue = "Shipments in, shipments out. That's all we do down here."},
-      {name = "Clerk", x = 9, y = 3, dialogue = "Need to track a package? Check the manifest."}
+      {name = "Dock Master", x = 5, y = 3, dialogue = "Shipments in, shipments out. That's all we do down here.", gender = "male"},
+      {name = "Clerk", x = 9, y = 3, dialogue = "Need to track a package? Check the manifest.", gender = "female"}
     }
   },
   storage_a = {
@@ -56,7 +56,7 @@ M.interiors = {
     width = 14, height = 10,
     exitX = 7, exitY = 9,
     npcs = {
-      {name = "Technician", x = 5, y = 4, dialogue = "These old conduits need replacing. Budget keeps getting cut."}
+      {name = "Technician", x = 5, y = 4, dialogue = "These old conduits need replacing. Budget keeps getting cut.", gender = "male"}
     }
   },
   freight_elevator = {
@@ -80,9 +80,9 @@ M.interiors = {
       {name = "Shop", x = 8, y = 11, game = "shop", color = {0.6, 0.3, 0.8}}
     },
     npcs = {
-      {name = "Blackjack Dealer", x = 14, y = 4, dialogue = "Care for a hand of blackjack?"},
-      {name = "Croupier", x = 22, y = 4, dialogue = "Place your bets! The wheel awaits."},
-      {name = "Shop Clerk", x = 6, y = 11, dialogue = "Welcome to our boutique!"}
+      {name = "Blackjack Dealer", x = 14, y = 4, dialogue = "Care for a hand of blackjack?", gender = "male", outfit = "suit", design = 5},
+      {name = "Croupier", x = 22, y = 4, dialogue = "Place your bets! The wheel awaits.", gender = "female", outfit = "suit", design = 1},
+      {name = "Shop Clerk", x = 6, y = 11, dialogue = "Welcome to our boutique!", gender = "female", design = 3}
     },
     zones = {
       {name = "foyer", x1 = 0, y1 = 0, x2 = 29, y2 = 2, floor = "marble"},
@@ -111,7 +111,7 @@ M.interiors = {
       {name = "Shop", x = 6, y = 3, game = "shop", color = {0.6, 0.3, 0.8}}
     },
     npcs = {
-      {name = "Shopkeeper", x = 4, y = 3, dialogue = "Best prices on the station! Lives, bombs, upgrades..."}
+      {name = "Shopkeeper", x = 4, y = 3, dialogue = "Best prices on the station! Lives, bombs, upgrades...", gender = "male"}
     }
   },
   cosmetics = {
@@ -119,8 +119,8 @@ M.interiors = {
     width = 12, height = 10,
     exitX = 6, exitY = 9,
     npcs = {
-      {name = "Stylist", x = 6, y = 3, dialogue = "Looking to change your look? We've got the latest station fashion."},
-      {name = "Model", x = 9, y = 5, dialogue = "This outfit cost me a month's salary, but totally worth it."}
+      {name = "Stylist", x = 6, y = 3, dialogue = "Looking to change your look? We've got the latest station fashion.", gender = "female", design = 1},
+      {name = "Model", x = 9, y = 5, dialogue = "This outfit cost me a month's salary, but totally worth it.", gender = "female", design = 1}
     }
   },
   shipbuilder = {
@@ -131,8 +131,8 @@ M.interiors = {
       {name = "Ship Catalog", x = 7, y = 4, game = "shipyard", color = {0.2, 0.7, 0.8}}
     },
     npcs = {
-      {name = "Shipwright", x = 5, y = 5, dialogue = "Every ship is hand-assembled. Well, robot-assembled. But with love."},
-      {name = "Test Pilot", x = 12, y = 7, dialogue = "I've flown every model here. The Phantom is something else..."}
+      {name = "Shipwright", x = 5, y = 5, dialogue = "Every ship is hand-assembled. Well, robot-assembled. But with love.", gender = "male"},
+      {name = "Test Pilot", x = 12, y = 7, dialogue = "I've flown every model here. The Phantom is something else...", gender = "female", design = 2}
     }
   },
   bank = {
@@ -143,8 +143,8 @@ M.interiors = {
       {name = "Exchange", x = 7, y = 3, game = "casino_exchange", color = {1, 1, 0}}
     },
     npcs = {
-      {name = "Teller", x = 5, y = 3, dialogue = "Notes to Credits, Credits to Notes. Standard rates apply."},
-      {name = "Manager", x = 10, y = 5, dialogue = "Your funds are safe with us. We've never been robbed. ...yet."}
+      {name = "Teller", x = 5, y = 3, dialogue = "Notes to Credits, Credits to Notes. Standard rates apply.", gender = "female", design = 4},
+      {name = "Manager", x = 10, y = 5, dialogue = "Your funds are safe with us. We've never been robbed. ...yet.", gender = "male"}
     }
   },
   food_court = {
@@ -152,9 +152,9 @@ M.interiors = {
     width = 16, height = 12,
     exitX = 8, exitY = 11,
     npcs = {
-      {name = "Chef", x = 4, y = 3, dialogue = "Today's special: Nebula Noodles with stardust seasoning!"},
-      {name = "Patron", x = 10, y = 7, dialogue = "The food here isn't bad for a space station. Try the ramen."},
-      {name = "Waiter", x = 12, y = 4, dialogue = "Table for one? Right this way."}
+      {name = "Chef", x = 4, y = 3, dialogue = "Today's special: Nebula Noodles with stardust seasoning!", gender = "male"},
+      {name = "Patron", x = 10, y = 7, dialogue = "The food here isn't bad for a space station. Try the ramen.", gender = "male"},
+      {name = "Waiter", x = 12, y = 4, dialogue = "Table for one? Right this way.", gender = "male"}
     }
   },
 
@@ -166,9 +166,9 @@ M.interiors = {
     width = 16, height = 12,
     exitX = 8, exitY = 11,
     npcs = {
-      {name = "Concierge", x = 8, y = 3, dialogue = "Welcome to the Celestial Grand. Finest rooms on the station."},
-      {name = "Bellhop", x = 4, y = 6, dialogue = "Need your bags carried? I've got anti-grav carts!"},
-      {name = "Guest", x = 12, y = 7, dialogue = "The view from room 307 is incredible. You can see the nebula!"}
+      {name = "Concierge", x = 8, y = 3, dialogue = "Welcome to the Celestial Grand. Finest rooms on the station.", gender = "male"},
+      {name = "Bellhop", x = 4, y = 6, dialogue = "Need your bags carried? I've got anti-grav carts!", gender = "male"},
+      {name = "Guest", x = 12, y = 7, dialogue = "The view from room 307 is incredible. You can see the nebula!", gender = "female"}
     }
   },
   hangout = {
@@ -176,9 +176,9 @@ M.interiors = {
     width = 14, height = 10,
     exitX = 7, exitY = 9,
     npcs = {
-      {name = "Bartender", x = 7, y = 2, dialogue = "What'll it be? We've got drinks from twelve systems."},
-      {name = "Regular", x = 3, y = 6, dialogue = "I come here every cycle. Best spot on the station to unwind."},
-      {name = "Musician", x = 11, y = 4, dialogue = "I play here on weekends. The acoustics are great."}
+      {name = "Bartender", x = 7, y = 2, dialogue = "What'll it be? We've got drinks from twelve systems.", gender = "female", design = 6},
+      {name = "Regular", x = 3, y = 6, dialogue = "I come here every cycle. Best spot on the station to unwind.", gender = "male"},
+      {name = "Musician", x = 11, y = 4, dialogue = "I play here on weekends. The acoustics are great.", gender = "female", design = 3}
     }
   },
   mainstage = {
@@ -189,8 +189,8 @@ M.interiors = {
       {name = "Watch Show", x = 9, y = 5, game = "mainstage", color = {1, 0.3, 0.8}}
     },
     npcs = {
-      {name = "Stage Manager", x = 5, y = 8, dialogue = "Tonight's show is going to be spectacular. Take a seat!"},
-      {name = "Groupie", x = 15, y = 10, dialogue = "Hypernova is my FAVORITE band! They rock so hard!"}
+      {name = "Stage Manager", x = 5, y = 8, dialogue = "Tonight's show is going to be spectacular. Take a seat!", gender = "male"},
+      {name = "Groupie", x = 15, y = 10, dialogue = "Hypernova is my FAVORITE band! They rock so hard!", gender = "female", design = 5}
     }
   },
   studio = {
@@ -201,7 +201,7 @@ M.interiors = {
       {name = "Studio Console", x = 6, y = 3, game = "studio", color = {0.0, 0.8, 1.0}}
     },
     npcs = {
-      {name = "DJ Orbit", x = 4, y = 4, dialogue = "Hey! Welcome to Studio 3. Want to pick the next track?"}
+      {name = "DJ Orbit", x = 4, y = 4, dialogue = "Hey! Welcome to Studio 3. Want to pick the next track?", gender = "male"}
     }
   },
   park = {
@@ -209,9 +209,9 @@ M.interiors = {
     width = 18, height = 14,
     exitX = 9, exitY = 13,
     npcs = {
-      {name = "Gardener", x = 5, y = 5, dialogue = "Real trees, real soil. Imported from three different planets."},
-      {name = "Jogger", x = 14, y = 9, dialogue = "Five laps around the atrium is exactly one kilometer!"},
-      {name = "Child", x = 9, y = 7, dialogue = "Look at the butterflies! They're not real but they're pretty."}
+      {name = "Gardener", x = 5, y = 5, dialogue = "Real trees, real soil. Imported from three different planets.", gender = "male"},
+      {name = "Jogger", x = 14, y = 9, dialogue = "Five laps around the atrium is exactly one kilometer!", gender = "female"},
+      {name = "Child", x = 9, y = 7, dialogue = "Look at the butterflies! They're not real but they're pretty.", gender = "female"}
     }
   },
   library = {
@@ -219,8 +219,8 @@ M.interiors = {
     width = 14, height = 12,
     exitX = 7, exitY = 11,
     npcs = {
-      {name = "Librarian", x = 7, y = 3, dialogue = "We have over two million digital volumes. Looking for anything specific?"},
-      {name = "Scholar", x = 11, y = 7, dialogue = "I'm researching ancient flight patterns. Fascinating stuff."}
+      {name = "Librarian", x = 7, y = 3, dialogue = "We have over two million digital volumes. Looking for anything specific?", gender = "female", design = 4},
+      {name = "Scholar", x = 11, y = 7, dialogue = "I'm researching ancient flight patterns. Fascinating stuff.", gender = "male", design = 4}
     }
   },
 
@@ -235,8 +235,8 @@ M.interiors = {
       {name = "Ship Selection", x = 9, y = 5, game = "hangar", color = {0.2, 0.7, 0.8}}
     },
     npcs = {
-      {name = "Mechanic", x = 5, y = 7, dialogue = "Pick your ride! Each ship has unique abilities."},
-      {name = "Crew Chief", x = 15, y = 5, dialogue = "All ships are fueled and ready for launch."}
+      {name = "Mechanic", x = 5, y = 7, dialogue = "Pick your ride! Each ship has unique abilities.", gender = "male", design = 6},
+      {name = "Crew Chief", x = 15, y = 5, dialogue = "All ships are fueled and ready for launch.", gender = "female", design = 2}
     }
   },
   mission_control = {
@@ -244,12 +244,13 @@ M.interiors = {
     width = 20, height = 15,
     exitX = 10, exitY = 14,
     portals = {
-      {name = "Asteroids", x = 7, y = 6, game = "asteroids", color = {0.3, 0.5, 0.8}},
-      {name = "StarFox", x = 13, y = 6, game = "starfox", color = {0.3, 0.5, 1}}
+      {name = "Asteroids", x = 6, y = 6, game = "asteroids", color = {0.3, 0.5, 0.8}},
+      {name = "StarFox", x = 10, y = 6, game = "starfox", color = {0.3, 0.5, 1}},
+      {name = "Planet Map", x = 14, y = 6, game = "planetmap", color = {0.5, 0.3, 0.7}}
     },
     npcs = {
-      {name = "Commander", x = 10, y = 3, dialogue = "Ready for a mission, pilot? Choose your assignment."},
-      {name = "Analyst", x = 16, y = 8, dialogue = "Sensor data shows heavy enemy activity in Sector Y."}
+      {name = "Commander", x = 10, y = 3, dialogue = "Check the Planet Map to plan your next journey across the galaxy.", gender = "female", design = 2},
+      {name = "Analyst", x = 16, y = 8, dialogue = "The map shows all charted systems and landing sites.", gender = "male"}
     }
   },
   repair_bay = {
@@ -257,8 +258,8 @@ M.interiors = {
     width = 14, height = 10,
     exitX = 7, exitY = 9,
     npcs = {
-      {name = "Engineer", x = 5, y = 4, dialogue = "Bring your damaged ships here. We'll have them good as new."},
-      {name = "Droid", x = 10, y = 6, dialogue = "BEEP BOOP. Structural integrity assessment complete."}
+      {name = "Engineer", x = 5, y = 4, dialogue = "Bring your damaged ships here. We'll have them good as new.", gender = "female", design = 2},
+      {name = "Droid", x = 10, y = 6, dialogue = "BEEP BOOP. Structural integrity assessment complete.", gender = "male"}
     }
   },
   briefing_room = {
@@ -266,8 +267,8 @@ M.interiors = {
     width = 16, height = 12,
     exitX = 8, exitY = 11,
     npcs = {
-      {name = "Tactical Officer", x = 8, y = 4, dialogue = "Mission objectives are on the screen. Study them carefully."},
-      {name = "Pilot", x = 4, y = 8, dialogue = "I've run Corneria dozens of times. Happy to share tips."}
+      {name = "Tactical Officer", x = 8, y = 4, dialogue = "Mission objectives are on the screen. Study them carefully.", gender = "male", design = 3},
+      {name = "Pilot", x = 4, y = 8, dialogue = "I've run Corneria dozens of times. Happy to share tips.", gender = "male"}
     }
   },
   armory = {
@@ -278,7 +279,7 @@ M.interiors = {
       {name = "Shop", x = 6, y = 3, game = "shop", color = {0.6, 0.3, 0.8}}
     },
     npcs = {
-      {name = "Quartermaster", x = 4, y = 4, dialogue = "Weapons, shields, upgrades. Everything a pilot needs."}
+      {name = "Quartermaster", x = 4, y = 4, dialogue = "Weapons, shields, upgrades. Everything a pilot needs.", gender = "female", design = 6}
     }
   },
 
@@ -293,7 +294,7 @@ M.interiors = {
       {name = "Lookout Deck", x = 8, y = 5, game = "lookout", color = {0.6, 0.2, 0.8}}
     },
     npcs = {
-      {name = "Astronomer", x = 12, y = 6, dialogue = "Look through the telescope! You can see the Horsehead Nebula tonight."}
+      {name = "Astronomer", x = 12, y = 6, dialogue = "Look through the telescope! You can see the Horsehead Nebula tonight.", gender = "male", design = 4}
     }
   },
   sky_lounge = {
@@ -301,8 +302,8 @@ M.interiors = {
     width = 16, height = 12,
     exitX = 8, exitY = 11,
     npcs = {
-      {name = "Bartender", x = 8, y = 3, dialogue = "Best view on the station, best drinks too. What's your pleasure?"},
-      {name = "VIP Guest", x = 13, y = 6, dialogue = "I paid extra for this booth. Worth every credit."}
+      {name = "Bartender", x = 8, y = 3, dialogue = "Best view on the station, best drinks too. What's your pleasure?", gender = "male"},
+      {name = "VIP Guest", x = 13, y = 6, dialogue = "I paid extra for this booth. Worth every credit.", gender = "female", design = 1}
     }
   },
   piano_bar = {
@@ -310,8 +311,8 @@ M.interiors = {
     width = 14, height = 10,
     exitX = 7, exitY = 9,
     npcs = {
-      {name = "Unit P-88", x = 5, y = 4, dialogue = "♪ ... Shall I play something for you?"},
-      {name = "Listener", x = 10, y = 6, dialogue = "The robot plays better than any human I've heard."}
+      {name = "Unit P-88", x = 5, y = 4, dialogue = "♪ ... Shall I play something for you?", gender = "male"},
+      {name = "Listener", x = 10, y = 6, dialogue = "The robot plays better than any human I've heard.", gender = "female"}
     }
   },
   vip_lounge = {
@@ -319,7 +320,7 @@ M.interiors = {
     width = 12, height = 10,
     exitX = 6, exitY = 9,
     npcs = {
-      {name = "Host", x = 6, y = 3, dialogue = "Welcome to the exclusive floor. Only the station's finest up here."}
+      {name = "Host", x = 6, y = 3, dialogue = "Welcome to the exclusive floor. Only the station's finest up here.", gender = "female", design = 1}
     }
   },
 
@@ -331,9 +332,9 @@ M.interiors = {
     width = 20, height = 14,
     exitX = 10, exitY = 13,
     npcs = {
-      {name = "Admiral", x = 10, y = 4, dialogue = "Welcome to the bridge, Commander. The station is yours."},
-      {name = "Navigator", x = 6, y = 6, dialogue = "All systems nominal. Course is steady."},
-      {name = "Comms Officer", x = 14, y = 6, dialogue = "Receiving transmissions from allied stations."}
+      {name = "Admiral", x = 10, y = 4, dialogue = "Welcome to the bridge, Commander. The station is yours.", gender = "male", design = 3},
+      {name = "Navigator", x = 6, y = 6, dialogue = "All systems nominal. Course is steady.", gender = "female", design = 4},
+      {name = "Comms Officer", x = 14, y = 6, dialogue = "Receiving transmissions from allied stations.", gender = "male"}
     }
   },
   war_room = {
@@ -341,7 +342,7 @@ M.interiors = {
     width = 14, height = 10,
     exitX = 7, exitY = 9,
     npcs = {
-      {name = "Strategist", x = 7, y = 4, dialogue = "The holographic map shows enemy positions across three sectors."}
+      {name = "Strategist", x = 7, y = 4, dialogue = "The holographic map shows enemy positions across three sectors.", gender = "male", design = 4}
     }
   },
   captains_quarters = {
@@ -349,7 +350,7 @@ M.interiors = {
     width = 12, height = 10,
     exitX = 6, exitY = 9,
     npcs = {
-      {name = "Personal Droid", x = 4, y = 4, dialogue = "Captain's quarters are in order. Shall I prepare anything?"}
+      {name = "Personal Droid", x = 4, y = 4, dialogue = "Captain's quarters are in order. Shall I prepare anything?", gender = "male"}
     }
   }
 }

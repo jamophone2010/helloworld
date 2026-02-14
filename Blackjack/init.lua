@@ -7,6 +7,10 @@ local player = require("blackjack.player")
 local bet = require("blackjack.bet")
 local audio = require("blackjack.audio")
 local ui = require("blackjack.ui")
+local winFx = require("casino_win_fx")
+
+local SCREEN_W = 800
+local SCREEN_H = 768
 
 local gameState = {}
 local animations = {}
@@ -74,7 +78,7 @@ local function getCardPosition(target, cardIndex, handIndex)
     end
     
     x = baseX + xOffset + (cardIndex - 1) * cards.CARD_SPACING
-    y = 330
+    y = 350
   end
   
   return x, y
@@ -95,6 +99,9 @@ function M.getCredits()
 end
 
 function M.update(dt)
+  -- Update win FX
+  winFx.update(dt)
+  
   -- Handle shuffle animation
   if gameState.shuffleAnimation.active then
     gameState.shuffleAnimation.timer = gameState.shuffleAnimation.timer + dt
@@ -228,7 +235,23 @@ function M.update(dt)
 end
 
 function M.draw()
+  -- Apply screen shake
+  local shakeX, shakeY = winFx.getScreenShake()
+  love.graphics.push()
+  love.graphics.translate(shakeX, shakeY)
+
+  -- Glow behind game elements
+  winFx.drawGlow()
+
   ui.drawGameUI(gameState, animations)
+
+  -- Win FX particles and text on top
+  winFx.drawParticles()
+  if winFx.isActive() then
+    winFx.drawWinText(SCREEN_W / 2, SCREEN_H / 2 - 80)
+  end
+
+  love.graphics.pop()
 end
 
 function M.dealCard()
@@ -345,6 +368,7 @@ function M.calculatePayout()
   local totalPayout = 0
   local results = {}
   local payouts = {}
+  local creditsBeforePayout = gameState.betting.credits
 
   for i, playerHand in ipairs(gameState.player.hands) do
     local payout, result = bet.calculatePayout(
@@ -371,6 +395,12 @@ function M.calculatePayout()
 
   if totalPayout > 0 then
     audio.playWin()
+    -- Start win FX with net winnings (total payout minus the original bet which was returned)
+    -- creditsBeforePayout was captured before bet.calculatePayout added credits back
+    local netWin = gameState.betting.credits - creditsBeforePayout
+    if netWin > 0 then
+      winFx.startWin(netWin, gameState.betting.currentBet, creditsBeforePayout, SCREEN_W / 2, SCREEN_H / 2 - 40)
+    end
   else
     audio.playLose()
   end
@@ -384,6 +414,10 @@ function M.newRound()
 end
 
 function M.keypressed(key)
+  if key == "space" and winFx.isActive() then
+    winFx.skip()
+    return
+  end
   if key == "up" then
     bet.nextChip(gameState.betting)
   elseif key == "down" then

@@ -51,15 +51,32 @@ function M.reset()
   M.abilityFlashTimer = 0
   M.activationFlash = 0
   M.abilityParticles = {}
+  M.empBurstRadius = 0
+  M.empBurstMaxRadius = 500
+  M.empBurstDamaged = {}
 end
 
 --- Add gauge from a kill (1 point per kill)
 function M.registerKill(levelId)
+  if M.active then return end
   if gauge >= GAUGE_MAX then return end
   local def = ships.getSelectedDef()
   if not def or not def.hasSpecial then return end
   gauge = math.min(GAUGE_MAX, gauge + 1)
   -- Sector Y (levelId 3) always keeps gauge full
+  if levelId == 3 then
+    gauge = GAUGE_MAX
+  end
+  M.checkReady()
+end
+
+--- Add gauge from boss damage (1 point per damage dealt)
+function M.registerBossDamage(damage, levelId)
+  if M.active then return end
+  if gauge >= GAUGE_MAX then return end
+  local def = ships.getSelectedDef()
+  if not def or not def.hasSpecial then return end
+  gauge = math.min(GAUGE_MAX, gauge + damage)
   if levelId == 3 then
     gauge = GAUGE_MAX
   end
@@ -145,6 +162,15 @@ function M.activate(player, infiniteSpecial)
     M.phaseAlpha = 0.5
     player.invulnerable = true
     player.invulnerableTimer = 5.0
+  elseif shipId == "prototype" then
+    M.abilityType = "empburst"
+    M.abilityDuration = 3.0
+    M.abilityTimer = 3.0
+    M.empBurstRadius = 0
+    M.empBurstMaxRadius = 500
+    M.empBurstDamaged = {}
+    player.invulnerable = true
+    player.invulnerableTimer = 1.5
   else
     M.active = false
     return false
@@ -163,6 +189,12 @@ function M.activate(player, infiniteSpecial)
       color = {def.accentColor[1], def.accentColor[2], def.accentColor[3]},
       size = math.random(3, 7),
     })
+  end
+
+  -- Special attack disrupts Prototype's shield
+  local prototype = require("starfox.prototype")
+  if prototype.isActive() and prototype.shieldActive then
+    prototype.onSpecialAttackHit()
   end
 
   return true
@@ -241,6 +273,50 @@ function M.update(dt, player)
           size = 3,
         })
       end
+    elseif M.abilityType == "empburst" then
+      -- Expand EMP burst ring outward
+      M.empBurstRadius = M.empBurstRadius + dt * 800
+      if M.empBurstRadius > M.empBurstMaxRadius then
+        M.empBurstRadius = M.empBurstMaxRadius
+      end
+      -- Damage enemies caught in the expanding ring
+      local enemies = require("starfox.enemies")
+      for _, enemy in ipairs(enemies.enemies) do
+        if not M.empBurstDamaged[enemy] then
+          local dx = enemy.x - player.x
+          local dy = enemy.y - player.y
+          local dist = math.sqrt(dx * dx + dy * dy)
+          if dist <= M.empBurstRadius then
+            enemies.damage(enemy, 3)
+            M.empBurstDamaged[enemy] = true
+            -- EMP spark particles at enemy position
+            for j = 1, 5 do
+              local angle = math.random() * math.pi * 2
+              table.insert(M.abilityParticles, {
+                x = enemy.x, y = enemy.y,
+                vx = math.cos(angle) * math.random(40, 100),
+                vy = math.sin(angle) * math.random(40, 100),
+                life = 0.4, maxLife = 0.4,
+                color = {0.3, 0.6, 1},
+                size = math.random(2, 5),
+              })
+            end
+          end
+        end
+      end
+      -- Ring particles
+      if math.random() < 0.5 and M.empBurstRadius < M.empBurstMaxRadius then
+        local angle = math.random() * math.pi * 2
+        table.insert(M.abilityParticles, {
+          x = player.x + math.cos(angle) * M.empBurstRadius,
+          y = player.y + math.sin(angle) * M.empBurstRadius,
+          vx = math.cos(angle) * 30,
+          vy = math.sin(angle) * 30,
+          life = 0.5, maxLife = 0.5,
+          color = {0.2, 0.5, 1},
+          size = math.random(3, 6),
+        })
+      end
     end
 
     -- Expire
@@ -277,6 +353,10 @@ function M.deactivate(player)
     M.multiLockTargeting = false
     -- Multi-lock release is handled by init.lua when timer expires
   end
+  if M.abilityType == "empburst" then
+    M.empBurstRadius = 0
+    M.empBurstDamaged = {}
+  end
 
   M.active = false
   M.abilityType = nil
@@ -291,6 +371,7 @@ function M.getEnemySpeedScale()
   if M.abilityType == "reflectshield" then return 0.5 end
   if M.abilityType == "convert" then return 0.75 end
   if M.abilityType == "phasecloak" then return 0.75 end
+  if M.abilityType == "empburst" then return 0.3 end
   return 1.0
 end
 
@@ -448,6 +529,41 @@ function M.drawEffects(player)
     -- Conversion count
     love.graphics.setColor(0.8, 0.4, 1, 0.8)
     love.graphics.printf(M.convertKills .. "/" .. M.convertMax, player.x - 30, player.y - 50, 60, "center")
+  end
+
+  -- EMP Burst visuals (Prototype)
+  if M.abilityType == "empburst" then
+    -- Expanding ring
+    if M.empBurstRadius < M.empBurstMaxRadius then
+      local ringAlpha = 1.0 - (M.empBurstRadius / M.empBurstMaxRadius)
+      love.graphics.setColor(0.2, 0.5, 1, ringAlpha * 0.6)
+      love.graphics.setLineWidth(4)
+      love.graphics.circle("line", player.x, player.y, M.empBurstRadius)
+      -- Secondary ring slightly behind
+      love.graphics.setColor(0.4, 0.7, 1, ringAlpha * 0.3)
+      love.graphics.setLineWidth(2)
+      love.graphics.circle("line", player.x, player.y, math.max(0, M.empBurstRadius - 20))
+      love.graphics.setLineWidth(1)
+    end
+    -- Inner glow that fades
+    local glowAlpha = math.max(0, 1.0 - M.abilityFlashTimer * 2)
+    if glowAlpha > 0 then
+      love.graphics.setColor(0.3, 0.6, 1, glowAlpha * 0.2)
+      love.graphics.circle("fill", player.x, player.y, 60)
+    end
+    -- Electric arcs around player
+    love.graphics.setColor(0.4, 0.7, 1, 0.4 + math.sin(M.abilityFlashTimer * 15) * 0.2)
+    love.graphics.setLineWidth(1.5)
+    for i = 0, 3 do
+      local angle = (i / 4) * math.pi * 2 + M.abilityFlashTimer * 3
+      local r = 25 + math.sin(M.abilityFlashTimer * 8 + i) * 5
+      local x1 = player.x + math.cos(angle) * r
+      local y1 = player.y + math.sin(angle) * r
+      local x2 = player.x + math.cos(angle + 0.5) * (r + 10)
+      local y2 = player.y + math.sin(angle + 0.5) * (r + 10)
+      love.graphics.line(x1, y1, x2, y2)
+    end
+    love.graphics.setLineWidth(1)
   end
 
   -- Timer overlay

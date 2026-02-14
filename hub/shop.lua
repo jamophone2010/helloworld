@@ -9,7 +9,8 @@ local items = {
   {name = "Health Pack", cost = 5, desc = "Restore 50 HP", type = "health", value = 50},
   {name = "Extra Life", cost = 10, desc = "+1 Life for StarFox", type = "lives", value = 1},
   {name = "Smart Bomb", cost = 3, desc = "+1 Bomb for StarFox", type = "bombs", value = 1},
-  {name = "Spartan Laser", cost = 20, desc = "Powerful beam weapon (Z to switch)", type = "laser", value = 1}
+  {name = "Spartan Laser", cost = 20, desc = "Powerful beam weapon (Z to switch)", type = "laser", value = 1},
+  {name = "Scanner Module", cost = 100, desc = "Reveals hidden portals in Asteroids (hold S to scan)", type = "scan", value = 1}
 }
 
 function M.load()
@@ -105,6 +106,8 @@ function M.keypressed(key)
         local shopItems = hub.getShopItems()
         if item.type == "laser" then
           shopItems.laser = true
+        elseif item.type == "scan" then
+          shopItems.scan = true
         else
           shopItems[item.type] = shopItems[item.type] + item.value
         end

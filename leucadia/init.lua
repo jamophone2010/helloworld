@@ -48,7 +48,7 @@ function M.load()
   -- Shared currency with main hub
   gameState.credits = 1000000
   gameState.notes = currency.load()
-  gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false}
+  gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false, scan = false}
   gameState.paused = false
   gameState.animationTime = 0
 
@@ -97,7 +97,7 @@ function M.spendNotes(amount)
 end
 
 function M.getShopItems() return gameState.shopItems end
-function M.clearShopItems() gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false} end
+function M.clearShopItems() gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false, scan = false} end
 function M.setPaused(paused) gameState.paused = paused end
 
 function M.setFadeInFromStarfox(enable)
@@ -111,7 +111,7 @@ end
 function M.setupOutdoorNPCs()
   gameState.currentNPCs = {}
   for _, npcData in ipairs(areas.npcs) do
-    table.insert(gameState.currentNPCs, npc.new(npcData.name, npcData.x, npcData.y, npcData.dialogue))
+    table.insert(gameState.currentNPCs, npc.new(npcData.name, npcData.x, npcData.y, npcData.dialogue, npcData.gender, npcData))
   end
 end
 
@@ -140,7 +140,7 @@ function M.enterBuilding(buildingId)
   gameState.currentNPCs = {}
   if interior.npcs then
     for _, npcData in ipairs(interior.npcs) do
-      table.insert(gameState.currentNPCs, npc.new(npcData.name, npcData.x, npcData.y, npcData.dialogue))
+      table.insert(gameState.currentNPCs, npc.new(npcData.name, npcData.x, npcData.y, npcData.dialogue, npcData.gender, npcData))
     end
   end
 end
@@ -199,7 +199,10 @@ end
 -- ═══════════════════════════════════════
 
 function M.update(dt)
-  if gameState.paused then return end
+  if gameState.paused then
+    pauseMenu.update(dt)
+    return
+  end
 
   gameState.animationTime = gameState.animationTime + dt
 
@@ -267,19 +270,22 @@ function M.update(dt)
     -- Check building doors
     if gameState.buildingEntryCooldown <= 0 and not gameState.transition then
       for _, b in ipairs(areas.buildings) do
-        if gameState.player.gridX == b.doorX and gameState.player.gridY == b.doorY then
-          gameState.nearBuildingDoor = b
-          local interiorId = b.interior
-          gameState.transition = {
-            phase = "out",
-            timer = 0,
-            duration = 0.2,
-            callback = function()
-              M.enterBuilding(interiorId)
-              audio.playPortal()
-            end
-          }
-          break
+        -- Check if player is on tile below door and pressing up to enter
+        if gameState.player.gridX == b.doorX and gameState.player.gridY == b.doorY - 1 then
+          if love.keyboard.isDown("up") then
+            gameState.nearBuildingDoor = b
+            local interiorId = b.interior
+            gameState.transition = {
+              phase = "out",
+              timer = 0,
+              duration = 0.2,
+              callback = function()
+                M.enterBuilding(interiorId)
+                audio.playPortal()
+              end
+            }
+            break
+          end
         end
       end
     end
@@ -325,7 +331,8 @@ function M.draw()
   local screenH = love.graphics.getHeight()
 
   if gameState.location == "outdoors" then
-    -- Draw sky gradient (before camera transform)
+    -- Draw horizon and sky gradient (before camera transform)
+    environment.drawHorizon(screenW, screenH, gameState.camera.y)
     environment.drawSky(screenW, screenH)
 
     -- Draw clouds (with parallax, before main world)
@@ -348,7 +355,7 @@ function M.draw()
   end
 
   -- Draw player
-  player.draw(gameState.player)
+  player.draw(gameState.player, gameState.animationTime)
 
   -- Draw NPCs
   for _, npcObj in ipairs(gameState.currentNPCs) do
@@ -401,27 +408,78 @@ function M.drawOutdoors()
       local w = (zone.x2 - zone.x1 + 1) * gs
       local h = (zone.y2 - zone.y1 + 1) * gs
       love.graphics.rectangle("fill", x, y, w, h)
+      
+      -- Add sand texture shimmer to beach
+      if name == "beach" then
+        for i = 1, 50 do
+          local sx = x + math.random(0, w)
+          local sy = y + math.random(0, h)
+          local shimmer = 0.5 + math.sin(gameState.animationTime * 2 + sx * 0.1) * 0.5
+          love.graphics.setColor(1, 1, 0.9, 0.15 * shimmer * ambientIntensity)
+          love.graphics.circle("fill", sx, sy, 1.5)
+        end
+      end
     end
   end
 
-  -- Draw pier planks
-  love.graphics.setColor(0.5 * ambientIntensity, 0.4 * ambientIntensity, 0.3 * ambientIntensity)
+  -- Draw pier planks with enhanced wood texture
   for y = 30, 34 do
     for x = 31, 49 do
+      -- Base plank color with variation
+      local colorVar = 0.95 + math.sin(x * 1.3 + y * 2.1) * 0.05
+      love.graphics.setColor(0.52 * ambientIntensity * colorVar, 0.42 * ambientIntensity * colorVar, 0.32 * ambientIntensity * colorVar)
       love.graphics.rectangle("fill", x * gs, y * gs, gs, gs)
-      love.graphics.setColor(0.35 * ambientIntensity, 0.25 * ambientIntensity, 0.15 * ambientIntensity)
+      
+      -- Plank separations (darker)
+      love.graphics.setColor(0.30 * ambientIntensity, 0.22 * ambientIntensity, 0.14 * ambientIntensity)
+      love.graphics.setLineWidth(2)
       love.graphics.line(x * gs, y * gs, x * gs + gs, y * gs)
-      love.graphics.setColor(0.5 * ambientIntensity, 0.4 * ambientIntensity, 0.3 * ambientIntensity)
+      love.graphics.line(x * gs + gs, y * gs, x * gs + gs, y * gs + gs)
+      
+      -- Wood grain texture
+      love.graphics.setColor(0.45 * ambientIntensity, 0.35 * ambientIntensity, 0.25 * ambientIntensity, 0.3)
+      love.graphics.setLineWidth(1)
+      for i = 1, 2 do
+        love.graphics.line(x * gs + 5, y * gs + i * 10, x * gs + gs - 5, y * gs + i * 10)
+      end
+      
+      -- Nail heads
+      love.graphics.setColor(0.25 * ambientIntensity, 0.25 * ambientIntensity, 0.28 * ambientIntensity)
+      love.graphics.circle("fill", x * gs + 6, y * gs + 6, 1.5)
+      love.graphics.circle("fill", x * gs + gs - 6, y * gs + 6, 1.5)
+      love.graphics.setLineWidth(1)
     end
   end
 
-  -- Draw ocean with tide-affected color
+  -- Draw ocean with tide-affected color and depth
   local oceanZone = areas.zones.ocean
   local oceanDepth = 0.6 + tideLevel * 0.2
-  love.graphics.setColor(0.2 * oceanDepth, 0.5 * oceanDepth, 0.75 * oceanDepth)
+  
+  -- Draw ocean in layers for depth effect
   for y = oceanZone.y1, oceanZone.y2 do
     for x = oceanZone.x1, oceanZone.x2 do
+      -- Base ocean color with depth gradient
+      local depthFactor = 1 + (y - oceanZone.y1) * 0.05
+      love.graphics.setColor(
+        0.2 * oceanDepth * depthFactor, 
+        0.5 * oceanDepth * depthFactor, 
+        0.75 * oceanDepth * depthFactor
+      )
       love.graphics.rectangle("fill", x * gs, y * gs, gs, gs)
+    end
+  end
+  
+  -- Ocean sparkles (sunlight on water)
+  if not lighting.isNight() then
+    for i = 1, 25 do
+      local sparkleX = (oceanZone.x1 + (i * 53 + gameState.animationTime * 3.75) % (oceanZone.x2 - oceanZone.x1)) * gs
+      local sparkleY = (oceanZone.y1 + (i * 37) % (oceanZone.y2 - oceanZone.y1)) * gs
+      local sparklePhase = math.sin(gameState.animationTime * 4 + i * 1.5)
+      if sparklePhase > 0.6 then
+        local brightness = (sparklePhase - 0.6) * 2.5
+        love.graphics.setColor(1, 1, 0.9, 0.5 * brightness * ambientIntensity)
+        love.graphics.circle("fill", sparkleX, sparkleY, 3 + brightness * 2)
+      end
     end
   end
 
@@ -430,6 +488,9 @@ function M.drawOutdoors()
 
   -- Draw crabs at low tide
   environment.drawCrabs()
+
+  -- Draw cobblestone sidewalks connecting building fronts
+  M.drawCobbleSidewalks(gs, ambientIntensity)
 
   -- Draw building shadows first (behind buildings)
   for _, b in ipairs(areas.buildings) do
@@ -448,10 +509,102 @@ function M.drawOutdoors()
     M.drawBuilding(b)
   end
 
-  -- Draw palm trees with wind animation (after buildings for correct layering)
+  -- Draw palm tree shadows (before trees for correct layering)
   for _, deco in ipairs(areas.decorations) do
     if deco.type == "palm_tree" then
-      environment.drawPalmTree(deco.x, deco.y, gs, gameState.animationTime)
+      lighting.drawPalmTreeShadow(deco.x, deco.y, gs, deco.variety)
+    end
+  end
+
+  -- Draw palm trees with wind animation (after buildings and shadows)
+  for _, deco in ipairs(areas.decorations) do
+    if deco.type == "palm_tree" then
+      environment.drawPalmTree(deco.x, deco.y, gs, gameState.animationTime, deco.variety)
+    end
+  end
+end
+
+function M.drawCobbleSidewalks(gs, ambientIntensity)
+  -- Group buildings by zone to create continuous sidewalk strips
+  local sidewalkStrips = {}
+
+  -- Coast Highway sidewalk: continuous strip along front of shops (moved up to y=17 and y=22-23)
+  table.insert(sidewalkStrips, {x1 = 2, y = 17, x2 = 16, depth = 1})  -- Upper row shops
+  table.insert(sidewalkStrips, {x1 = 2, y = 22, x2 = 13, depth = 2})  -- Lower row shops
+
+  -- Connector from Coast Highway to Town Square
+  table.insert(sidewalkStrips, {x1 = 14, y = 17, x2 = 18, depth = 1})
+  table.insert(sidewalkStrips, {x1 = 16, y = 18, x2 = 18, depth = 3})
+
+  -- Town Square walkways
+  table.insert(sidewalkStrips, {x1 = 17, y = 20, x2 = 31, depth = 1})  -- North shops
+  table.insert(sidewalkStrips, {x1 = 20, y = 25, x2 = 28, depth = 1})  -- Town Hall front
+
+  -- Connector from Town Square to Mission District
+  table.insert(sidewalkStrips, {x1 = 31, y = 20, x2 = 36, depth = 1})
+  table.insert(sidewalkStrips, {x1 = 33, y = 21, x2 = 36, depth = 2})
+
+  -- Mission District walkways
+  table.insert(sidewalkStrips, {x1 = 35, y = 22, x2 = 49, depth = 1})  -- Upper buildings
+  table.insert(sidewalkStrips, {x1 = 35, y = 27, x2 = 49, depth = 1})  -- Lower buildings
+
+  -- Residential walkway
+  table.insert(sidewalkStrips, {x1 = 2, y = 7, x2 = 23, depth = 1})
+
+  -- Connector from Residential to Flower Fields
+  table.insert(sidewalkStrips, {x1 = 23, y = 7, x2 = 30, depth = 1})
+  table.insert(sidewalkStrips, {x1 = 28, y = 8, x2 = 30, depth = 2})
+
+  -- Flower fields path
+  table.insert(sidewalkStrips, {x1 = 29, y = 9, x2 = 48, depth = 1})
+
+  for _, strip in ipairs(sidewalkStrips) do
+    for dy = 0, strip.depth - 1 do
+      for gx = strip.x1, strip.x2 do
+        local px = gx * gs
+        local py = (strip.y + dy) * gs
+
+        -- Base cobblestone color (warm gray)
+        local stoneVar = math.sin(gx * 3.7 + (strip.y + dy) * 5.3) * 0.04
+        love.graphics.setColor(
+          (0.62 + stoneVar) * ambientIntensity,
+          (0.58 + stoneVar) * ambientIntensity,
+          (0.50 + stoneVar) * ambientIntensity
+        )
+        love.graphics.rectangle("fill", px, py, gs, gs)
+
+        -- Draw individual cobblestones (2x3 grid per tile)
+        for cx = 0, 1 do
+          for cy = 0, 2 do
+            local stoneX = px + cx * 16 + 1
+            local stoneY = py + cy * 11 + 1
+            local sw = 14
+            local sh = 9
+
+            -- Offset alternate rows for brick pattern
+            local rowOffset = (cy % 2 == 1) and 8 or 0
+            stoneX = stoneX + rowOffset
+
+            -- Individual stone color variation
+            local shade = 0.95 + math.sin((gx * 2 + cx) * 4.1 + (strip.y + dy + cy) * 3.3) * 0.05
+            love.graphics.setColor(
+              0.58 * shade * ambientIntensity,
+              0.54 * shade * ambientIntensity,
+              0.46 * shade * ambientIntensity
+            )
+            love.graphics.rectangle("fill", stoneX, stoneY, sw, sh, 2, 2)
+
+            -- Stone border / mortar lines
+            love.graphics.setColor(0.42 * ambientIntensity, 0.38 * ambientIntensity, 0.32 * ambientIntensity, 0.5)
+            love.graphics.setLineWidth(1)
+            love.graphics.rectangle("line", stoneX, stoneY, sw, sh, 2, 2)
+
+            -- Subtle highlight on top edge
+            love.graphics.setColor(0.72 * ambientIntensity, 0.68 * ambientIntensity, 0.60 * ambientIntensity, 0.3)
+            love.graphics.line(stoneX + 2, stoneY + 1, stoneX + sw - 2, stoneY + 1)
+          end
+        end
+      end
     end
   end
 end
@@ -461,31 +614,394 @@ function M.drawBuilding(b)
   local y = b.y * 32
   local w = b.w * 32
   local h = b.h * 32
+  local ambientColor, ambientIntensity = lighting.getAmbientLight()
+  local nameLower = b.name:lower()
 
-  -- Building body
-  love.graphics.setColor(b.color[1], b.color[2], b.color[3])
+  -- Determine building style
+  local isShop = string.match(nameLower, "shop") or string.match(nameLower, "cafe") or
+                 string.match(nameLower, "grill") or string.match(nameLower, "boutique") or
+                 string.match(nameLower, "stand") or string.match(nameLower, "tackle")
+  local isHouse = string.match(nameLower, "house")
+  local isCivic = string.match(nameLower, "hall") or string.match(nameLower, "bank") or
+                  string.match(nameLower, "mission") or string.match(nameLower, "control")
+  local isMilitary = string.match(nameLower, "hangar") or string.match(nameLower, "depot") or
+                     string.match(nameLower, "lounge")
+
+  -- ═══ BUILDING BODY (stucco texture) ═══
+  love.graphics.setColor(
+    b.color[1] * ambientIntensity, 
+    b.color[2] * ambientIntensity, 
+    b.color[3] * ambientIntensity
+  )
   love.graphics.rectangle("fill", x, y, w, h)
 
-  -- Roof (top portion)
-  love.graphics.setColor(b.roofColor[1], b.roofColor[2], b.roofColor[3])
-  love.graphics.rectangle("fill", x, y, w, 16)
-
-  -- Door
-  love.graphics.setColor(0.4, 0.25, 0.15)
-  love.graphics.rectangle("fill", b.doorX * 32 + 4, b.doorY * 32 - 24, 24, 24)
-
-  -- Windows
-  love.graphics.setColor(0.7, 0.85, 0.95)
-  local windowY = y + 24
-  for wx = x + 8, x + w - 24, 24 do
-    love.graphics.rectangle("fill", wx, windowY, 16, 12)
+  -- Stucco texture (tiny speckles for Mediterranean feel)
+  for sx = x + 2, x + w - 2, 6 do
+    for sy = y + 18, y + h - 2, 6 do
+      local speckle = math.sin(sx * 3.1 + sy * 2.7) * 0.03
+      love.graphics.setColor(
+        (b.color[1] + speckle) * ambientIntensity,
+        (b.color[2] + speckle) * ambientIntensity,
+        (b.color[3] + speckle) * ambientIntensity
+      )
+      love.graphics.rectangle("fill", sx, sy, 4, 4)
+    end
   end
 
-  -- Building name sign
-  love.graphics.setColor(0.9, 0.85, 0.75)
+  -- Side shading for depth
+  love.graphics.setColor(
+    b.color[1] * ambientIntensity * 0.7,
+    b.color[2] * ambientIntensity * 0.7,
+    b.color[3] * ambientIntensity * 0.7
+  )
+  love.graphics.rectangle("fill", x + w - 5, y + 4, 5, h - 4)
+
+  -- Bottom shadow strip (ground contact)
+  love.graphics.setColor(
+    b.color[1] * ambientIntensity * 0.6,
+    b.color[2] * ambientIntensity * 0.6,
+    b.color[3] * ambientIntensity * 0.6
+  )
+  love.graphics.rectangle("fill", x, y + h - 3, w, 3)
+
+  -- ═══ SPANISH TILE ROOF ═══
+  -- Roof base
+  love.graphics.setColor(
+    b.roofColor[1] * ambientIntensity, 
+    b.roofColor[2] * ambientIntensity, 
+    b.roofColor[3] * ambientIntensity
+  )
+  love.graphics.rectangle("fill", x - 2, y - 2, w + 4, 18)
+
+  -- Scalloped tile pattern (terracotta barrel tiles)
+  for tx = x - 2, x + w, 8 do
+    -- Upper row of tiles
+    love.graphics.setColor(
+      b.roofColor[1] * ambientIntensity * 1.1,
+      b.roofColor[2] * ambientIntensity * 0.9,
+      b.roofColor[3] * ambientIntensity * 0.8
+    )
+    love.graphics.arc("fill", tx + 4, y + 2, 5, math.pi, 0)
+    -- Lower row offset
+    love.graphics.setColor(
+      b.roofColor[1] * ambientIntensity * 0.9,
+      b.roofColor[2] * ambientIntensity * 0.8,
+      b.roofColor[3] * ambientIntensity * 0.7
+    )
+    love.graphics.arc("fill", tx + 8, y + 8, 5, math.pi, 0)
+  end
+
+  -- Roof edge overhang shadow
+  love.graphics.setColor(0, 0, 0, 0.15 * ambientIntensity)
+  love.graphics.rectangle("fill", x - 2, y + 14, w + 4, 3)
+
+  -- Roof trim line (decorative molding)
+  love.graphics.setColor(
+    b.roofColor[1] * ambientIntensity * 1.3,
+    b.roofColor[2] * ambientIntensity * 1.2,
+    b.roofColor[3] * ambientIntensity * 1.1
+  )
+  love.graphics.setLineWidth(2)
+  love.graphics.line(x - 2, y + 16, x + w + 2, y + 16)
+  love.graphics.setLineWidth(1)
+
+  -- ═══ DOOR (arched for shops/civic, square for others) ═══
+  local doorX = b.doorX * 32 + 4
+  local doorY = b.doorY * 32 - 24
+  local doorW = 24
+  local doorH = 24
+
+  if isShop or isCivic then
+    -- Arched doorway (Carlsbad Mediterranean style)
+    love.graphics.setColor(0.35 * ambientIntensity, 0.22 * ambientIntensity, 0.12 * ambientIntensity)
+    love.graphics.rectangle("fill", doorX, doorY + 8, doorW, doorH - 8)
+    love.graphics.arc("fill", doorX + doorW/2, doorY + 8, doorW/2, math.pi, 0)
+    -- Arch frame
+    love.graphics.setColor(0.28 * ambientIntensity, 0.18 * ambientIntensity, 0.10 * ambientIntensity)
+    love.graphics.setLineWidth(2)
+    love.graphics.arc("line", doorX + doorW/2, doorY + 8, doorW/2, math.pi, 0)
+    love.graphics.line(doorX, doorY + 8, doorX, doorY + doorH)
+    love.graphics.line(doorX + doorW, doorY + 8, doorX + doorW, doorY + doorH)
+    love.graphics.setLineWidth(1)
+    -- Decorative keystone at arch top
+    love.graphics.setColor(0.55 * ambientIntensity, 0.50 * ambientIntensity, 0.42 * ambientIntensity)
+    love.graphics.polygon("fill",
+      doorX + doorW/2 - 3, doorY - 3,
+      doorX + doorW/2 + 3, doorY - 3,
+      doorX + doorW/2 + 2, doorY + 2,
+      doorX + doorW/2 - 2, doorY + 2
+    )
+  else
+    -- Standard door
+    love.graphics.setColor(0.4 * ambientIntensity, 0.25 * ambientIntensity, 0.15 * ambientIntensity)
+    love.graphics.rectangle("fill", doorX, doorY, doorW, doorH)
+    -- Door frame
+    love.graphics.setColor(0.3 * ambientIntensity, 0.2 * ambientIntensity, 0.12 * ambientIntensity)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", doorX, doorY, doorW, doorH)
+    love.graphics.setLineWidth(1)
+  end
+
+  -- Door handle
+  love.graphics.setColor(0.75, 0.70, 0.35, ambientIntensity)
+  love.graphics.circle("fill", doorX + doorW - 4, doorY + doorH/2, 2)
+
+  -- Door panel lines
+  love.graphics.setColor(0.32 * ambientIntensity, 0.20 * ambientIntensity, 0.12 * ambientIntensity, 0.4)
+  love.graphics.line(doorX + doorW/2, doorY + 6, doorX + doorW/2, doorY + doorH)
+
+  -- ═══ AWNING (shops and cafes) ═══
+  if isShop then
+    -- Striped canvas awning
+    local awningX = b.doorX * 32 - 4
+    local awningY = doorY - 4
+    local awningW = 40
+    local awningH = 8
+    love.graphics.setColor(
+      b.roofColor[1] * ambientIntensity * 0.85,
+      b.roofColor[2] * ambientIntensity * 0.85,
+      b.roofColor[3] * ambientIntensity * 0.85
+    )
+    love.graphics.polygon("fill",
+      awningX, awningY,
+      awningX + awningW, awningY,
+      awningX + awningW + 3, awningY + awningH,
+      awningX - 3, awningY + awningH
+    )
+    -- Awning stripes
+    love.graphics.setColor(
+      b.roofColor[1] * ambientIntensity * 0.6,
+      b.roofColor[2] * ambientIntensity * 0.6,
+      b.roofColor[3] * ambientIntensity * 0.6
+    )
+    for stripe = 0, 4 do
+      love.graphics.rectangle("fill", awningX + stripe * 8, awningY, 4, awningH)
+    end
+    -- Awning scalloped bottom edge
+    love.graphics.setColor(
+      b.roofColor[1] * ambientIntensity * 0.75,
+      b.roofColor[2] * ambientIntensity * 0.75,
+      b.roofColor[3] * ambientIntensity * 0.75
+    )
+    for scallop = 0, 4 do
+      love.graphics.arc("fill", awningX + scallop * 8 + 4, awningY + awningH, 4, 0, math.pi)
+    end
+  end
+
+  -- ═══ WINDOWS ═══
+  local windowY = y + 24
+  for wx = x + 8, x + w - 24, 24 do
+    -- Window shutters (wooden, Carlsbad style)
+    love.graphics.setColor(
+      b.color[1] * ambientIntensity * 0.65,
+      b.color[2] * ambientIntensity * 0.65,
+      b.color[3] * ambientIntensity * 0.65
+    )
+    love.graphics.rectangle("fill", wx - 4, windowY - 1, 4, 14)
+    love.graphics.rectangle("fill", wx + 16, windowY - 1, 4, 14)
+    -- Shutter slats
+    love.graphics.setColor(
+      b.color[1] * ambientIntensity * 0.5,
+      b.color[2] * ambientIntensity * 0.5,
+      b.color[3] * ambientIntensity * 0.5
+    )
+    for slat = 0, 2 do
+      love.graphics.line(wx - 3, windowY + slat * 4, wx, windowY + slat * 4)
+      love.graphics.line(wx + 17, windowY + slat * 4, wx + 20, windowY + slat * 4)
+    end
+
+    -- Window glass
+    love.graphics.setColor(0.55 * ambientIntensity, 0.72 * ambientIntensity, 0.85 * ambientIntensity)
+    love.graphics.rectangle("fill", wx, windowY, 16, 12)
+
+    -- Sky reflection
+    love.graphics.setColor(0.70 * ambientIntensity, 0.85 * ambientIntensity, 0.95 * ambientIntensity, 0.3)
+    love.graphics.rectangle("fill", wx, windowY, 16, 4)
+
+    -- Window frame (thicker, more ornate)
+    love.graphics.setColor(0.35 * ambientIntensity, 0.30 * ambientIntensity, 0.25 * ambientIntensity)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", wx, windowY, 16, 12)
+    love.graphics.line(wx + 8, windowY, wx + 8, windowY + 12)
+    love.graphics.line(wx, windowY + 6, wx + 16, windowY + 6)
+    love.graphics.setLineWidth(1)
+
+    -- Window sill (stone ledge)
+    love.graphics.setColor(0.60 * ambientIntensity, 0.55 * ambientIntensity, 0.48 * ambientIntensity)
+    love.graphics.rectangle("fill", wx - 2, windowY + 12, 20, 3)
+
+    -- Window flower box (alternating windows)
+    if math.floor(wx / 24) % 2 == 0 then
+      love.graphics.setColor(0.45 * ambientIntensity, 0.30 * ambientIntensity, 0.20 * ambientIntensity)
+      love.graphics.rectangle("fill", wx - 1, windowY + 15, 18, 4)
+      -- Colorful flowers (varied colors per building)
+      local flowerSeed = b.x * 3 + b.y * 7
+      for f = 0, 4 do
+        local fColor = (flowerSeed + f) % 3
+        if fColor == 0 then
+          love.graphics.setColor(0.9 * ambientIntensity, 0.3 * ambientIntensity, 0.4 * ambientIntensity)
+        elseif fColor == 1 then
+          love.graphics.setColor(0.95 * ambientIntensity, 0.75 * ambientIntensity, 0.2 * ambientIntensity)
+        else
+          love.graphics.setColor(0.7 * ambientIntensity, 0.3 * ambientIntensity, 0.8 * ambientIntensity)
+        end
+        love.graphics.circle("fill", wx + 1 + f * 3.5, windowY + 15, 2)
+      end
+      -- Green leaves
+      love.graphics.setColor(0.3 * ambientIntensity, 0.55 * ambientIntensity, 0.25 * ambientIntensity)
+      for f = 0, 3 do
+        love.graphics.circle("fill", wx + 2 + f * 4, windowY + 17, 1.5)
+      end
+    end
+
+    -- Day reflection sparkle
+    if not lighting.isNight() then
+      love.graphics.setColor(1, 1, 0.95, 0.25 * ambientIntensity)
+      love.graphics.rectangle("fill", wx + 2, windowY + 1, 5, 3)
+    end
+  end
+
+  -- ═══ DECORATIVE TILE ACCENT (below windows, Carlsbad style) ═══
+  if isShop or isCivic then
+    local accentY = windowY + 20
+    for tx = x + 4, x + w - 8, 12 do
+      local tileShade = 0.9 + math.sin(tx * 0.5) * 0.1
+      love.graphics.setColor(
+        0.15 * tileShade * ambientIntensity,
+        0.35 * tileShade * ambientIntensity,
+        0.55 * tileShade * ambientIntensity
+      )
+      love.graphics.rectangle("fill", tx, accentY, 10, 5, 1, 1)
+      love.graphics.setColor(
+        0.65 * tileShade * ambientIntensity,
+        0.55 * tileShade * ambientIntensity,
+        0.20 * tileShade * ambientIntensity
+      )
+      love.graphics.rectangle("fill", tx + 5, accentY, 5, 5, 1, 1)
+    end
+  end
+
+  -- ═══ OUTDOOR PLANTERS (at building base) ═══
+  if isShop or isCivic then
+    -- Terracotta planters on each side of door
+    for _, planterSide in ipairs({-1, 1}) do
+      local planterX = b.doorX * 32 + (planterSide > 0 and 30 or -10)
+      local planterY = b.doorY * 32 - 10
+      -- Pot
+      love.graphics.setColor(0.65 * ambientIntensity, 0.38 * ambientIntensity, 0.22 * ambientIntensity)
+      love.graphics.polygon("fill",
+        planterX, planterY,
+        planterX + 10, planterY,
+        planterX + 8, planterY + 10,
+        planterX + 2, planterY + 10
+      )
+      -- Pot rim
+      love.graphics.setColor(0.58 * ambientIntensity, 0.34 * ambientIntensity, 0.20 * ambientIntensity)
+      love.graphics.rectangle("fill", planterX - 1, planterY - 2, 12, 3)
+      -- Plant
+      love.graphics.setColor(0.30 * ambientIntensity, 0.55 * ambientIntensity, 0.25 * ambientIntensity)
+      love.graphics.circle("fill", planterX + 5, planterY - 5, 6)
+      love.graphics.setColor(0.35 * ambientIntensity, 0.60 * ambientIntensity, 0.30 * ambientIntensity)
+      love.graphics.circle("fill", planterX + 3, planterY - 7, 4)
+    end
+  end
+
+  -- ═══ BUILDING NAME SIGN ═══
+  -- Hanging sign with bracket (Carlsbad style)
   local font = love.graphics.getFont()
   local textW = font:getWidth(b.name)
-  love.graphics.print(b.name, x + w/2 - textW/2, y - 18)
+  local signX = x + w/2 - textW/2 - 6
+  local signY = y - 22
+
+  -- Sign bracket
+  love.graphics.setColor(0.25 * ambientIntensity, 0.25 * ambientIntensity, 0.28 * ambientIntensity)
+  love.graphics.setLineWidth(2)
+  love.graphics.line(signX + 4, y, signX + 4, signY + 2)
+  love.graphics.line(signX + textW + 8, y, signX + textW + 8, signY + 2)
+  love.graphics.setLineWidth(1)
+
+  -- Sign board
+  love.graphics.setColor(0.18, 0.14, 0.10, 0.75)
+  love.graphics.rectangle("fill", signX, signY, textW + 12, 18, 3, 3)
+  -- Sign border
+  love.graphics.setColor(0.45 * ambientIntensity, 0.38 * ambientIntensity, 0.28 * ambientIntensity)
+  love.graphics.setLineWidth(1)
+  love.graphics.rectangle("line", signX, signY, textW + 12, 18, 3, 3)
+
+  -- Sign text
+  love.graphics.setColor(0.95 * ambientIntensity, 0.92 * ambientIntensity, 0.82 * ambientIntensity)
+  love.graphics.print(b.name, signX + 6, signY + 2)
+
+  -- ═══ CHIMNEY (houses and grill) ═══
+  if isHouse or string.match(nameLower, "grill") then
+    local chimneyX = x + w - 16
+    local chimneyY = y - 10
+    love.graphics.setColor(
+      b.roofColor[1] * ambientIntensity * 0.55,
+      b.roofColor[2] * ambientIntensity * 0.55,
+      b.roofColor[3] * ambientIntensity * 0.55
+    )
+    love.graphics.rectangle("fill", chimneyX, chimneyY, 8, 26)
+    -- Chimney cap
+    love.graphics.setColor(
+      b.roofColor[1] * ambientIntensity * 0.45,
+      b.roofColor[2] * ambientIntensity * 0.45,
+      b.roofColor[3] * ambientIntensity * 0.45
+    )
+    love.graphics.rectangle("fill", chimneyX - 2, chimneyY - 2, 12, 3)
+    -- Brick detail
+    love.graphics.setColor(
+      b.roofColor[1] * ambientIntensity * 0.4,
+      b.roofColor[2] * ambientIntensity * 0.4,
+      b.roofColor[3] * ambientIntensity * 0.4
+    )
+    for brickY = chimneyY + 4, chimneyY + 20, 6 do
+      love.graphics.line(chimneyX, brickY, chimneyX + 8, brickY)
+    end
+  end
+
+  -- ═══ CORNER COLUMNS (civic buildings) ═══
+  if isCivic then
+    love.graphics.setColor(
+      b.color[1] * ambientIntensity * 1.15,
+      b.color[2] * ambientIntensity * 1.15,
+      b.color[3] * ambientIntensity * 1.15
+    )
+    -- Left column
+    love.graphics.rectangle("fill", x + 2, y + 16, 5, h - 16)
+    -- Right column
+    love.graphics.rectangle("fill", x + w - 7, y + 16, 5, h - 16)
+    -- Column capitals
+    love.graphics.setColor(
+      b.color[1] * ambientIntensity * 1.25,
+      b.color[2] * ambientIntensity * 1.25,
+      b.color[3] * ambientIntensity * 1.25
+    )
+    love.graphics.rectangle("fill", x + 1, y + 16, 7, 3)
+    love.graphics.rectangle("fill", x + w - 8, y + 16, 7, 3)
+    -- Column bases
+    love.graphics.rectangle("fill", x + 1, y + h - 3, 7, 3)
+    love.graphics.rectangle("fill", x + w - 8, y + h - 3, 7, 3)
+  end
+
+  -- ═══ WROUGHT IRON BALCONY (some residential/cafe buildings) ═══
+  if isHouse or string.match(nameLower, "cafe") or string.match(nameLower, "lounge") then
+    local balconyY = y + 20
+    -- Balcony base
+    love.graphics.setColor(0.25 * ambientIntensity, 0.25 * ambientIntensity, 0.28 * ambientIntensity)
+    love.graphics.rectangle("fill", x + 6, balconyY, w - 12, 2)
+    -- Iron railing
+    love.graphics.setLineWidth(1.5)
+    for rx = x + 8, x + w - 12, 6 do
+      love.graphics.line(rx, balconyY - 8, rx, balconyY)
+    end
+    -- Top rail
+    love.graphics.line(x + 6, balconyY - 8, x + w - 6, balconyY - 8)
+    -- Decorative scroll at center
+    love.graphics.arc("line", x + w/2, balconyY - 4, 3, 0, math.pi)
+    love.graphics.setLineWidth(1)
+  end
+
 end
 
 function M.drawDecoration(deco)
@@ -561,6 +1077,63 @@ function M.drawDecoration(deco)
       love.graphics.setColor(0.8 * ambientIntensity, 0.85 * ambientIntensity, 0.9 * ambientIntensity, 0.5)
       love.graphics.circle("fill", x + 16, y + 4, 8)
     end
+    
+  elseif deco.type == "towel" then
+    -- Beach towel laid out on sand
+    local color = deco.color or {1, 0.5, 0.5}
+    love.graphics.setColor(color[1] * ambientIntensity, color[2] * ambientIntensity, color[3] * ambientIntensity)
+    love.graphics.rectangle("fill", x + 4, y + 8, 24, 18)
+    -- Towel stripes
+    love.graphics.setColor(color[1] * 0.7 * ambientIntensity, color[2] * 0.7 * ambientIntensity, color[3] * 0.7 * ambientIntensity)
+    love.graphics.rectangle("fill", x + 4, y + 12, 24, 3)
+    love.graphics.rectangle("fill", x + 4, y + 19, 24, 3)
+    
+  elseif deco.type == "surfboard" then
+    -- Surfboard stuck in sand
+    local color = deco.color or {0.2, 0.8, 0.9}
+    lighting.drawShadow(deco.x, deco.y, 0.3, 2, 32)
+    love.graphics.setColor(color[1] * ambientIntensity, color[2] * ambientIntensity, color[3] * ambientIntensity)
+    -- Board shape (pointed oval)
+    for i = 0, 8 do
+      local t = i / 8
+      local w = math.sin(t * math.pi) * 6
+      love.graphics.ellipse("fill", x + 16, y + 8 + t * 40, w, 3)
+    end
+    -- Fin
+    love.graphics.setColor(color[1] * 0.7 * ambientIntensity, color[2] * 0.7 * ambientIntensity, color[3] * 0.7 * ambientIntensity)
+    love.graphics.polygon("fill", x + 16, y + 42, x + 16 - 3, y + 50, x + 16 + 3, y + 50)
+    -- Wax shine
+    love.graphics.setColor(1, 1, 1, 0.4)
+    love.graphics.ellipse("fill", x + 16, y + 20, 4, 10)
+    
+  elseif deco.type == "piling" then
+    -- Pier support piling
+    love.graphics.setColor(0.35 * ambientIntensity, 0.25 * ambientIntensity, 0.15 * ambientIntensity)
+    love.graphics.rectangle("fill", x + 12, y, 8, 64)
+    -- Wood texture lines
+    love.graphics.setColor(0.25 * ambientIntensity, 0.18 * ambientIntensity, 0.10 * ambientIntensity)
+    for i = 0, 3 do
+      love.graphics.line(x + 12, y + i * 16, x + 20, y + i * 16)
+    end
+    -- Barnacles and wear
+    love.graphics.setColor(0.6, 0.6, 0.65, 0.4)
+    for i = 1, 4 do
+      love.graphics.circle("fill", x + 12 + math.random(0, 8), y + 32 + math.random(0, 20), 2)
+    end
+    
+  elseif deco.type == "pier_rope" then
+    -- Rope tied to pier
+    love.graphics.setColor(0.7 * ambientIntensity, 0.6 * ambientIntensity, 0.4 * ambientIntensity)
+    love.graphics.setLineWidth(3)
+    local ropeY = y + 16
+    for i = 0, 5 do
+      local segX = x + i * 8
+      local segY = ropeY + math.sin(i * 0.8 + gameState.animationTime) * 3
+      if i > 0 then
+        love.graphics.line(x + (i-1) * 8, ropeY + math.sin((i-1) * 0.8 + gameState.animationTime) * 3, segX, segY)
+      end
+    end
+    love.graphics.setLineWidth(1)
   end
 end
 
@@ -684,6 +1257,12 @@ end
 -- ═══════════════════════════════════════
 -- INPUT
 -- ═══════════════════════════════════════
+
+function M.textinput(text)
+  if gameState.paused then
+    pauseMenu.textinput(text)
+  end
+end
 
 function M.keypressed(key)
   if gameState.paused then

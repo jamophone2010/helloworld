@@ -102,9 +102,11 @@ function M.getSave(slot)
   for key, value in string.gmatch(contents, "([%w_]+):([^,}%]]+)") do
     if key == "highScores" or key == "purchasedShips" or key == "unlockedQuests" then
       -- Already handled above
-    elseif key == "credits" or key == "notes" or key == "level" or key == "timePlayed" or key == "currentFloor" then
+    elseif key == "credits" or key == "notes" or key == "level" or key == "timePlayed" or key == "currentFloor"
+        or key == "protoMapX" or key == "protoMapY" or key == "protoMapSector" or key == "protoDefeatedCount" then
       saveData[key] = tonumber(value)
-    elseif key == "hasMegaAntenna" or key == "hasPowerAmplifier" then
+    elseif key == "hasMegaAntenna" or key == "hasPowerAmplifier"
+        or key == "protoQuestStarted" or key == "protoQuestComplete" or key == "protoFirstBeat" or key == "protoOnMap" then
       saveData[key] = (value == "true")
     elseif key == "selectedShip" then
       -- Ship ID - strip quotes
@@ -117,6 +119,20 @@ function M.getSave(slot)
 
   -- Defaults for new fields
   saveData.currentFloor = saveData.currentFloor or 2
+
+  -- Build prototypeData from flat fields
+  if saveData.protoQuestStarted ~= nil then
+    saveData.prototypeData = {
+      questStarted = saveData.protoQuestStarted,
+      questComplete = saveData.protoQuestComplete or false,
+      firstLevelBeaten = saveData.protoFirstBeat or false,
+      prototypeOnMap = saveData.protoOnMap or false,
+      prototypeMapX = saveData.protoMapX or 0,
+      prototypeMapY = saveData.protoMapY or 0,
+      prototypeMapSector = saveData.protoMapSector or 0,
+      defeatedCount = saveData.protoDefeatedCount or 0,
+    }
+  end
 
   return saveData
 end
@@ -131,7 +147,7 @@ function M.saveSave(slot, saveData)
 
   -- Format save data as string
   local saveString = string.format(
-    "name:'%s',credits:%d,notes:%d,level:%d,lastPlayed:'%s',timePlayed:%d,selectedShip:'%s',hasMegaAntenna:%s,hasPowerAmplifier:%s,currentFloor:%d,highScores:%s,purchasedShips:%s,unlockedQuests:%s",
+    "name:'%s',credits:%d,notes:%d,level:%d,lastPlayed:'%s',timePlayed:%d,selectedShip:'%s',hasMegaAntenna:%s,hasPowerAmplifier:%s,currentFloor:%d,highScores:%s,purchasedShips:%s,unlockedQuests:%s,protoQuestStarted:%s,protoQuestComplete:%s,protoFirstBeat:%s,protoOnMap:%s,protoMapX:%d,protoMapY:%d,protoMapSector:%d,protoDefeatedCount:%d",
     saveData.name or "Unnamed",
     saveData.credits or 0,
     saveData.notes or 0,
@@ -144,7 +160,15 @@ function M.saveSave(slot, saveData)
     saveData.currentFloor or 2,
     serializeHighScores(saveData.highScores),
     serializeStringSet(saveData.purchasedShips or { starwing = true }),
-    serializeStringSet(saveData.unlockedQuests or {})
+    serializeStringSet(saveData.unlockedQuests or {}),
+    (saveData.prototypeData and saveData.prototypeData.questStarted) and "true" or "false",
+    (saveData.prototypeData and saveData.prototypeData.questComplete) and "true" or "false",
+    (saveData.prototypeData and saveData.prototypeData.firstLevelBeaten) and "true" or "false",
+    (saveData.prototypeData and saveData.prototypeData.prototypeOnMap) and "true" or "false",
+    (saveData.prototypeData and saveData.prototypeData.prototypeMapX) or 0,
+    (saveData.prototypeData and saveData.prototypeData.prototypeMapY) or 0,
+    (saveData.prototypeData and saveData.prototypeData.prototypeMapSector) or 0,
+    (saveData.prototypeData and saveData.prototypeData.defeatedCount) or 0
   )
 
   local success, err = love.filesystem.write(filename, saveString)

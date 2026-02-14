@@ -404,6 +404,79 @@ M.SENTINEL = {
   {time = 73, type = "sentinelboss"}
 }
 
+-- Distant Dynamo: Endgame raid through power supply cables
+-- 8-phase Elden Ring boss with Indiana Jones obstacles and puzzles
+M.DISTANT_DYNAMO = {
+  -- Phase 1: Entering the cable conduit - moderate waves
+  {time = 1, type = "wave", formation = "v", x = 683, count = 6},
+  {time = 4, type = "wave", formation = "line", x = 512, count = 5},
+  {time = 4, type = "wave", formation = "line", x = 854, count = 5},
+  {time = 8, type = "turret", x = 341},
+  {time = 8, type = "turret", x = 1025},
+
+  -- Phase 2: Deeper into the cables - capital ship escorts
+  {time = 12, type = "capitalship", x = 683},
+  {time = 14, type = "wave", formation = "diamond", x = 512, count = 4},
+  {time = 14, type = "wave", formation = "diamond", x = 854, count = 4},
+  {time = 18, type = "wave", formation = "v", x = 683, count = 8},
+
+  -- Phase 3: Cable junction - heavy resistance
+  {time = 22, type = "turret", x = 200},
+  {time = 22, type = "turret", x = 500},
+  {time = 22, type = "turret", x = 866},
+  {time = 22, type = "turret", x = 1166},
+  {time = 24, type = "wave", formation = "triangle", x = 512, count = 5},
+  {time = 24, type = "wave", formation = "triangle", x = 854, count = 5},
+
+  -- Phase 4: Power bus intersection - flanking assault
+  {time = 28, type = "capitalship", x = 400},
+  {time = 28, type = "capitalship", x = 966},
+  {time = 30, type = "wave", formation = "box", x = 400, count = 5},
+  {time = 30, type = "wave", formation = "box", x = 683, count = 5},
+  {time = 30, type = "wave", formation = "box", x = 966, count = 5},
+
+  -- Phase 5: Transformer coils - diamond storm
+  {time = 35, type = "wave", formation = "diamond", x = 341, count = 4},
+  {time = 35, type = "wave", formation = "diamond", x = 683, count = 4},
+  {time = 35, type = "wave", formation = "diamond", x = 1025, count = 4},
+  {time = 38, type = "turret", x = 341},
+  {time = 38, type = "turret", x = 683},
+  {time = 38, type = "turret", x = 1025},
+
+  -- Phase 6: Capacitor bank - overwhelming numbers
+  {time = 42, type = "wave", formation = "line", x = 683, count = 12},
+  {time = 45, type = "wave", formation = "v", x = 512, count = 8},
+  {time = 45, type = "wave", formation = "v", x = 854, count = 8},
+  {time = 48, type = "capitalship", x = 512},
+  {time = 48, type = "capitalship", x = 854},
+
+  -- Phase 7: Final approach to the PSU - triple capital ships
+  {time = 52, type = "capitalship", x = 341},
+  {time = 52, type = "capitalship", x = 683},
+  {time = 52, type = "capitalship", x = 1025},
+  {time = 55, type = "wave", formation = "triangle", x = 512, count = 5},
+  {time = 55, type = "wave", formation = "triangle", x = 854, count = 5},
+  {time = 58, type = "wave", formation = "wave", x = 683, count = 14},
+
+  -- Phase 8: PSU box entrance - final gauntlet
+  {time = 62, type = "wave", formation = "diamond", x = 400, count = 4},
+  {time = 62, type = "wave", formation = "diamond", x = 683, count = 4},
+  {time = 62, type = "wave", formation = "diamond", x = 966, count = 4},
+  {time = 65, type = "turret", x = 200},
+  {time = 65, type = "turret", x = 400},
+  {time = 65, type = "turret", x = 600},
+  {time = 65, type = "turret", x = 800},
+  {time = 65, type = "turret", x = 1000},
+  {time = 65, type = "turret", x = 1166},
+  {time = 68, type = "wave", formation = "wave", x = 683, count = 16},
+
+  -- Boss warning - the Power Supply Overlord
+  {time = 72, type = "callout", message = "triggerEnemyWarning"},
+  {time = 75, type = "wave", formation = "v", x = 683, count = 10},
+  {time = 78, type = "callout", message = "triggerBossWarning"},
+  {time = 82, type = "dynamoboss"}
+}
+
 -- Sector Z: Extreme difficulty gauntlet before 7-phase Elden Ring boss
 M.SECTORZ = {
   -- Wave 1: Aggressive opening - no warmup
@@ -434,7 +507,7 @@ M.SECTORZ = {
 
   -- Wave 5: Rival encounter
   {time = 26, type = "callout", message = "triggerRivalWarning"},
-  {time = 28, type = "rival", hp = 60, variant = "teleport"},
+  {time = 28, type = "rival", hp = 15, variant = "teleport"},
 
   -- Wave 6: Continuous pressure during/after rival
   {time = 32, type = "wave", formation = "v", x = 512, count = 7},
@@ -474,6 +547,303 @@ M.SECTORZ = {
   {time = 80, type = "sectorzboss"}
 }
 
+-- Synesthesia Installation: Endgame Raid
+-- Fly through a graphics card's heatsink fins, circuit board, and VRM corridor
+-- toward the GPU Core itself, where a 10-phase boss awaits.
+-- Background is a music-reactive visualizer.
+M.SYNESTHESIA = {
+  -- The raid module handles terrain/puzzles internally via sections.
+  -- Wave data provides enemy waves that attack during the terrain gauntlet.
+
+  -- === SECTION 1: HEATSINK CANYON (0-25s) ===
+  {time = 0, type = "callout", message = "triggerEnemyWarning"},
+  {time = 1, type = "synesthesia_start"},  -- Activates raid terrain/visualization
+
+  -- Enemies attack while navigating heatsink fins
+  {time = 3, type = "wave", formation = "v", x = 683, count = 6},
+  {time = 7, type = "wave", formation = "line", x = 512, count = 5},
+  {time = 7, type = "wave", formation = "line", x = 854, count = 5},
+  {time = 11, type = "wave", formation = "diamond", x = 683, count = 4},
+  {time = 14, type = "wave", formation = "v", x = 427, count = 5},
+  {time = 14, type = "wave", formation = "v", x = 940, count = 5},
+  -- Puzzle 1 triggers at section timer 12s (trace_route)
+  {time = 17, type = "turret", x = 341},
+  {time = 17, type = "turret", x = 1025},
+  {time = 20, type = "wave", formation = "wave", x = 683, count = 8},
+  {time = 23, type = "wave", formation = "triangle", x = 683, count = 5},
+
+  -- === SECTION 2: PCB GAUNTLET (25-55s) ===
+  {time = 26, type = "callout", message = "triggerCover"},
+  {time = 28, type = "wave", formation = "v", x = 683, count = 7},
+  {time = 31, type = "capitalship", x = 683},
+  {time = 34, type = "wave", formation = "box", x = 512, count = 5},
+  {time = 34, type = "wave", formation = "box", x = 854, count = 5},
+  {time = 38, type = "wave", formation = "line", x = 683, count = 8},
+  {time = 41, type = "turret", x = 256},
+  {time = 41, type = "turret", x = 683},
+  {time = 41, type = "turret", x = 1110},
+  -- Puzzle 2 triggers at section timer 15s (frequency)
+  {time = 44, type = "wave", formation = "diamond", x = 427, count = 4},
+  {time = 44, type = "wave", formation = "diamond", x = 940, count = 4},
+  {time = 47, type = "wave", formation = "v", x = 683, count = 8},
+  {time = 50, type = "capitalship", x = 427},
+  {time = 50, type = "capitalship", x = 940},
+  {time = 53, type = "wave", formation = "wave", x = 683, count = 10},
+
+  -- === SECTION 3: VRM CORRIDOR (55-75s) ===
+  {time = 56, type = "callout", message = "triggerEnemyWarning"},
+  {time = 58, type = "wave", formation = "triangle", x = 512, count = 5},
+  {time = 58, type = "wave", formation = "triangle", x = 854, count = 5},
+  {time = 61, type = "wave", formation = "v", x = 683, count = 9},
+  {time = 64, type = "turret", x = 341},
+  {time = 64, type = "turret", x = 683},
+  {time = 64, type = "turret", x = 1025},
+  -- Puzzle 3 triggers at section timer 10s (color_decode)
+  {time = 67, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 70, type = "wave", formation = "box", x = 683, count = 5},
+  {time = 73, type = "wave", formation = "diamond", x = 512, count = 4},
+  {time = 73, type = "wave", formation = "diamond", x = 854, count = 4},
+
+  -- === SECTION 4: GPU CORE - BOSS (75s+) ===
+  {time = 76, type = "callout", message = "triggerBossWarning"},
+  {time = 80, type = "synesthesiaboss"},
+
+  -- Reinforcement waves during boss fight
+  {time = 95, type = "wave", formation = "v", x = 512, count = 5},
+  {time = 95, type = "wave", formation = "v", x = 854, count = 5},
+  {time = 115, type = "wave", formation = "line", x = 683, count = 6},
+  {time = 135, type = "wave", formation = "diamond", x = 427, count = 4},
+  {time = 135, type = "wave", formation = "diamond", x = 940, count = 4},
+  {time = 160, type = "wave", formation = "v", x = 683, count = 7},
+  {time = 185, type = "wave", formation = "wave", x = 683, count = 8},
+}
+
+-- Logician's Lament: Endgame Raid
+-- Fly through a PCB motherboard - resistors, capacitors, traces, vias between layers
+-- Logic puzzles while enemies attack, then face The Logician (CPU Die boss)
+-- 10-phase Elden Ring boss, Indiana Jones obstacles, Tron Legacy Lightcycles aesthetic
+M.LOGICIAN = {
+  -- === PCB LAYER GAUNTLET (0-75s) ===
+  -- raid.lua handles terrain/puzzles/vias internally
+  {time = 0,  type = "callout", message = "triggerEnemyWarning"},
+  {time = 1,  type = "raid_start"},  -- Activates PCB terrain/layer system
+
+  -- Layer 1: Top Copper - initial waves through resistor arrays
+  {time = 3,  type = "wave", formation = "v",       x = 683, count = 5},
+  {time = 7,  type = "wave", formation = "line",    x = 512, count = 4},
+  {time = 7,  type = "wave", formation = "line",    x = 854, count = 4},
+  {time = 11, type = "wave", formation = "diamond", x = 683, count = 4},
+  {time = 14, type = "turret", x = 341},
+  {time = 14, type = "turret", x = 1025},
+  {time = 17, type = "wave", formation = "v",       x = 427, count = 5},
+  {time = 17, type = "wave", formation = "v",       x = 940, count = 5},
+
+  -- First via transition zone (~20s) - puzzle gate AND/OR logic
+  {time = 20, type = "callout", message = "triggerCover"},
+  {time = 22, type = "wave", formation = "wave",    x = 683, count = 7},
+  {time = 25, type = "wave", formation = "triangle",x = 683, count = 5},
+
+  -- Layer 2: Inner 1 - deeper into the board, capital ships appear
+  {time = 28, type = "capitalship", x = 683},
+  {time = 30, type = "wave", formation = "v",       x = 683, count = 6},
+  {time = 33, type = "wave", formation = "box",     x = 512, count = 5},
+  {time = 33, type = "wave", formation = "box",     x = 854, count = 5},
+  {time = 37, type = "turret", x = 256},
+  {time = 37, type = "turret", x = 683},
+  {time = 37, type = "turret", x = 1110},
+
+  -- Second via transition zone (~40s) - XOR puzzle
+  {time = 40, type = "wave", formation = "line",    x = 683, count = 8},
+  {time = 43, type = "wave", formation = "diamond", x = 427, count = 4},
+  {time = 43, type = "wave", formation = "diamond", x = 940, count = 4},
+
+  -- Layer 3: Inner 2 - heavy resistance near power planes
+  {time = 46, type = "callout", message = "triggerEnemyWarning"},
+  {time = 48, type = "capitalship", x = 427},
+  {time = 48, type = "capitalship", x = 940},
+  {time = 50, type = "wave", formation = "v",       x = 683, count = 8},
+  {time = 53, type = "wave", formation = "triangle",x = 512, count = 5},
+  {time = 53, type = "wave", formation = "triangle",x = 854, count = 5},
+  {time = 56, type = "turret", x = 200},
+  {time = 56, type = "turret", x = 500},
+  {time = 56, type = "turret", x = 866},
+  {time = 56, type = "turret", x = 1166},
+
+  -- Third via - sequence puzzle + resistor code
+  {time = 59, type = "wave", formation = "wave",    x = 683, count = 10},
+  {time = 62, type = "wave", formation = "box",     x = 400, count = 5},
+  {time = 62, type = "wave", formation = "box",     x = 683, count = 5},
+  {time = 62, type = "wave", formation = "box",     x = 966, count = 5},
+
+  -- Layer 4: Bottom Copper - final approach to CPU die
+  {time = 66, type = "capitalship", x = 341},
+  {time = 66, type = "capitalship", x = 683},
+  {time = 66, type = "capitalship", x = 1025},
+  {time = 68, type = "wave", formation = "v",       x = 683, count = 9},
+  {time = 71, type = "wave", formation = "diamond", x = 400, count = 4},
+  {time = 71, type = "wave", formation = "diamond", x = 683, count = 4},
+  {time = 71, type = "wave", formation = "diamond", x = 966, count = 4},
+
+  -- === CPU DIE - THE LOGICIAN BOSS (75s+) ===
+  {time = 74, type = "callout", message = "triggerBossWarning"},
+  {time = 78, type = "raidboss"},
+
+  -- Reinforcement waves during boss fight (every ~20-25s)
+  {time = 93,  type = "wave", formation = "v",       x = 512, count = 5},
+  {time = 93,  type = "wave", formation = "v",       x = 854, count = 5},
+  {time = 115, type = "wave", formation = "line",    x = 683, count = 6},
+  {time = 135, type = "wave", formation = "diamond", x = 427, count = 4},
+  {time = 135, type = "wave", formation = "diamond", x = 940, count = 4},
+  {time = 160, type = "wave", formation = "v",       x = 683, count = 7},
+  {time = 185, type = "wave", formation = "wave",    x = 683, count = 8},
+  {time = 210, type = "wave", formation = "triangle",x = 683, count = 6},
+  {time = 240, type = "wave", formation = "v",       x = 400, count = 6},
+  {time = 240, type = "wave", formation = "v",       x = 966, count = 6},
+}
+
+-- Megalith of Memories: Endgame Raid
+-- Fly through RAM sticks, hard drive sectors, and into a spinning disk core
+-- 10-phase boss fight with puzzles, Indiana Jones obstacles, Elden Ring mechanics
+M.MEGALITH = {
+  -- === ACT I: RAM CORRIDOR (0-30s) ===
+  {time = 0,  type = "callout", message = "triggerEnemyWarning"},
+
+  -- Waves attack while navigating RAM stick gaps
+  {time = 3,  type = "wave", formation = "v",       x = 683, count = 5},
+  {time = 6,  type = "wave", formation = "line",    x = 400, count = 4},
+  {time = 6,  type = "wave", formation = "line",    x = 966, count = 4},
+  {time = 10, type = "wave", formation = "diamond", x = 683, count = 4},
+  {time = 13, type = "turret", x = 341},
+  {time = 13, type = "turret", x = 1025},
+  {time = 16, type = "wave", formation = "wave",    x = 683, count = 7},
+  {time = 20, type = "wave", formation = "v",       x = 400, count = 5},
+  {time = 20, type = "wave", formation = "v",       x = 966, count = 5},
+  {time = 24, type = "wave", formation = "triangle",x = 683, count = 6},
+  {time = 27, type = "turret", x = 200},
+  {time = 27, type = "turret", x = 683},
+  {time = 27, type = "turret", x = 1166},
+
+  -- === ACT II: SECTOR GAUNTLET (30-65s) ===
+  {time = 31, type = "callout", message = "triggerCover"},
+  {time = 33, type = "wave", formation = "v",       x = 683, count = 7},
+  {time = 36, type = "capitalship", x = 683},
+  {time = 39, type = "wave", formation = "box",     x = 500, count = 5},
+  {time = 39, type = "wave", formation = "box",     x = 866, count = 5},
+  {time = 43, type = "wave", formation = "line",    x = 683, count = 8},
+  {time = 46, type = "turret", x = 256},
+  {time = 46, type = "turret", x = 683},
+  {time = 46, type = "turret", x = 1110},
+  {time = 49, type = "wave", formation = "diamond", x = 400, count = 4},
+  {time = 49, type = "wave", formation = "diamond", x = 966, count = 4},
+  {time = 52, type = "wave", formation = "v",       x = 683, count = 8},
+  {time = 55, type = "capitalship", x = 400},
+  {time = 55, type = "capitalship", x = 966},
+  {time = 58, type = "wave", formation = "wave",    x = 683, count = 10},
+  {time = 62, type = "wave", formation = "triangle",x = 500, count = 5},
+  {time = 62, type = "wave", formation = "triangle",x = 866, count = 5},
+
+  -- === ACT III: THE CORE - BOSS (65s+) ===
+  {time = 66, type = "callout", message = "triggerBossWarning"},
+  {time = 70, type = "megalithboss"},
+
+  -- Reinforcement waves during boss fight
+  {time = 85,  type = "wave", formation = "v",       x = 500, count = 5},
+  {time = 85,  type = "wave", formation = "v",       x = 866, count = 5},
+  {time = 105, type = "wave", formation = "line",    x = 683, count = 6},
+  {time = 125, type = "wave", formation = "diamond", x = 400, count = 4},
+  {time = 125, type = "wave", formation = "diamond", x = 966, count = 4},
+  {time = 150, type = "wave", formation = "v",       x = 683, count = 8},
+  {time = 180, type = "wave", formation = "wave",    x = 683, count = 8},
+  {time = 210, type = "wave", formation = "triangle",x = 683, count = 6},
+  {time = 240, type = "wave", formation = "v",       x = 400, count = 6},
+  {time = 240, type = "wave", formation = "v",       x = 966, count = 6},
+}
+
+-- The Sphere: Final boss — Death Star core run
+-- Fly deeper into the superstructure with each phase, Return of the Jedi style
+M.SPHERE = {
+  -- === OUTER TRENCH (0-25s) ===
+  {time = 0,  type = "callout", message = "triggerEnemyWarning"},
+  {time = 2,  type = "wave", formation = "v",       x = 683, count = 6},
+  {time = 5,  type = "wave", formation = "line",    x = 512, count = 5},
+  {time = 5,  type = "wave", formation = "line",    x = 854, count = 5},
+  {time = 9,  type = "turret", x = 341},
+  {time = 9,  type = "turret", x = 1025},
+  {time = 12, type = "wave", formation = "diamond", x = 683, count = 5},
+  {time = 15, type = "capitalship", x = 683},
+  {time = 17, type = "wave", formation = "v",       x = 400, count = 6},
+  {time = 17, type = "wave", formation = "v",       x = 966, count = 6},
+  {time = 20, type = "turret", x = 200},
+  {time = 20, type = "turret", x = 500},
+  {time = 20, type = "turret", x = 866},
+  {time = 20, type = "turret", x = 1166},
+  {time = 23, type = "wave", formation = "wave",    x = 683, count = 8},
+
+  -- === INNER SUPERSTRUCTURE (25-50s) ===
+  {time = 26, type = "callout", message = "triggerCover"},
+  {time = 28, type = "capitalship", x = 400},
+  {time = 28, type = "capitalship", x = 966},
+  {time = 30, type = "wave", formation = "triangle",x = 512, count = 5},
+  {time = 30, type = "wave", formation = "triangle",x = 854, count = 5},
+  {time = 34, type = "wave", formation = "box",     x = 683, count = 6},
+  {time = 37, type = "turret", x = 341},
+  {time = 37, type = "turret", x = 683},
+  {time = 37, type = "turret", x = 1025},
+  {time = 40, type = "wave", formation = "v",       x = 683, count = 10},
+  {time = 43, type = "capitalship", x = 341},
+  {time = 43, type = "capitalship", x = 683},
+  {time = 43, type = "capitalship", x = 1025},
+  {time = 46, type = "wave", formation = "line",    x = 683, count = 12},
+  {time = 49, type = "wave", formation = "diamond", x = 400, count = 4},
+  {time = 49, type = "wave", formation = "diamond", x = 966, count = 4},
+
+  -- === APPROACHING THE CORE (50s+) ===
+  {time = 52, type = "callout", message = "triggerBossWarning"},
+  {time = 55, type = "wave", formation = "v",       x = 683, count = 8},
+  {time = 58, type = "sphereboss"},
+
+  -- Reinforcement waves during boss fight
+  {time = 75,  type = "wave", formation = "v",       x = 512, count = 5},
+  {time = 75,  type = "wave", formation = "v",       x = 854, count = 5},
+  {time = 100, type = "wave", formation = "line",    x = 683, count = 6},
+  {time = 130, type = "wave", formation = "diamond", x = 400, count = 4},
+  {time = 130, type = "wave", formation = "diamond", x = 966, count = 4},
+  {time = 160, type = "wave", formation = "v",       x = 683, count = 8},
+  {time = 200, type = "wave", formation = "wave",    x = 683, count = 8},
+  {time = 240, type = "wave", formation = "triangle",x = 683, count = 6},
+}
+
+-- The Machine: 21-phase ultimate final boss raid
+M.MACHINE = {
+  -- Opening gauntlet before The Machine awakens
+  {time = 0,  type = "callout", message = "triggerBossWarning"},
+  {time = 2,  type = "wave", formation = "v", x = 683, count = 8},
+  {time = 6,  type = "capitalship", x = 512},
+  {time = 6,  type = "capitalship", x = 854},
+  {time = 10, type = "wave", formation = "line", x = 683, count = 10},
+  {time = 14, type = "turret", x = 341},
+  {time = 14, type = "turret", x = 1025},
+  {time = 18, type = "wave", formation = "wave", x = 683, count = 12},
+  {time = 22, type = "capitalship", x = 341},
+  {time = 22, type = "capitalship", x = 683},
+  {time = 22, type = "capitalship", x = 1025},
+  {time = 26, type = "wave", formation = "diamond", x = 512, count = 6},
+  {time = 26, type = "wave", formation = "diamond", x = 854, count = 6},
+  {time = 30, type = "callout", message = "triggerCover"},
+  
+  -- The Machine awakens
+  {time = 35, type = "machineboss"},
+  
+  -- Reinforcement waves during the 21-phase battle
+  {time = 60,  type = "wave", formation = "v", x = 683, count = 6},
+  {time = 90,  type = "wave", formation = "line", x = 512, count = 5},
+  {time = 90,  type = "wave", formation = "line", x = 854, count = 5},
+  {time = 120, type = "capitalship", x = 683},
+  {time = 150, type = "wave", formation = "diamond", x = 400, count = 4},
+  {time = 150, type = "wave", formation = "diamond", x = 966, count = 4},
+  {time = 180, type = "wave", formation = "v", x = 683, count = 8}
+}
+
 function M.getEnemyCount(levelId)
   local waves = M.getWaves(levelId)
   local count = 0
@@ -483,7 +853,11 @@ function M.getEnemyCount(levelId)
     elseif wave.type == "turret" or wave.type == "capitalship" or wave.type == "mothership"
         or wave.type == "midboss" or wave.type == "finalboss" or wave.type == "area6boss"
         or wave.type == "rival" or wave.type == "venomboss" or wave.type == "wardenboss"
-        or wave.type == "sentinelboss" or wave.type == "sectorzboss" then
+        or wave.type == "sentinelboss" or wave.type == "sectorzboss" or wave.type == "dynamoboss"
+        or wave.type == "synesthesiaboss"
+        or wave.type == "megalithboss"
+        or wave.type == "raidboss"
+        or wave.type == "sphereboss" then
       count = count + 1
     elseif wave.type == "bolsestation" then
       count = count + 7
@@ -517,13 +891,25 @@ function M.getWaves(levelId)
     return M.WARDEN
   elseif levelId == 20 then
     return M.SENTINEL
+  elseif levelId == 21 then
+    return M.SYNESTHESIA
+  elseif levelId == 22 then
+    return M.MEGALITH
+  elseif levelId == 23 then
+    return M.DISTANT_DYNAMO
+  elseif levelId == 24 then
+    return M.SPHERE
+  elseif levelId == 25 then
+    return M.LOGICIAN
+  elseif levelId == 26 then
+    return M.MACHINE
   end
   return M.CORNERIA
 end
 
 function M.getName(levelId)
   local names = {
-    [1] = "CORNERIA",
+    [1] = "NEWTON'S NEBULA",
     [2] = "METEO",
     [3] = "SECTOR Y",
     [4] = "FORTUNA",
@@ -542,9 +928,15 @@ function M.getName(levelId)
     [17] = "VENOM II",
     [18] = "VENOM",
     [19] = "THE WARDEN",
-    [20] = "THE SENTINEL"
+    [20] = "THE SENTINEL",
+    [21] = "SYNESTHESIA",
+    [22] = "MEGALITH OF MEMORIES",
+    [23] = "DISTANT DYNAMO",
+    [24] = "THE SPHERE",
+    [25] = "LOGICIAN'S LAMENT",
+    [26] = "THE MACHINE"
   }
-  return names[levelId] or "CORNERIA"
+  return names[levelId] or "NEWTON'S NEBULA"
 end
 
 return M

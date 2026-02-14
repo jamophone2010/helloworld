@@ -15,8 +15,8 @@ local worldTime = 0  -- Seconds into the cycle
 local dayNumber = 1  -- For cloud seed
 
 function M.init()
-  -- Start at noon for nice initial lighting
-  worldTime = M.CYCLE_DURATION / 2
+  -- Start at random time of day
+  worldTime = math.random() * M.CYCLE_DURATION
   dayNumber = math.floor(os.time() / 86400)  -- Different clouds each real day
 end
 
@@ -246,6 +246,37 @@ function M.drawPlayerShadow(px, py)
     shadowWidth,
     shadowLength * 0.3
   )
+end
+
+-- Draw palm tree shadow
+function M.drawPalmTreeShadow(x, y, gs, variety)
+  local sdx, sdy = M.getSunDirection()
+  if sdx == 0 and sdy == 0.3 then
+    -- Night: minimal ambient shadow at base
+    love.graphics.setColor(0, 0, 0, 0.15)
+    love.graphics.ellipse("fill", x * gs + gs/2, y * gs + gs, gs * 0.4, gs * 0.2)
+    return
+  end
+
+  -- Palm tree shadows: tall trunk creates elongated shadow
+  local trunkHeight = variety == 1 and gs * 3.2 or gs * 2.8
+  local shadowLength = trunkHeight * sdy * 1.2
+  local shadowAngle = math.atan2(sdy, sdx)
+  
+  -- Trunk shadow
+  love.graphics.setColor(0, 0, 0, 0.2)
+  love.graphics.polygon("fill",
+    x * gs + gs/2 - 5, y * gs + gs,
+    x * gs + gs/2 + 5, y * gs + gs,
+    x * gs + gs/2 + 5 + sdx * shadowLength * 0.3, y * gs + gs + shadowLength,
+    x * gs + gs/2 - 5 + sdx * shadowLength * 0.3, y * gs + gs + shadowLength
+  )
+  
+  -- Crown shadow (fronds create circular shadow at top)
+  local crownX = x * gs + gs/2 + sdx * shadowLength * 0.3
+  local crownY = y * gs + gs + shadowLength
+  love.graphics.setColor(0, 0, 0, 0.15)
+  love.graphics.ellipse("fill", crownX, crownY, gs * 0.8, gs * 0.6)
 end
 
 -- Apply ambient lighting overlay

@@ -22,14 +22,24 @@ function M.getAsteroidCount(level)
   return 4 + (level.number - 1) * 2
 end
 
-function M.spawnAsteroids(level, width, height, overrideCount)
+-- Center exclusion zone: asteroids won't spawn aimed at the center 1/3 of the screen
+local CENTER_EXCLUSION = 0.33  -- fraction of screen width/height
+
+function M.spawnAsteroids(level, width, height, overrideCount, isOortCloud)
   local asteroids = {}
-  local count = overrideCount or M.getAsteroidCount(level)
+  local rawCount = overrideCount or M.getAsteroidCount(level)
+  -- Reduce asteroid count everywhere except Oort Cloud
+  local count = isOortCloud and rawCount or math.max(1, math.floor(rawCount * 0.5))
+
+  -- Center exclusion bounds
+  local cxMin = width * (0.5 - CENTER_EXCLUSION / 2)
+  local cxMax = width * (0.5 + CENTER_EXCLUSION / 2)
+  local cyMin = height * (0.5 - CENTER_EXCLUSION / 2)
+  local cyMax = height * (0.5 + CENTER_EXCLUSION / 2)
 
   for i = 1, count do
     local side = math.random(4)
     local x, y
-
     if side == 1 then
       x = -50
       y = math.random(height)
@@ -44,7 +54,22 @@ function M.spawnAsteroids(level, width, height, overrideCount)
       y = height + 50
     end
 
-    table.insert(asteroids, asteroid.new(x, y, "large"))
+    -- Pick velocity that avoids aiming into center exclusion zone
+    local speed = math.random(50, 150)
+    local angle
+    local attempts = 0
+    repeat
+      angle = math.random() * math.pi * 2
+      -- Project where asteroid would be after ~2 seconds
+      local futX = x + math.cos(angle) * speed * 2
+      local futY = y + math.sin(angle) * speed * 2
+      attempts = attempts + 1
+    until not (futX > cxMin and futX < cxMax and futY > cyMin and futY < cyMax) or attempts > 10
+
+    local a = asteroid.new(x, y, "large")
+    a.vx = math.cos(angle) * speed
+    a.vy = math.sin(angle) * speed
+    table.insert(asteroids, a)
   end
 
   return asteroids

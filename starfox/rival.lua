@@ -56,7 +56,7 @@ function M.reset()
   M.lasers = nil
 end
 
-function M.spawn(x, y, overrideHP, variant)
+function M.spawn(x, y, overrideHP, variant, noRespawn)
   local hp = overrideHP or 20
   M.rival = {
     x = x or 400,
@@ -83,6 +83,7 @@ function M.spawn(x, y, overrideHP, variant)
     burstDelay = 0,
     respawnTimer = 0,
     retreating = false,
+    noRespawn = noRespawn or false,
     variant = variant or "standard",
     teleportTimer = 0,
     teleportCooldown = 3,
@@ -179,9 +180,11 @@ function M.update(dt, playerX, playerY, playerLasers)
   if not r then return end
 
   if r.destroyed and not r.retreating then
-    r.respawnTimer = r.respawnTimer - dt
-    if r.respawnTimer <= 0 then
-      M.spawn(400, -50)
+    if not r.noRespawn then
+      r.respawnTimer = r.respawnTimer - dt
+      if r.respawnTimer <= 0 then
+        M.spawn(400, -50)
+      end
     end
     return
   end
@@ -264,13 +267,9 @@ function M.fireAtPlayer(playerX, playerY)
     width = 6,
     height = 6,
     damage = 5,
-    owner = "enemy"
+    owner = "enemy",
+    reflectable = true
   }
-
-  -- Mark teleporting rival's bullets as reflectable
-  if r.variant == "teleport" then
-    laser.reflectable = true
-  end
 
   table.insert(M.lasers, laser)
 end

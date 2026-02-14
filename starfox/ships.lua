@@ -73,10 +73,24 @@ M.defs = {
     color = {0.3, 0.3, 0.4},
     accentColor = {0.6, 0.6, 0.8},
   },
+  prototype = {
+    id = "prototype",
+    name = "Prototype",
+    type = "Experimental",
+    description = "An advanced experimental starfighter from Leucadia Labs. Blazing fast with devastating EMP weapons.",
+    healthMultiplier = 1.5,
+    speedMultiplier = 1.3,
+    dodgeMultiplier = 1.3,
+    hasSpecial = true,
+    specialName = "EMP Burst",
+    specialDesc = "Fire an EMP pulse that stuns all enemies on screen for 3s. Enemies slowed to 0.5x.",
+    color = {0.1, 0.1, 0.15},
+    accentColor = {0.0, 0.8, 1.0},
+  },
 }
 
 -- Ordered list for UI navigation
-M.order = {"starwing", "lancer", "paladin", "mistral", "phantom"}
+M.order = {"starwing", "lancer", "paladin", "mistral", "phantom", "prototype"}
 
 -- Currently selected ship (default starwing)
 local selectedShip = "starwing"

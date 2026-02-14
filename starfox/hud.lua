@@ -109,6 +109,18 @@ function M.draw(p, levelTime, callout, bossHealth, bossMaxHealth, levelName, por
   -- Special ability gauge (drawn right of dodge)
   abilities.drawGauge()
 
+  -- Stun indicator
+  if p.stunned then
+    local time = love.timer.getTime()
+    local pulse = 0.6 + 0.4 * math.sin(time * 8)
+    love.graphics.setFont(fonts.large)
+    love.graphics.setColor(0.3, 0.5, 1, pulse)
+    love.graphics.printf("EMP STUNNED", 0, screen.HEIGHT / 2 - 40, screen.WIDTH, "center")
+    love.graphics.setFont(fonts.normal)
+    love.graphics.setColor(0.5, 0.7, 1, pulse * 0.8)
+    love.graphics.printf(string.format("%.1fs", p.stunnedTimer), 0, screen.HEIGHT / 2 - 10, screen.WIDTH, "center")
+  end
+
   -- Weapon indicator
   if p.hasLaser then
     love.graphics.setFont(fonts.normal)
