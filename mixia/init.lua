@@ -1690,23 +1690,23 @@ function M.drawFloor(floorDef)
 
   -- Floor ground
   if gameState.currentFloor == 0 then
-    -- Ancient Citadel: dark stone and sand ground
-    love.graphics.setColor(0.1, 0.08, 0.05)
+    -- Ancient Citadel: very dark impassable stone ground
+    love.graphics.setColor(0.06, 0.05, 0.04)
     love.graphics.rectangle("fill", 0, 0, floorDef.width * 32, floorDef.height * 32)
 
-    -- Scattered ancient rubble and sand
+    -- Scattered ancient rubble and sand (subtle)
     math.randomseed(999)
     for i = 1, 25 do
       local px = math.random(0, floorDef.width * 32)
       local py = math.random(0, floorDef.height * 32)
-      love.graphics.setColor(0.15, 0.12, 0.07, 0.4)
+      love.graphics.setColor(0.09, 0.07, 0.05, 0.3)
       love.graphics.ellipse("fill", px, py, math.random(8, 25), math.random(4, 12))
     end
-    -- Cracked stone tiles
+    -- Rough impassable stone (cold, dark, minimal detail)
     for cy = 0, floorDef.height * 32, 32 do
       for cx = 0, floorDef.width * 32, 32 do
-        local shade = 0.08 + ((cx * 3 + cy * 7) % 11) / 150
-        love.graphics.setColor(shade, shade - 0.01, shade - 0.02, 0.3)
+        local shade = 0.05 + ((cx * 3 + cy * 7) % 11) / 250
+        love.graphics.setColor(shade, shade - 0.005, shade - 0.01, 0.25)
         love.graphics.rectangle("fill", cx + 1, cy + 1, 30, 30)
       end
     end
@@ -1797,8 +1797,8 @@ function M.drawFloor(floorDef)
 
   -- Grid pattern
   if gameState.currentFloor == 0 then
-    -- Ancient Citadel: faint stone mortar lines
-    love.graphics.setColor(0.06, 0.05, 0.03, 0.15)
+    -- Ancient Citadel: very faint mortar lines on dark ground
+    love.graphics.setColor(0.04, 0.03, 0.02, 0.08)
   elseif gameState.currentFloor == 1 then
     -- Surface: subtle root/path lines instead of grid
     love.graphics.setColor(0.08, 0.14, 0.06, 0.15)
@@ -1833,27 +1833,36 @@ function M.drawFloor(floorDef)
       local ph = (path.y2 - path.y1 + 1) * 32
 
       if gameState.currentFloor == 0 then
-        -- Ancient Citadel: worn stone path with sand
-        love.graphics.setColor(0.18, 0.14, 0.08, 0.7)
+        -- Ancient Citadel: amber/gold stone walkway (distinct from dark ground)
+        love.graphics.setColor(0.42, 0.32, 0.14, 0.9)
         love.graphics.rectangle("fill", px, py, pw, ph)
-        -- Cracked stone blocks
+        -- Carved golden sandstone blocks
         for fy = py, py + ph - 1, 20 do
           local rowOff = (math.floor((fy - py) / 20) % 2 == 0) and 0 or 10
           for fx = px + rowOff, px + pw - 1, 20 do
-            local shade = 0.16 + ((fx + fy * 3) % 11) / 100
-            love.graphics.setColor(shade, shade - 0.02, shade - 0.04, 0.4)
+            local shade = 0.38 + ((fx + fy * 3) % 11) / 55
+            love.graphics.setColor(shade, shade * 0.78, shade * 0.4, 0.6)
             love.graphics.rectangle("fill", fx + 1, fy + 1, 17, 17, 1, 1)
           end
         end
         -- Sand drifts along edges
-        love.graphics.setColor(0.22, 0.18, 0.1, 0.25)
+        love.graphics.setColor(0.5, 0.4, 0.2, 0.3)
         love.graphics.ellipse("fill", px + pw * 0.3, py + 4, pw * 0.15, 6)
         love.graphics.ellipse("fill", px + pw * 0.7, py + ph - 4, pw * 0.12, 5)
-        -- Ancient stone border
-        love.graphics.setColor(0.25, 0.2, 0.12, 0.5)
-        love.graphics.setLineWidth(2)
+        -- Torch glow accents at path corners (warm orange light pools)
+        local torchGlow = 0.18 + math.sin(t * 2.0) * 0.04
+        love.graphics.setColor(0.9, 0.55, 0.15, torchGlow)
+        love.graphics.circle("fill", px + 8, py + 8, 22)
+        love.graphics.circle("fill", px + pw - 8, py + 8, 22)
+        love.graphics.circle("fill", px + 8, py + ph - 8, 22)
+        love.graphics.circle("fill", px + pw - 8, py + ph - 8, 22)
+        -- Strong carved stone border (golden)
+        love.graphics.setColor(0.6, 0.45, 0.15, 0.75)
+        love.graphics.setLineWidth(3)
         love.graphics.rectangle("line", px, py, pw, ph)
+        love.graphics.setColor(0.7, 0.55, 0.2, 0.4)
         love.graphics.setLineWidth(1)
+        love.graphics.rectangle("line", px + 2, py + 2, pw - 4, ph - 4)
       elseif gameState.currentFloor == 1 then
         -- Surface: packed earth trail with wooden planks
         love.graphics.setColor(0.16, 0.12, 0.06, 0.7)
@@ -2721,9 +2730,9 @@ function M.drawMazeInterior(interior)
           end
         end
       else
-        -- Path tile: worn stone floor
-        local pathShade = 0.2 + ((x * 3 + y * 11) % 13) / 180
-        love.graphics.setColor(pathShade, pathShade - 0.01, pathShade - 0.03)
+        -- Path tile: worn sandy stone floor (warmer, lighter than walls)
+        local pathShade = 0.38 + ((x * 3 + y * 11) % 13) / 130
+        love.graphics.setColor(pathShade, pathShade - 0.06, pathShade - 0.14)
         love.graphics.rectangle("fill", px, py, GS, GS)
 
         -- Tile cracks and mortar

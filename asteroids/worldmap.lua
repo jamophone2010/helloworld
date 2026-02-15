@@ -5,6 +5,10 @@ local constellation = require("asteroids.constellation")
 M.GRID_MIN = -3
 M.GRID_MAX = 3
 
+-- Full world bounds (63x63)
+M.WORLD_MIN = -31
+M.WORLD_MAX = 31
+
 -- Current tile position
 M.tileX = 0
 M.tileY = 0
@@ -19,6 +23,9 @@ local tiles = {}
 
 -- Tile cache for dynamically generated tiles
 local tileCache = {}
+
+-- Discovery tracking: set of "x,y" keys the player has visited
+local discoveredTiles = {}
 
 -- Initialize special tile data (stations, portals)
 local function initTiles()
@@ -243,6 +250,8 @@ function M.init()
   M.tileY = 0
   initTiles()
   M.updateBounds()
+  -- Mark starting tile as discovered
+  M.markDiscovered(0, 0)
 end
 
 function M.updateBounds()
@@ -254,6 +263,48 @@ end
 function M.setProgression(antennaInstalled, sentinelDefeated)
   constellation.setProgression(antennaInstalled, sentinelDefeated)
   M.updateBounds()
+end
+
+-- ===== DISCOVERY SYSTEM =====
+
+function M.markDiscovered(x, y)
+  local key = x .. "," .. y
+  discoveredTiles[key] = true
+end
+
+function M.isDiscovered(x, y)
+  local key = x .. "," .. y
+  return discoveredTiles[key] == true
+end
+
+function M.getDiscoveredTiles()
+  return discoveredTiles
+end
+
+function M.setDiscoveredTiles(data)
+  discoveredTiles = data or {}
+end
+
+-- Get all special tiles (stations and portals) for world map display
+function M.getAllSpecialTiles()
+  return tiles
+end
+
+-- Check if fast travel to a tile is allowed (must be in radio range)
+function M.canFastTravel(targetX, targetY)
+  return constellation.isInRadioRange(targetX, targetY)
+end
+
+-- Get zone name for a tile
+function M.getZoneName(x, y)
+  local zone = constellation.getZone(x, y)
+  if zone == constellation.ZONE_NAMED then
+    return constellation.getConstellationName(x, y)
+  elseif zone == constellation.ZONE_DEEP_SPACE then
+    return "Deep Space"
+  else
+    return "Outer Space"
+  end
 end
 
 function M.getTile(x, y)

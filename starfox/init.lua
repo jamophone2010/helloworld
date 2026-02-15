@@ -319,7 +319,43 @@ function M.update(dt)
     terrain.update(dt)
     ui.updateVictory(dt)
   elseif gameState.state == "gameover" or gameState.state == "warp" then
+    -- Decelerate stars during gameover
+    if gameState.state == "gameover" then
+      terrain.starSpeedMultiplier = math.max(0, terrain.starSpeedMultiplier - dt * 0.5)
+    end
     terrain.update(dt)
+    particles.update(dt)
+  elseif gameState.state == "playerdeath" then
+    -- Player death during boss fight: update boss, particles, decelerate stars, count down respawn
+    terrain.starSpeedMultiplier = math.max(0.2, terrain.starSpeedMultiplier - dt * 0.5)
+    terrain.update(dt)
+    particles.update(dt)
+    -- Keep bosses animating during death
+    boss.update(dt, gameState.deathX, gameState.deathY)
+    venomboss.update(dt, gameState.deathX, gameState.deathY)
+    sectorzboss.update(dt, gameState.deathX, gameState.deathY)
+    wardenboss.update(dt, gameState.deathX, gameState.deathY)
+    sentinelboss.update(dt, gameState.deathX, gameState.deathY)
+    megalith.update(dt, gameState.deathX, gameState.deathY)
+    dynamoboss.update(dt, gameState.deathX, gameState.deathY)
+    synesthesia.update(dt, gameState.deathX, gameState.deathY)
+    raidboss.update(dt, gameState.deathX, gameState.deathY)
+    sphereboss.update(dt, gameState.deathX, gameState.deathY)
+    machineboss.update(dt, gameState.deathX, gameState.deathY)
+    mothership.update(dt, gameState.deathX, gameState.deathY)
+    bolse.update(dt, gameState.deathX, gameState.deathY)
+    rival.update(dt, gameState.deathX, gameState.deathY, {})
+    bossexplosion.update(dt)
+    gameState.deathRespawnTimer = gameState.deathRespawnTimer - dt
+    if gameState.deathRespawnTimer <= 0 then
+      -- Respawn player
+      gameState.state = "playing"
+      gameState.player.health = gameState.player.maxHealth
+      gameState.player.invulnerableTimer = 3
+      gameState.player.x = screen.WIDTH / 2
+      gameState.player.y = screen.HEIGHT - 100
+      terrain.starSpeedMultiplier = 1.0
+    end
   end
 end
 
@@ -372,6 +408,30 @@ function M.updatePlaying(dt)
     elseif targeting.active then
       local targets = targeting.releaseLocks()
       if #targets > 0 then
+        -- Check for fully-targeted squadrons and drop their shields
+        local checkedSquadrons = {}
+        for _, t in ipairs(targets) do
+          if t.ref and t.ref.squadronId and not checkedSquadrons[t.ref.squadronId] then
+            checkedSquadrons[t.ref.squadronId] = true
+            -- Check if all squadron members were targeted
+            local members = enemies.getSquadronMembers(t.ref.squadronId)
+            local allTargeted = #members > 0
+            for _, m in ipairs(members) do
+              local found = false
+              for _, tt in ipairs(targets) do
+                if tt.ref == m then found = true; break end
+              end
+              if not found then allTargeted = false; break end
+            end
+            if allTargeted then
+              enemies.dropSquadronShields(t.ref.squadronId)
+              -- Visual feedback: shield break effect
+              for _, m in ipairs(members) do
+                particles.spawn(m.x, m.y, 12, {1, 0.8, 0.2})
+              end
+            end
+          end
+        end
         weapons.fireHomingMissiles(gameState.player, targets)
       else
         weapons.shoot(gameState.player)
@@ -397,6 +457,28 @@ function M.updatePlaying(dt)
     if targeting.active then
       local targets = targeting.releaseLocks()
       if #targets > 0 then
+        -- Check for fully-targeted squadrons and drop their shields
+        local checkedSquadrons = {}
+        for _, t in ipairs(targets) do
+          if t.ref and t.ref.squadronId and not checkedSquadrons[t.ref.squadronId] then
+            checkedSquadrons[t.ref.squadronId] = true
+            local members = enemies.getSquadronMembers(t.ref.squadronId)
+            local allTargeted = #members > 0
+            for _, m in ipairs(members) do
+              local found = false
+              for _, tt in ipairs(targets) do
+                if tt.ref == m then found = true; break end
+              end
+              if not found then allTargeted = false; break end
+            end
+            if allTargeted then
+              enemies.dropSquadronShields(t.ref.squadronId)
+              for _, m in ipairs(members) do
+                particles.spawn(m.x, m.y, 12, {1, 0.8, 0.2})
+              end
+            end
+          end
+        end
         weapons.fireHomingMissiles(gameState.player, targets)
         abilities.spawnMultiLockBarrage(gameState.player.x, gameState.player.y, #targets)
         -- Extra explosion particles per target for bloom effect
@@ -504,8 +586,43 @@ function M.updatePlaying(dt)
   M.checkPortals()
 
   if not player.isAlive(gameState.player) then
+    -- Spawn death explosion at player position
+    particles.spawn(gameState.player.x, gameState.player.y, 30, {1, 0.6, 0.1})
+    particles.spawn(gameState.player.x, gameState.player.y, 20, {1, 0.2, 0})
+    particles.spawn(gameState.player.x, gameState.player.y, 10, {1, 1, 0.5})
     gameState.state = "gameover"
     prototype.onPlayerDefeated()
+  elseif gameState.player.justDied then
+    gameState.player.justDied = false
+    -- Died during boss fight (lives remaining) - check if any boss is active
+    local bossIsActive = (boss.currentBoss ~= nil and boss.currentBoss.active)
+      or mothership.isActive()
+      or bolse.isActive()
+      or rival.isActive()
+      or venomboss.isActive()
+      or sectorzboss.isActive()
+      or wardenboss.isActive()
+      or sentinelboss.isActive()
+      or megalith.isActive()
+      or dynamoboss.isActive()
+      or synesthesia.isActive()
+      or raidboss.isActive()
+      or sphereboss.isActive()
+      or machineboss.isActive()
+    if bossIsActive then
+      -- Spawn explosion particles at player position
+      particles.spawn(gameState.player.x, gameState.player.y, 30, {1, 0.6, 0.1})
+      particles.spawn(gameState.player.x, gameState.player.y, 20, {1, 0.2, 0})
+      particles.spawn(gameState.player.x, gameState.player.y, 10, {1, 1, 0.5})
+      -- Store death position and hide player off-screen during death
+      gameState.deathX = gameState.player.x
+      gameState.deathY = gameState.player.y
+      gameState.player.x = -200
+      gameState.player.y = -200
+      gameState.player.invulnerable = true
+      gameState.state = "playerdeath"
+      gameState.deathRespawnTimer = 3.0
+    end
   end
 
   -- Catch venomboss laser-reflect self-kill (bypasses checkCollisions)
@@ -3439,43 +3556,43 @@ function M.checkCollisions()
 
     if not p.invulnerable and not p.barrelRolling then
       -- Heatsink fin collisions (terrain section)
-      local finDmg = synesthesia.checkFinCollision(p.x, p.y, p.width, p.height)
-      if finDmg > 0 then
+      local finHit, finDmg = synesthesia.checkFinCollision(p.x, p.y, p.width, p.height)
+      if finHit then
         player.takeDamage(p, finDmg)
         particles.spawn(p.x, p.y, 10, {0.6, 0.6, 0.7})
       end
 
       -- Circuit trace arc damage (terrain section)
-      local arcDmg = synesthesia.checkTraceArcDamage(p.x, p.y, 20)
-      if arcDmg > 0 then
+      local arcHit, arcDmg = synesthesia.checkTraceArcDamage(p.x, p.y, 20)
+      if arcHit then
         player.takeDamage(p, arcDmg)
         particles.spawn(p.x, p.y, 12, {0.2, 0.8, 1})
       end
 
       -- Capacitor boulder collisions (terrain section)
-      local boulderDmg = synesthesia.checkBoulderCollision(p.x, p.y, p.width, p.height)
-      if boulderDmg > 0 then
+      local boulderHit, boulderDmg = synesthesia.checkBoulderCollision(p.x, p.y, p.width, p.height)
+      if boulderHit then
         player.takeDamage(p, boulderDmg)
         particles.spawn(p.x, p.y, 12, {0.4, 0.3, 0.2})
       end
 
       -- Laser grid damage (terrain section)
-      local gridDmg = synesthesia.checkLaserGridDamage(p.x, p.y, 20)
-      if gridDmg > 0 then
+      local gridHit, gridDmg = synesthesia.checkLaserGridDamage(p.x, p.y, 20)
+      if gridHit then
         player.takeDamage(p, gridDmg)
         particles.spawn(p.x, p.y, 10, {1, 0.2, 0.2})
       end
 
       -- VRM explosion damage (terrain section)
-      local vrmDmg = synesthesia.checkVRMDamage(p.x, p.y, 20)
-      if vrmDmg > 0 then
+      local vrmHit, vrmDmg = synesthesia.checkVRMDamage(p.x, p.y, 20)
+      if vrmHit then
         player.takeDamage(p, vrmDmg)
         particles.spawn(p.x, p.y, 15, {1, 0.6, 0})
       end
 
       -- PCB bridge collapse damage (terrain section)
-      local bridgeDmg = synesthesia.checkBridgeDamage(p.x, p.y, p.width, p.height)
-      if bridgeDmg > 0 then
+      local bridgeHit, bridgeDmg = synesthesia.checkBridgeDamage(p.x, p.y, p.width, p.height)
+      if bridgeHit then
         player.takeDamage(p, bridgeDmg)
         particles.spawn(p.x, p.y, 8, {0.3, 0.5, 0.2})
       end
@@ -3882,7 +3999,34 @@ function M.draw()
     prototype.drawAcquisitionScreen(love.timer.getTime())
   elseif gameState.state == "gameover" then
     ui.drawBackground()
+    ui.drawParticles()
     ui.drawGameOver(gameState.player.enemiesDefeated)
+  elseif gameState.state == "playerdeath" then
+    -- Draw the battle scene without the player ship
+    ui.drawBackground()
+    ui.drawTurrets()
+    ui.drawCapitalShips()
+    ui.drawMothership()
+    ui.drawEnemies()
+    ui.drawBoss()
+    ui.drawBolseStation()
+    ui.drawVenomBoss()
+    ui.drawSectorZBoss()
+    ui.drawWardenBoss()
+    ui.drawSentinelBoss()
+    ui.drawMegalith()
+    ui.drawDynamoBoss()
+    ui.drawSynesthesia()
+    ui.drawSphereBoss()
+    ui.drawMachineBoss()
+    raid.draw()
+    raidboss.draw()
+    ui.drawLasers()
+    ui.drawParticles()
+    bossexplosion.draw()
+    -- Show respawn countdown
+    ui.drawRespawnCountdown(gameState.deathRespawnTimer)
+    ui.drawHUD(gameState.player, terrain.getLevelTime(), boss.isActive(), levels.getName(gameState.levelId), portals.getCollected(), gameState.totalEnemiesSpawned)
   elseif gameState.state == "victory" then
     ui.drawBackground()
     ui.drawVictory(gameState.player.enemiesDefeated, gameState.totalEnemiesSpawned, gameState.notesEarned)

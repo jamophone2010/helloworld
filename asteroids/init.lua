@@ -187,6 +187,7 @@ local warpState = {
 function M.load()
   gameState.state = "playing"
   gameState.pauseMenuIndex = 1
+  gameState.pauseSubMenu = nil
   gameState.width = 1366
   gameState.height = 768
 
@@ -351,6 +352,8 @@ end
 
 function M.transitionToTile(newX, newY, shipWrapX, shipWrapY)
   worldmap.setPosition(newX, newY)
+  -- Mark the new tile as discovered
+  worldmap.markDiscovered(newX, newY)
   local oldShipX = gameState.ship.x
   local oldShipY = gameState.ship.y
   gameState.ship.x = shipWrapX
@@ -2486,11 +2489,11 @@ function M.drawMinimap()
     viewRadius = 3
     cellSize = 14
   elseif tier == constellation.TIER_INNER_SPACE then
-    viewRadius = 7 -- Show a 15x15 window centered on player
-    cellSize = 6
+    viewRadius = 5 -- Show a 11x11 window centered on player (named constellations ±10)
+    cellSize = 8
   else
-    viewRadius = 10 -- 21x21 window for outer space
-    cellSize = 4
+    viewRadius = 7 -- 15x15 window for full 63x63 world
+    cellSize = 6
   end
 
   local viewSize = (viewRadius * 2 + 1)
@@ -2798,6 +2801,12 @@ function M.drawPlaying()
 end
 
 function M.drawPauseMenu()
+  -- If world map sub-menu is active, delegate to it
+  if gameState.pauseSubMenu == "world_map" then
+    M.drawWorldMapOverlay()
+    return
+  end
+
   -- Semi-transparent overlay
   love.graphics.setColor(0, 0, 0, 0.7)
   love.graphics.rectangle("fill", 0, 0, gameState.width, gameState.height)
@@ -2809,8 +2818,8 @@ function M.drawPauseMenu()
 
   -- Menu options
   love.graphics.setFont(ui.getFont("small"))
-  local options = {"Resume", "Restart Level", "Options", "Exit to Station"}
-  local startY = 350
+  local options = {"Resume", "World Map", "Restart Level", "Options", "Exit to Station"}
+  local startY = 340
 
   for i, option in ipairs(options) do
     if i == gameState.pauseMenuIndex then
@@ -2825,7 +2834,245 @@ function M.drawPauseMenu()
   -- Instructions
   love.graphics.setFont(ui.getFont("hudLabel"))
   love.graphics.setColor(0.5, 0.5, 0.5)
-  love.graphics.printf("Arrows: Navigate | ENTER: Select | ESC: Resume", 0, 550, gameState.width, "center")
+  love.graphics.printf("Arrows: Navigate | ENTER: Select | ESC: Resume", 0, 560, gameState.width, "center")
+end
+
+-- World Map overlay (full screen, shown from pause menu)
+-- State for world map cursor
+local worldMapState = {
+  cursorX = 0,
+  cursorY = 0,
+  message = nil,
+  messageTimer = 0,
+}
+
+function M.drawWorldMapOverlay()
+  love.graphics.setColor(0, 0, 0, 0.92)
+  love.graphics.rectangle("fill", 0, 0, gameState.width, gameState.height)
+
+  local WORLD_MIN = -31
+  local WORLD_MAX = 31
+  local WORLD_SIZE = 63
+
+  local screenW = gameState.width
+  local screenH = gameState.height
+  local headerHeight = 45
+  local footerHeight = 55
+  local mapPadding = 20
+
+  local availW = screenW - mapPadding * 2
+  local availH = screenH - headerHeight - footerHeight - mapPadding
+  local cellSize = math.floor(math.min(availW / WORLD_SIZE, availH / WORLD_SIZE))
+  cellSize = math.max(cellSize, 8)
+  local mapSize = cellSize * WORLD_SIZE
+
+  local mapX = math.floor((screenW - mapSize) / 2)
+  local mapY = headerHeight + 5
+
+  -- Title
+  love.graphics.setFont(ui.getFont("title"))
+  love.graphics.setColor(0.3, 0.7, 1)
+  love.graphics.printf("WORLD MAP", 0, 8, screenW, "center")
+
+  -- Background
+  love.graphics.setColor(0.03, 0.03, 0.06, 0.95)
+  love.graphics.rectangle("fill", mapX - 2, mapY - 2, mapSize + 4, mapSize + 4)
+
+  local playerTX = worldmap.tileX
+  local playerTY = worldmap.tileY
+
+  -- Draw tiles
+  for ty = WORLD_MAX, WORLD_MIN, -1 do
+    for tx = WORLD_MIN, WORLD_MAX do
+      local drawCellX = mapX + (tx - WORLD_MIN) * cellSize
+      local drawCellY = mapY + (WORLD_MAX - ty) * cellSize
+
+      local discovered = worldmap.isDiscovered(tx, ty)
+      local tile = worldmap.getTile(tx, ty)
+      local zone = constellation.getZone(tx, ty)
+
+      if discovered then
+        if tile.type == worldmap.TILE_STATION then
+          love.graphics.setColor(0.3, 0.6, 0.9, 0.9)
+        elseif tile.type == worldmap.TILE_PORTAL then
+          love.graphics.setColor(tile.color[1] * 0.8, tile.color[2] * 0.8, tile.color[3] * 0.8, 0.9)
+        else
+          if zone == constellation.ZONE_NAMED then
+            local cId = constellation.getConstellationId(tx, ty)
+            local cData = constellation.CONSTELLATIONS[cId]
+            if cData then
+              local bg = cData.bgColor
+              love.graphics.setColor(bg[1] * 6 + 0.15, bg[2] * 6 + 0.15, bg[3] * 6 + 0.15, 0.6)
+            else
+              love.graphics.setColor(0.2, 0.2, 0.3, 0.5)
+            end
+          elseif zone == constellation.ZONE_DEEP_SPACE then
+            love.graphics.setColor(0.12, 0.12, 0.18, 0.5)
+          else
+            love.graphics.setColor(0.08, 0.08, 0.1, 0.4)
+          end
+        end
+        love.graphics.rectangle("fill", drawCellX, drawCellY, cellSize - 1, cellSize - 1)
+      else
+        if zone == constellation.ZONE_NAMED then
+          love.graphics.setColor(0.1, 0.1, 0.15, 0.25)
+        elseif zone == constellation.ZONE_DEEP_SPACE then
+          love.graphics.setColor(0.07, 0.07, 0.1, 0.2)
+        else
+          love.graphics.setColor(0.04, 0.04, 0.06, 0.15)
+        end
+        love.graphics.rectangle("fill", drawCellX, drawCellY, cellSize - 1, cellSize - 1)
+      end
+    end
+  end
+
+  -- Constellation boundary lines (7x7 blocks)
+  love.graphics.setColor(0.25, 0.25, 0.35, 0.35)
+  for i = 0, 9 do
+    local lineX = mapX + i * 7 * cellSize
+    love.graphics.line(lineX, mapY, lineX, mapY + mapSize)
+    local lineY = mapY + i * 7 * cellSize
+    love.graphics.line(mapX, lineY, mapX + mapSize, lineY)
+  end
+
+  -- Zone boundaries
+  -- Named zone outline (tiles -10..10)
+  love.graphics.setColor(0.4, 0.6, 0.8, 0.5)
+  local namedOff = ((-10) - WORLD_MIN) * cellSize
+  local namedSz = 21 * cellSize
+  love.graphics.rectangle("line", mapX + namedOff, mapY + (WORLD_MAX - 10) * cellSize, namedSz, namedSz)
+
+  -- Deep space outline (tiles -17..17)
+  love.graphics.setColor(0.5, 0.4, 0.3, 0.4)
+  local deepOff = ((-17) - WORLD_MIN) * cellSize
+  local deepSz = 35 * cellSize
+  love.graphics.rectangle("line", mapX + deepOff, mapY + (WORLD_MAX - 17) * cellSize, deepSz, deepSz)
+
+  -- Constellation labels
+  love.graphics.setFont(ui.getFont("hudLabel"))
+  local labels = {
+    {name = "The Nebula",  cx = 0,  cy = 0},
+    {name = "Gargantua",   cx = 1,  cy = 0},
+    {name = "Pleiades",    cx = -1, cy = 0},
+    {name = "Oort Cloud",  cx = 0,  cy = 1},
+    {name = "Messier",     cx = 0,  cy = -1},
+    {name = "Vela",        cx = 1,  cy = 1},
+    {name = "Pandora",     cx = -1, cy = 1},
+    {name = "Orion",       cx = -1, cy = -1},
+    {name = "Andromeda",   cx = 1,  cy = -1},
+  }
+  for _, c in ipairs(labels) do
+    local centerTileX = c.cx * 7
+    local centerTileY = c.cy * 7
+    local labelX = mapX + (centerTileX - WORLD_MIN) * cellSize
+    local labelY = mapY + (WORLD_MAX - centerTileY) * cellSize
+    love.graphics.setColor(0.5, 0.6, 0.8, 0.6)
+    love.graphics.printf(c.name, labelX - 3.5 * cellSize, labelY - cellSize * 0.3, 7 * cellSize, "center")
+  end
+
+  -- Zone labels
+  love.graphics.setColor(0.35, 0.35, 0.45, 0.45)
+  local deepLabelY = mapY + (WORLD_MAX - 14) * cellSize
+  love.graphics.printf("DEEP SPACE", mapX, deepLabelY, mapSize, "center")
+  local outerLabelY = mapY + (WORLD_MAX - 25) * cellSize
+  love.graphics.printf("OUTER SPACE", mapX, outerLabelY, mapSize, "center")
+
+  -- Special tile icons (discovered only)
+  local specialTiles = worldmap.getAllSpecialTiles()
+  for key, tile in pairs(specialTiles) do
+    local tx, ty = key:match("^(-?%d+),(-?%d+)$")
+    tx = tonumber(tx)
+    ty = tonumber(ty)
+    if tx and ty and worldmap.isDiscovered(tx, ty) then
+      local iconX = mapX + (tx - WORLD_MIN) * cellSize + cellSize / 2
+      local iconY = mapY + (WORLD_MAX - ty) * cellSize + cellSize / 2
+      local iconR = math.max(2, cellSize * 0.35)
+      if tile.type == worldmap.TILE_STATION then
+        love.graphics.setColor(0.3, 0.8, 1, 1)
+        love.graphics.rectangle("fill", iconX - iconR, iconY - iconR, iconR * 2, iconR * 2)
+      elseif tile.type == worldmap.TILE_PORTAL then
+        love.graphics.setColor(tile.color[1], tile.color[2], tile.color[3], 1)
+        love.graphics.polygon("fill",
+          iconX, iconY - iconR,
+          iconX + iconR, iconY,
+          iconX, iconY + iconR,
+          iconX - iconR, iconY)
+      end
+    end
+  end
+
+  -- Cursor
+  local curX = mapX + (worldMapState.cursorX - WORLD_MIN) * cellSize
+  local curY = mapY + (WORLD_MAX - worldMapState.cursorY) * cellSize
+  local pulse = math.sin(love.timer.getTime() * 4) * 0.3 + 0.7
+  love.graphics.setColor(1, 1, 0, pulse)
+  love.graphics.setLineWidth(2)
+  love.graphics.rectangle("line", curX - 1, curY - 1, cellSize + 1, cellSize + 1)
+  love.graphics.setLineWidth(1)
+
+  -- Player marker
+  local plX = mapX + (playerTX - WORLD_MIN) * cellSize + cellSize / 2
+  local plY = mapY + (WORLD_MAX - playerTY) * cellSize + cellSize / 2
+  love.graphics.setColor(0, 1, 0, 0.9)
+  love.graphics.circle("fill", plX, plY, math.max(2, cellSize * 0.3))
+
+  -- Info footer
+  local infoY = mapY + mapSize + 4
+  love.graphics.setFont(ui.getFont("hudLabel"))
+
+  -- Tile info
+  local cursorTile = worldmap.getTile(worldMapState.cursorX, worldMapState.cursorY)
+  local cursorZone = constellation.getZone(worldMapState.cursorX, worldMapState.cursorY)
+  local zoneName = worldmap.getZoneName(worldMapState.cursorX, worldMapState.cursorY)
+  local discovered = worldmap.isDiscovered(worldMapState.cursorX, worldMapState.cursorY)
+  local inRange = worldmap.canFastTravel(worldMapState.cursorX, worldMapState.cursorY)
+
+  love.graphics.setColor(0.8, 0.8, 0.9)
+  local tileLabel = "(" .. worldMapState.cursorX .. ", " .. worldMapState.cursorY .. ") " .. zoneName
+  if discovered and cursorTile.type ~= worldmap.TILE_EMPTY then
+    tileLabel = tileLabel .. " — " .. (cursorTile.name or "")
+  elseif not discovered then
+    tileLabel = tileLabel .. " (Unexplored)"
+  end
+  love.graphics.print(tileLabel, mapX, infoY)
+
+  -- Radio range status
+  if inRange then
+    love.graphics.setColor(0.3, 1, 0.4)
+    love.graphics.printf("● IN RANGE — ENTER to Fast Travel", 0, infoY, screenW - mapX, "right")
+  else
+    love.graphics.setColor(0.7, 0.3, 0.3)
+    love.graphics.printf("○ OUT OF RANGE", 0, infoY, screenW - mapX, "right")
+  end
+
+  -- Status message
+  if worldMapState.message then
+    love.graphics.setFont(ui.getFont("hudSmall"))
+    love.graphics.setColor(1, 0.4, 0.3, 0.9)
+    love.graphics.printf(worldMapState.message, 0, infoY + 15, screenW, "center")
+  end
+
+  -- Legend row
+  love.graphics.setFont(ui.getFont("hudSmall"))
+  local legY = infoY + 14
+  love.graphics.setColor(0.5, 0.5, 0.6)
+  love.graphics.print("Legend:", mapX, legY)
+  love.graphics.setColor(0.3, 0.8, 1)
+  love.graphics.rectangle("fill", mapX + 48, legY + 2, 7, 7)
+  love.graphics.setColor(0.6, 0.6, 0.7)
+  love.graphics.print("Station", mapX + 58, legY)
+  love.graphics.setColor(0.8, 0.5, 0.3)
+  love.graphics.polygon("fill", mapX + 120, legY + 1, mapX + 124, legY + 5, mapX + 120, legY + 9, mapX + 116, legY + 5)
+  love.graphics.setColor(0.6, 0.6, 0.7)
+  love.graphics.print("Portal", mapX + 128, legY)
+  love.graphics.setColor(0, 1, 0)
+  love.graphics.circle("fill", mapX + 186, legY + 5, 3)
+  love.graphics.setColor(0.6, 0.6, 0.7)
+  love.graphics.print("You", mapX + 192, legY)
+
+  -- Controls
+  love.graphics.setColor(0.5, 0.5, 0.5)
+  love.graphics.printf("Arrows: Move | ENTER: Fast Travel | P: Center on Player | ESC: Back", 0, screenH - 18, screenW, "center")
 end
 
 function M.drawEdgeHit()
@@ -3766,16 +4013,73 @@ function M.keypressed(key)
   end
 
   if gameState.state == "paused" then
+    -- World map sub-menu input
+    if gameState.pauseSubMenu == "world_map" then
+      if key == "escape" then
+        gameState.pauseSubMenu = nil
+        worldMapState.message = nil
+      elseif key == "up" then
+        worldMapState.cursorY = math.min(31, worldMapState.cursorY + 1)
+      elseif key == "down" then
+        worldMapState.cursorY = math.max(-31, worldMapState.cursorY - 1)
+      elseif key == "left" then
+        worldMapState.cursorX = math.max(-31, worldMapState.cursorX - 1)
+      elseif key == "right" then
+        worldMapState.cursorX = math.min(31, worldMapState.cursorX + 1)
+      elseif key == "p" then
+        worldMapState.cursorX = worldmap.tileX
+        worldMapState.cursorY = worldmap.tileY
+      elseif key == "return" or key == "space" then
+        -- Attempt fast travel
+        if worldMapState.cursorX == worldmap.tileX and worldMapState.cursorY == worldmap.tileY then
+          worldMapState.message = "You are already here!"
+          worldMapState.messageTimer = 2
+        elseif not worldmap.canFastTravel(worldMapState.cursorX, worldMapState.cursorY) then
+          local zone = constellation.getZone(worldMapState.cursorX, worldMapState.cursorY)
+          if zone == constellation.ZONE_OUTER_SPACE then
+            worldMapState.message = "Cannot fast travel: Outer Space is beyond radio range"
+          elseif zone == constellation.ZONE_DEEP_SPACE then
+            worldMapState.message = "Cannot fast travel: need Power Amplifier for Deep Space"
+          else
+            worldMapState.message = "Cannot fast travel: need Mega Antenna for radio comms"
+          end
+          worldMapState.messageTimer = 3
+        elseif worldMapState.cursorX < worldmap.GRID_MIN or worldMapState.cursorX > worldmap.GRID_MAX or
+               worldMapState.cursorY < worldmap.GRID_MIN or worldMapState.cursorY > worldmap.GRID_MAX then
+          worldMapState.message = "Cannot fast travel: sector not yet accessible"
+          worldMapState.messageTimer = 2
+        else
+          -- Fast travel via tile transition
+          local targetX = worldMapState.cursorX
+          local targetY = worldMapState.cursorY
+          gameState.pauseSubMenu = nil
+          worldMapState.message = nil
+          gameState.state = "playing"
+          M.startFade(function()
+            M.transitionToTile(targetX, targetY, gameState.width / 2, gameState.height / 2)
+          end)
+        end
+      end
+      -- Update message timer
+      if worldMapState.messageTimer > 0 then
+        worldMapState.messageTimer = worldMapState.messageTimer - 0.016 -- approx dt
+        if worldMapState.messageTimer <= 0 then
+          worldMapState.message = nil
+        end
+      end
+      return
+    end
+
     if key == "escape" then
       gameState.state = "playing"
     elseif key == "up" then
       gameState.pauseMenuIndex = gameState.pauseMenuIndex - 1
       if gameState.pauseMenuIndex < 1 then
-        gameState.pauseMenuIndex = 4
+        gameState.pauseMenuIndex = 5
       end
     elseif key == "down" then
       gameState.pauseMenuIndex = gameState.pauseMenuIndex + 1
-      if gameState.pauseMenuIndex > 4 then
+      if gameState.pauseMenuIndex > 5 then
         gameState.pauseMenuIndex = 1
       end
     elseif key == "return" or key == "space" then
@@ -3783,13 +4087,19 @@ function M.keypressed(key)
         -- Resume
         gameState.state = "playing"
       elseif gameState.pauseMenuIndex == 2 then
+        -- World Map
+        gameState.pauseSubMenu = "world_map"
+        worldMapState.cursorX = worldmap.tileX
+        worldMapState.cursorY = worldmap.tileY
+        worldMapState.message = nil
+      elseif gameState.pauseMenuIndex == 3 then
         -- Restart Level: restore missiles to entry count and restart
         gameState.ship.missiles = gameState.ship.missileEntryCount
         M.startGame()
-      elseif gameState.pauseMenuIndex == 3 then
+      elseif gameState.pauseMenuIndex == 4 then
         -- Options (placeholder)
         gameState.state = "playing"  -- For now, just resume
-      elseif gameState.pauseMenuIndex == 4 then
+      elseif gameState.pauseMenuIndex == 5 then
         -- Exit to Station with fade
         M.startFade(function()
           if M.returnToHub then
@@ -3830,6 +4140,7 @@ function M.keypressed(key)
     if key == "escape" then
       gameState.state = "paused"
       gameState.pauseMenuIndex = 1
+      gameState.pauseSubMenu = nil
     elseif key == "return" or key == "space" then
       -- Check for portal warp
       if portalState.nearPortal and portalState.portalInfo and not warpState.active then

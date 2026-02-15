@@ -52,6 +52,7 @@ function M.new(startFromPortal)
     portalEntryActive = startFromPortal or false,
     stunned = false,
     stunnedTimer = 0,
+    justDied = false,
   }
 end
 
@@ -196,6 +197,7 @@ function M.takeDamage(player, amount)
     if player.lives > 0 then
       player.health = player.maxHealth
       player.invulnerableTimer = 2
+      player.justDied = true  -- Flag for boss fight death/respawn
     end
     return true
   end

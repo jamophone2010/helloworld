@@ -259,12 +259,21 @@ function returnToHub(stationInfo)
     -- Return to Ship (from space) vs Return to Station (from planet map)
     if fromPlanetMap then
       pauseMenu.returnToShip = nil
+      pauseMenu.onFastTravel = nil
       pauseMenu.returnToStation = function()
         switchToGame("planetmap")
       end
     else
       pauseMenu.returnToShip = leucadia.returnToAsteroids
       pauseMenu.returnToStation = nil
+      pauseMenu.onFastTravel = function(tileX, tileY)
+        switchToGame("asteroids")
+        if gameModules.asteroids then
+          gameModules.asteroids.restoreFromPortal()
+          local wm = require("asteroids.worldmap")
+          gameModules.asteroids.transitionToTile(tileX, tileY, 683, 384)
+        end
+      end
     end
   elseif hubType == "singularity" then
     singularity.setFadeInFromStarfox(true)
@@ -284,12 +293,21 @@ function returnToHub(stationInfo)
     -- Return to Ship (from space) vs Return to Station (from planet map)
     if fromPlanetMap then
       pauseMenu.returnToShip = nil
+      pauseMenu.onFastTravel = nil
       pauseMenu.returnToStation = function()
         switchToGame("planetmap")
       end
     else
       pauseMenu.returnToShip = singularity.returnToAsteroids
       pauseMenu.returnToStation = nil
+      pauseMenu.onFastTravel = function(tileX, tileY)
+        switchToGame("asteroids")
+        if gameModules.asteroids then
+          gameModules.asteroids.restoreFromPortal()
+          local wm = require("asteroids.worldmap")
+          gameModules.asteroids.transitionToTile(tileX, tileY, 683, 384)
+        end
+      end
     end
   elseif hubType == "mixia" then
     mixia.setFadeInFromStarfox(true)
@@ -309,12 +327,21 @@ function returnToHub(stationInfo)
     -- Return to Ship (from space) vs Return to Station (from planet map)
     if fromPlanetMap then
       pauseMenu.returnToShip = nil
+      pauseMenu.onFastTravel = nil
       pauseMenu.returnToStation = function()
         switchToGame("planetmap")
       end
     else
       pauseMenu.returnToShip = mixia.returnToAsteroids
       pauseMenu.returnToStation = nil
+      pauseMenu.onFastTravel = function(tileX, tileY)
+        switchToGame("asteroids")
+        if gameModules.asteroids then
+          gameModules.asteroids.restoreFromPortal()
+          local wm = require("asteroids.worldmap")
+          gameModules.asteroids.transitionToTile(tileX, tileY, 683, 384)
+        end
+      end
     end
   else
     -- Default to Hometown Station hub
@@ -323,6 +350,7 @@ function returnToHub(stationInfo)
     hub.returnFromGame()
     pauseMenu.returnToShip = nil
     pauseMenu.returnToStation = nil
+    pauseMenu.onFastTravel = nil
   end
 end
 
@@ -578,6 +606,7 @@ function love.load()
       end
       pauseMenu.returnToShip = nil
       pauseMenu.returnToStation = nil
+      pauseMenu.onFastTravel = nil
 
     elseif entry.type == "hub_area" then
       -- Warp to a non-floor hub (leucadia, singularity)
@@ -597,6 +626,7 @@ function love.load()
       end
       pauseMenu.returnToShip = nil
       pauseMenu.returnToStation = nil
+      pauseMenu.onFastTravel = nil
 
     elseif entry.type == "constellation" then
       -- Warp to a constellation center in asteroids

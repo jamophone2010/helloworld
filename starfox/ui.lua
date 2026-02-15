@@ -226,14 +226,11 @@ function M.drawPlayer(player, introTimer)
   local yOffset = 0
   if introTimer then
     if introTimer < 2.5 then
-      -- Off-screen at bottom
       yOffset = 700
     elseif introTimer < 4.5 then
-      -- Slide in over 2 seconds (from 2.5s to 4.5s)
       local slideProgress = (introTimer - 2.5) / 2.0
       yOffset = 700 * (1.0 - slideProgress)
     else
-      -- Clamp to 0 once fully transitioned
       yOffset = 0
     end
   end
@@ -243,18 +240,26 @@ function M.drawPlayer(player, introTimer)
     return
   end
 
-  -- Get player draw alpha (for Phantom phase cloak)
   local playerAlpha = abilities.getPlayerAlpha()
+  local time = love.timer.getTime()
 
-  -- Dodge trail effect
+  -- Get ship colors from definition
+  local def = ships.getSelectedDef()
+  local c = def and def.color or {0.3, 0.5, 1.0}
+  local ac = def and def.accentColor or {0.5, 0.7, 1.0}
+
+  -- Dodge trail effect (uses ship accent color)
   if player.dodging then
-    for i = 1, 3 do
-      local alpha = 0.3 - (i * 0.08)
-      local offset = i * 25 * (player.dodgeDirection == "left" and 1 or -1)
+    for i = 1, 4 do
+      local alpha = (0.35 - i * 0.07) * playerAlpha
+      local offset = i * 22 * (player.dodgeDirection == "left" and 1 or -1)
       love.graphics.push()
-      love.graphics.translate(player.x + offset, player.y)
-      love.graphics.setColor(0.3, 0.5, 1, alpha)
-      love.graphics.polygon("fill", 0, -20, -15, 15, 15, 15)
+      love.graphics.translate(player.x + offset, player.y + yOffset)
+      -- Ghost Arwing silhouette
+      love.graphics.setColor(ac[1], ac[2], ac[3], alpha * 0.5)
+      love.graphics.polygon("fill", 0, -22, -10, 8, 10, 8)
+      love.graphics.polygon("fill", -24, 6, -10, 0, -10, 8, -22, 10)
+      love.graphics.polygon("fill", 24, 6, 10, 0, 10, 8, 22, 10)
       love.graphics.pop()
     end
   end
@@ -262,67 +267,133 @@ function M.drawPlayer(player, introTimer)
   love.graphics.push()
   love.graphics.translate(player.x, player.y + yOffset)
 
+  -- == ENGINE GLOW (behind everything) ==
+  local thrustPulse = 0.7 + 0.3 * math.sin(time * 18)
+  -- Main thruster bloom
+  love.graphics.setColor(ac[1], ac[2], ac[3], 0.06 * playerAlpha * thrustPulse)
+  love.graphics.circle("fill", 0, 12, 28)
+  love.graphics.setColor(c[1], c[2], c[3], 0.12 * playerAlpha * thrustPulse)
+  love.graphics.circle("fill", 0, 14, 14)
+  -- Thruster exhaust flames
+  local flicker = math.sin(time * 35) * 3
+  love.graphics.setColor(ac[1], ac[2], ac[3], 0.7 * playerAlpha * thrustPulse)
+  love.graphics.polygon("fill", -3, 10, 3, 10, 1, 20 + flicker, -1, 20 + flicker)
+  love.graphics.setColor(1, 1, 1, 0.5 * playerAlpha * thrustPulse)
+  love.graphics.polygon("fill", -1.5, 10, 1.5, 10, 0.5, 16 + flicker * 0.5, -0.5, 16 + flicker * 0.5)
+  -- Wing engine glows
+  love.graphics.setColor(ac[1], ac[2], ac[3], 0.5 * playerAlpha * thrustPulse)
+  love.graphics.circle("fill", -19, 10, 3)
+  love.graphics.circle("fill", 19, 10, 3)
+  love.graphics.setColor(1, 1, 1, 0.3 * playerAlpha * thrustPulse)
+  love.graphics.circle("fill", -19, 10, 1.5)
+  love.graphics.circle("fill", 19, 10, 1.5)
+
   -- Barrel roll shield (semicircle in front)
   if player.barrelRolling then
-    -- Glow effect (narrow radius)
     for i = 3, 1, -1 do
       local glowRadius = 35 + i * 2
       local alpha = 0.15 * (4 - i) / 3
-      love.graphics.setColor(0.3, 0.8, 1, alpha)
+      love.graphics.setColor(ac[1], ac[2], ac[3], alpha)
       love.graphics.setLineWidth(3)
       love.graphics.arc("line", "open", 0, 0, glowRadius, -math.pi/2 - math.pi/3, -math.pi/2 + math.pi/3)
     end
-
-    -- Main shield arc (no radial lines)
     love.graphics.setColor(0.5, 1, 1, 0.8)
     love.graphics.setLineWidth(2)
     love.graphics.arc("line", "open", 0, 0, 35, -math.pi/2 - math.pi/3, -math.pi/2 + math.pi/3)
     love.graphics.setLineWidth(1)
   end
 
-  love.graphics.setColor(0.3, 0.5, 1, playerAlpha)
-  love.graphics.polygon("fill", 0, -20, -15, 15, 15, 15)
+  -- == MAIN ARWING BODY (Asteroids-style: filled hull + wireframe) ==
+  -- Fuselage (main body triangle)
+  local bodyPoints = {0, -22, -10, 8, -3, 10, 3, 10, 10, 8}
+  -- Wings (swept-back like SF64 Arwing)
+  local leftWing = {-10, 0, -26, 6, -24, 10, -10, 8}
+  local rightWing = {10, 0, 26, 6, 24, 10, 10, 8}
+  -- Wing tips (vertical fins)
+  local leftFin = {-24, 4, -28, -2, -26, 6}
+  local rightFin = {24, 4, 28, -2, 26, 6}
+  -- Nose cone extension
+  local noseCone = {0, -22, -4, -16, 4, -16}
 
-  love.graphics.setColor(0.5, 0.7, 1, playerAlpha)
-  love.graphics.polygon("fill", -25, 10, -15, 5, -15, 15, -25, 15)
-  love.graphics.polygon("fill", 25, 10, 15, 5, 15, 15, 25, 15)
+  -- Subtle ambient glow around ship
+  love.graphics.setColor(c[1], c[2], c[3], 0.05 * playerAlpha)
+  love.graphics.circle("fill", 0, -2, 32)
 
-  love.graphics.setColor(1, 1, 1, playerAlpha)
-  love.graphics.polygon("line", 0, -20, -15, 15, 15, 15)
+  -- Filled hull panels
+  love.graphics.setColor(c[1] * 0.4, c[2] * 0.4, c[3] * 0.4, 0.75 * playerAlpha)
+  love.graphics.polygon("fill", unpack(bodyPoints))
+  love.graphics.setColor(c[1] * 0.35, c[2] * 0.35, c[3] * 0.35, 0.7 * playerAlpha)
+  love.graphics.polygon("fill", unpack(leftWing))
+  love.graphics.polygon("fill", unpack(rightWing))
+  love.graphics.setColor(c[1] * 0.5, c[2] * 0.5, c[3] * 0.5, 0.6 * playerAlpha)
+  love.graphics.polygon("fill", unpack(leftFin))
+  love.graphics.polygon("fill", unpack(rightFin))
 
+  -- Bright nose cone
+  love.graphics.setColor(ac[1] * 0.6, ac[2] * 0.6, ac[3] * 0.6, 0.8 * playerAlpha)
+  love.graphics.polygon("fill", unpack(noseCone))
+
+  -- Wireframe edges (bright ship color)
+  love.graphics.setColor(c[1], c[2], c[3], playerAlpha)
+  love.graphics.polygon("line", unpack(bodyPoints))
+  love.graphics.polygon("line", unpack(leftWing))
+  love.graphics.polygon("line", unpack(rightWing))
+  love.graphics.setColor(ac[1], ac[2], ac[3], 0.8 * playerAlpha)
+  love.graphics.polygon("line", unpack(leftFin))
+  love.graphics.polygon("line", unpack(rightFin))
+  love.graphics.polygon("line", unpack(noseCone))
+
+  -- Hull detail lines (panel seams)
+  love.graphics.setColor(c[1] * 0.7, c[2] * 0.7, c[3] * 0.7, 0.4 * playerAlpha)
+  love.graphics.line(-5, -8, -10, 4)  -- Left hull seam
+  love.graphics.line(5, -8, 10, 4)   -- Right hull seam
+  love.graphics.line(-14, 4, -22, 8)  -- Left wing seam
+  love.graphics.line(14, 4, 22, 8)   -- Right wing seam
+
+  -- Cockpit canopy (glowing blue-white dome)
+  love.graphics.setColor(0.4, 0.85, 1, 0.6 * playerAlpha)
+  love.graphics.ellipse("fill", 0, -6, 4, 6)
+  love.graphics.setColor(0.7, 0.95, 1, 0.8 * playerAlpha)
+  love.graphics.ellipse("fill", 0, -7, 2.5, 4)
+  love.graphics.setColor(1, 1, 1, 0.5 * playerAlpha)
+  love.graphics.circle("fill", -1, -9, 1.2)  -- Canopy highlight
+
+  -- G-Diffuser vents (glowing slots on wings)
+  local ventPulse = 0.5 + 0.5 * math.sin(time * 6)
+  love.graphics.setColor(ac[1], ac[2], ac[3], 0.4 * playerAlpha * ventPulse)
+  love.graphics.rectangle("fill", -22, 5, 8, 2)
+  love.graphics.rectangle("fill", 14, 5, 8, 2)
+  love.graphics.setColor(1, 1, 1, 0.2 * playerAlpha * ventPulse)
+  love.graphics.rectangle("fill", -21, 5.5, 6, 1)
+  love.graphics.rectangle("fill", 15, 5.5, 6, 1)
+
+  -- Charge effect at nose
   if player.charging and player.chargeLevel > 0.2 then
     local size = 5 + player.chargeLevel * 15
-    love.graphics.setColor(0.3, 0.8, 1, 0.5 + player.chargeLevel * 0.5)
-    love.graphics.circle("fill", 0, -20, size)
+    love.graphics.setColor(ac[1], ac[2], ac[3], (0.5 + player.chargeLevel * 0.5) * playerAlpha)
+    love.graphics.circle("fill", 0, -22, size)
+    love.graphics.setColor(1, 1, 1, 0.4 * player.chargeLevel * playerAlpha)
+    love.graphics.circle("fill", 0, -22, size * 0.5)
   end
 
-  -- Paladin charge indicator (green/shield color)
+  -- Paladin charge indicator
   if weapons.paladinCharging and weapons.paladinChargeLevel > 0.1 then
-    local time = love.timer.getTime()
     local pulse = 0.6 + 0.4 * math.sin(time * 15)
     local size = 10 + weapons.paladinChargeLevel * 40
-
-    -- Outer glow rings
     for i = 3, 1, -1 do
       local ringSize = size * (1 + i * 0.3)
       local ringAlpha = (0.2 / i) * pulse
       love.graphics.setColor(0.3, 1, 0.5, ringAlpha * playerAlpha)
       love.graphics.circle("fill", 0, -25, ringSize)
     end
-
-    -- Main charge orb
     love.graphics.setColor(0.4, 1, 0.6, (0.6 + weapons.paladinChargeLevel * 0.4) * pulse * playerAlpha)
     love.graphics.circle("fill", 0, -25, size)
-
-    -- Bright core
     love.graphics.setColor(1, 1, 1, 0.8 * pulse * playerAlpha)
     love.graphics.circle("fill", 0, -25, size * 0.5)
   end
 
-  -- EMP stun effect: crackling electricity around ship
+  -- EMP stun effect
   if player.stunned then
-    local time = love.timer.getTime()
-    -- Blue-white electric arcs around ship
     for i = 1, 6 do
       local angle = (time * 8 + i * math.pi / 3) % (math.pi * 2)
       local r = 20 + math.sin(time * 12 + i) * 8
@@ -333,11 +404,9 @@ function M.drawPlayer(player, introTimer)
       love.graphics.setColor(0.3, 0.6, 1, 0.7 + math.sin(time * 20 + i) * 0.3)
       love.graphics.setLineWidth(2)
       love.graphics.line(ex, ey, ex2, ey2)
-      -- Small spark at end
       love.graphics.setColor(0.8, 0.9, 1, 0.9)
       love.graphics.circle("fill", ex, ey, 2)
     end
-    -- Pulsing blue overlay
     local stunPulse = 0.15 + 0.1 * math.sin(time * 10)
     love.graphics.setColor(0.2, 0.4, 1, stunPulse)
     love.graphics.circle("fill", 0, 0, 25)
@@ -456,8 +525,47 @@ function M.drawLasers()
       love.graphics.setColor(1, 1, 1, 0.8 * pulse)
       love.graphics.rectangle("fill", laser.x - laser.width/4, laser.y - laser.height/2, laser.width/2, laser.height)
     else
-      love.graphics.setColor(r, g, b)
-      love.graphics.rectangle("fill", laser.x - laser.width/2, laser.y - laser.height/2, laser.width, laser.height)
+      local t = love.timer.getTime()
+      local pulse = math.sin(t * 12 + laser.x * 0.3 + laser.y * 0.2) * 0.15 + 0.85
+
+      if laser.owner == "player" then
+        -- Outer bloom halo
+        love.graphics.setColor(r, g, b, 0.06 * pulse)
+        love.graphics.circle("fill", laser.x, laser.y, laser.width * 5)
+        -- Mid bloom
+        love.graphics.setColor(r, g, b, 0.14 * pulse)
+        love.graphics.circle("fill", laser.x, laser.y, laser.width * 3)
+        -- Inner glow
+        love.graphics.setColor(r, g, b, 0.35 * pulse)
+        love.graphics.circle("fill", laser.x, laser.y, laser.width * 1.5)
+        -- Core bullet
+        love.graphics.setColor(r * 1.2, g * 1.2, b * 0.7, 0.95)
+        love.graphics.rectangle("fill", laser.x - laser.width/2, laser.y - laser.height/2, laser.width, laser.height)
+        -- Hot white center
+        love.graphics.setColor(1, 1, 1, 0.85)
+        love.graphics.rectangle("fill", laser.x - laser.width/4, laser.y - laser.height/3, laser.width/2, laser.height * 0.6)
+        -- Motion trail (2 trailing dots)
+        local speed = math.sqrt((laser.vx or 0)^2 + laser.vy^2)
+        if speed > 10 then
+          local nx, ny = (laser.vx or 0) / speed, laser.vy / speed
+          for i = 1, 2 do
+            local d = i * 6
+            local ta = 0.3 - i * 0.1
+            love.graphics.setColor(r, g, b, ta * pulse)
+            love.graphics.circle("fill", laser.x - nx * d, laser.y - ny * d, laser.width * (0.6 - i * 0.15))
+          end
+        end
+      else
+        -- Enemy laser with glow
+        love.graphics.setColor(r, g, b, 0.08 * pulse)
+        love.graphics.circle("fill", laser.x, laser.y, laser.width * 4)
+        love.graphics.setColor(r, g, b, 0.2 * pulse)
+        love.graphics.circle("fill", laser.x, laser.y, laser.width * 2)
+        love.graphics.setColor(r, g, b, 0.9)
+        love.graphics.rectangle("fill", laser.x - laser.width/2, laser.y - laser.height/2, laser.width, laser.height)
+        love.graphics.setColor(1, 0.8, 0.8, 0.6)
+        love.graphics.rectangle("fill", laser.x - laser.width/4, laser.y - laser.height/3, laser.width/2, laser.height * 0.5)
+      end
     end
   end
 end
@@ -501,10 +609,54 @@ function M.drawMissiles()
       love.graphics.setColor(0.2, 0.6, 1, 0.5 * pulse)
       love.graphics.rectangle("fill", m.x - 3, m.y + m.height/2, 6, 10)
     else
-      love.graphics.setColor(1, 0.8, 0)
-      love.graphics.rectangle("fill", m.x - m.width/2, m.y - m.height/2, m.width, m.height)
-      love.graphics.setColor(1, 0.5, 0, 0.6)
-      love.graphics.rectangle("fill", m.x - 3, m.y + m.height/2, 6, 8)
+      local time = love.timer.getTime()
+      local pulse = 0.7 + 0.3 * math.sin(time * 14 + m.x * 0.3)
+
+      -- Compute missile angle from velocity
+      local mAngle = math.atan2(m.vy, m.vx)
+
+      -- Outer bloom halo
+      love.graphics.setColor(1, 0.5, 0.1, 0.06 * pulse)
+      love.graphics.circle("fill", m.x, m.y, 18)
+      -- Mid glow
+      love.graphics.setColor(1, 0.6, 0.15, 0.15 * pulse)
+      love.graphics.circle("fill", m.x, m.y, 10)
+
+      -- Missile body (arrow shape oriented along velocity)
+      love.graphics.push()
+      love.graphics.translate(m.x, m.y)
+      love.graphics.rotate(mAngle + math.pi/2)  -- Nose points in direction of travel
+      -- Filled hull
+      love.graphics.setColor(0.9, 0.45, 0.1, 0.85)
+      love.graphics.polygon("fill", 0, -8, -4, 4, 4, 4)
+      -- Wireframe edge
+      love.graphics.setColor(1, 0.7, 0.3, 0.9)
+      love.graphics.polygon("line", 0, -8, -4, 4, 4, 4)
+      -- Fins
+      love.graphics.setColor(0.8, 0.3, 0.1, 0.7)
+      love.graphics.polygon("fill", -4, 2, -7, 5, -4, 4)
+      love.graphics.polygon("fill", 4, 2, 7, 5, 4, 4)
+      -- Exhaust flame (flickering)
+      local flicker = math.sin(time * 30) * 2
+      love.graphics.setColor(1, 0.6, 0, 0.9 * pulse)
+      love.graphics.polygon("fill", -2, 4, 2, 4, 0.5, 11 + flicker, -0.5, 11 + flicker)
+      love.graphics.setColor(1, 0.9, 0.5, 0.7 * pulse)
+      love.graphics.polygon("fill", -1, 4, 1, 4, 0, 8 + flicker * 0.5)
+      love.graphics.pop()
+
+      -- Hot white tip
+      local tipX = m.x + math.cos(mAngle) * 6
+      local tipY = m.y + math.sin(mAngle) * 6
+      love.graphics.setColor(1, 1, 0.8, 0.9)
+      love.graphics.circle("fill", tipX, tipY, 2)
+
+      -- Motion trail sparks
+      for j = 1, 2 do
+        local trailX = m.x - math.cos(mAngle) * j * 8
+        local trailY = m.y - math.sin(mAngle) * j * 8
+        love.graphics.setColor(1, 0.5, 0.1, (0.3 - j * 0.1) * pulse)
+        love.graphics.circle("fill", trailX, trailY, 3 - j * 0.5)
+      end
     end
   end
 end
@@ -674,6 +826,26 @@ function M.drawTargetingCrosshairs(player)
         else
           love.graphics.circle("line", enemy.x, enemy.y, size*0.7)
         end
+
+        -- Squadron indicator: show link status
+        if enemy.squadronId then
+          local time = love.timer.getTime()
+          local sqPulse = 0.5 + 0.5 * math.sin(time * 8)
+          -- Gold hexagonal outline for squadron members
+          love.graphics.setColor(1, 0.85, 0.3, 0.6 * sqPulse)
+          local hexPts = {}
+          for h = 0, 5 do
+            local a = (h / 6) * math.pi * 2 + time * 1.5
+            table.insert(hexPts, enemy.x + math.cos(a) * (size + 4))
+            table.insert(hexPts, enemy.y + math.sin(a) * (size + 4))
+          end
+          love.graphics.polygon("line", hexPts)
+          -- "LINK" text hint if shielded
+          if enemy.squadronShielded then
+            love.graphics.setColor(1, 0.9, 0.4, 0.7)
+            love.graphics.printf("LINK", enemy.x - 20, enemy.y + size + 4, 40, "center")
+          end
+        end
       end
 
       love.graphics.setLineWidth(1)
@@ -699,42 +871,185 @@ function M.drawEnemies()
       for _, laser in ipairs(weapons.lasers) do
         local dist = math.sqrt((enemy.x - laser.x)^2 + (enemy.y - laser.y)^2)
         if dist < 400 then
-          local t = 1 - (dist / 400)  -- 1 at center, 0 at edge
-          local laserAlpha = math.exp(-12 * (1 - t)) * 0.9  -- Match 4x steep decay
+          local t = 1 - (dist / 400)
+          local laserAlpha = math.exp(-12 * (1 - t)) * 0.9
           alpha = math.max(alpha, laserAlpha)
         end
       end
       if alpha <= 0.01 then goto continue end
     end
 
-    -- Set color based on enemy type
-    local r, g, b = 1, 0.3, 0.3
-    if enemy.color == "green" then
-      r, g, b = 0.3, 1, 0.3
+    local time = love.timer.getTime()
+    local ex, ey = enemy.x, enemy.y
+
+    if enemy.color == "squadron" then
+      -- == SQUADRON ENEMY: Linked energy drones ==
+      local pulse = 0.6 + 0.4 * math.sin(time * 8 + ex * 0.1)
+
+      -- Squadron energy shield (if still shielded)
+      if enemy.squadronShielded then
+        -- Energy tether lines to other squadron members
+        for _, other in ipairs(enemies.enemies) do
+          if other ~= enemy and other.squadronId == enemy.squadronId then
+            love.graphics.setColor(1, 0.8, 0.2, 0.25 * alpha * pulse)
+            love.graphics.setLineWidth(2)
+            love.graphics.line(ex, ey, other.x, other.y)
+            love.graphics.setLineWidth(1)
+          end
+        end
+        -- Shield hexagon
+        love.graphics.setColor(1, 0.85, 0.3, 0.15 * alpha * pulse)
+        love.graphics.circle("fill", ex, ey, 18)
+        love.graphics.setColor(1, 0.9, 0.4, 0.5 * alpha * pulse)
+        love.graphics.setLineWidth(2)
+        local sides = 6
+        local pts = {}
+        for i = 0, sides - 1 do
+          local a = (i / sides) * math.pi * 2 + time * 2
+          table.insert(pts, ex + math.cos(a) * 16)
+          table.insert(pts, ey + math.sin(a) * 16)
+        end
+        love.graphics.polygon("line", pts)
+        love.graphics.setLineWidth(1)
+      end
+
+      -- Drone body (angular diamond shape)
+      love.graphics.setColor(0.8, 0.6, 0.15, 0.7 * alpha)
+      love.graphics.polygon("fill", ex, ey - 10, ex - 8, ey, ex, ey + 10, ex + 8, ey)
+      love.graphics.setColor(1, 0.85, 0.3, alpha)
+      love.graphics.polygon("line", ex, ey - 10, ex - 8, ey, ex, ey + 10, ex + 8, ey)
+      -- Inner core glow
+      love.graphics.setColor(1, 1, 0.7, 0.6 * alpha * pulse)
+      love.graphics.circle("fill", ex, ey, 4)
+      love.graphics.setColor(1, 1, 1, 0.4 * alpha * pulse)
+      love.graphics.circle("fill", ex, ey, 2)
+
+    elseif enemy.color == "red" then
+      -- == RED FIGHTER: Granga-style attack craft ==
+      -- Engine glow
+      love.graphics.setColor(1, 0.3, 0.1, 0.08 * alpha)
+      love.graphics.circle("fill", ex, ey, 20)
+      -- Hull (inverted arrowhead - pointing down at player)
+      love.graphics.setColor(0.5, 0.12, 0.1, 0.75 * alpha)
+      love.graphics.polygon("fill", ex, ey + 14, ex - 11, ey - 8, ex - 3, ey - 4, ex + 3, ey - 4, ex + 11, ey - 8)
+      -- Wing struts
+      love.graphics.setColor(0.6, 0.15, 0.12, 0.7 * alpha)
+      love.graphics.polygon("fill", ex - 11, ey - 6, ex - 17, ey - 2, ex - 15, ey + 4, ex - 9, ey - 2)
+      love.graphics.polygon("fill", ex + 11, ey - 6, ex + 17, ey - 2, ex + 15, ey + 4, ex + 9, ey - 2)
+      -- Wireframe
+      love.graphics.setColor(1, 0.35, 0.25, alpha)
+      love.graphics.polygon("line", ex, ey + 14, ex - 11, ey - 8, ex + 11, ey - 8)
+      love.graphics.line(ex - 11, ey - 6, ex - 17, ey - 2)
+      love.graphics.line(ex + 11, ey - 6, ex + 17, ey - 2)
+      -- Cockpit (red glowing eye)
+      local redPulse = 0.6 + 0.4 * math.sin(time * 6 + ex * 0.2)
+      love.graphics.setColor(1, 0.5, 0.3, 0.7 * alpha * redPulse)
+      love.graphics.circle("fill", ex, ey, 3.5)
+      love.graphics.setColor(1, 0.9, 0.8, 0.5 * alpha * redPulse)
+      love.graphics.circle("fill", ex, ey, 1.5)
+      -- Engine exhaust (top, since flying downward)
+      local flicker = math.sin(time * 25 + ex) * 1.5
+      love.graphics.setColor(1, 0.4, 0.1, 0.5 * alpha)
+      love.graphics.polygon("fill", ex - 2, ey - 8, ex + 2, ey - 8, ex, ey - 13 - flicker)
+
+    elseif enemy.color == "green" then
+      -- == GREEN FIGHTER: Armored interceptor (2HP) ==
+      local greenPulse = 0.7 + 0.3 * math.sin(time * 5 + ey * 0.15)
+      -- Ambient glow
+      love.graphics.setColor(0.2, 0.8, 0.3, 0.06 * alpha)
+      love.graphics.circle("fill", ex, ey, 22)
+      -- Armored hull (broader, heavier shape)
+      love.graphics.setColor(0.15, 0.4, 0.15, 0.75 * alpha)
+      love.graphics.polygon("fill", ex, ey + 12, ex - 14, ey - 6, ex - 8, ey - 10, ex + 8, ey - 10, ex + 14, ey - 6)
+      -- Armor plating (extra panels on wings)
+      love.graphics.setColor(0.2, 0.5, 0.2, 0.65 * alpha)
+      love.graphics.polygon("fill", ex - 14, ey - 4, ex - 20, ey + 2, ex - 16, ey + 6, ex - 12, ey)
+      love.graphics.polygon("fill", ex + 14, ey - 4, ex + 20, ey + 2, ex + 16, ey + 6, ex + 12, ey)
+      -- Shield generator (glowing ring on hull)
+      love.graphics.setColor(0.3, 1, 0.4, 0.2 * alpha * greenPulse)
+      love.graphics.circle("fill", ex, ey - 2, 8)
+      -- Wireframe
+      love.graphics.setColor(0.3, 1, 0.4, alpha)
+      love.graphics.polygon("line", ex, ey + 12, ex - 14, ey - 6, ex + 14, ey - 6)
+      love.graphics.line(ex - 14, ey - 4, ex - 20, ey + 2)
+      love.graphics.line(ex + 14, ey - 4, ex + 20, ey + 2)
+      -- Cockpit (green scanner)
+      love.graphics.setColor(0.5, 1, 0.6, 0.8 * alpha * greenPulse)
+      love.graphics.ellipse("fill", ex, ey - 2, 3, 4)
+      love.graphics.setColor(0.9, 1, 0.9, 0.5 * alpha)
+      love.graphics.circle("fill", ex, ey - 3, 1.2)
+      -- Dual engine exhaust
+      local flicker = math.sin(time * 22 + ex) * 1.5
+      love.graphics.setColor(0.3, 1, 0.3, 0.45 * alpha)
+      love.graphics.polygon("fill", ex - 4, ey - 10, ex - 2, ey - 10, ex - 3, ey - 15 - flicker)
+      love.graphics.polygon("fill", ex + 2, ey - 10, ex + 4, ey - 10, ex + 3, ey - 15 - flicker)
+
     elseif enemy.color == "blue" then
-      r, g, b = 0.3, 0.5, 1
+      -- == BLUE FIGHTER: Elite heavy fighter (3HP, SF64 ace style) ==
+      local bluePulse = 0.6 + 0.4 * math.sin(time * 4 + ex * 0.15)
+      -- Energy field
+      love.graphics.setColor(0.2, 0.4, 1, 0.08 * alpha * bluePulse)
+      love.graphics.circle("fill", ex, ey, 24)
+      -- Heavy hull (wide, angular)
+      love.graphics.setColor(0.12, 0.2, 0.5, 0.75 * alpha)
+      love.graphics.polygon("fill", ex, ey + 14, ex - 10, ey + 4, ex - 16, ey - 8, ex - 6, ey - 12, ex + 6, ey - 12, ex + 16, ey - 8, ex + 10, ey + 4)
+      -- Wing blades (swept forward like SF64 elites)
+      love.graphics.setColor(0.15, 0.25, 0.55, 0.7 * alpha)
+      love.graphics.polygon("fill", ex - 16, ey - 6, ex - 24, ey - 10, ex - 22, ey + 2, ex - 14, ey)
+      love.graphics.polygon("fill", ex + 16, ey - 6, ex + 24, ey - 10, ex + 22, ey + 2, ex + 14, ey)
+      -- Fin stabilizers
+      love.graphics.setColor(0.2, 0.35, 0.7, 0.6 * alpha)
+      love.graphics.polygon("fill", ex - 22, ey - 8, ex - 26, ey - 14, ex - 24, ey - 10)
+      love.graphics.polygon("fill", ex + 22, ey - 8, ex + 26, ey - 14, ex + 24, ey - 10)
+      -- Wireframe (bright blue)
+      love.graphics.setColor(0.4, 0.6, 1, alpha)
+      love.graphics.polygon("line", ex, ey + 14, ex - 16, ey - 8, ex + 16, ey - 8)
+      love.graphics.line(ex - 16, ey - 6, ex - 24, ey - 10)
+      love.graphics.line(ex + 16, ey - 6, ex + 24, ey - 10)
+      love.graphics.line(ex - 22, ey - 8, ex - 26, ey - 14)
+      love.graphics.line(ex + 22, ey - 8, ex + 26, ey - 14)
+      -- Cockpit (intense blue core)
+      love.graphics.setColor(0.4, 0.7, 1, 0.7 * alpha * bluePulse)
+      love.graphics.circle("fill", ex, ey - 2, 4)
+      love.graphics.setColor(0.8, 0.9, 1, 0.6 * alpha * bluePulse)
+      love.graphics.circle("fill", ex, ey - 2, 2)
+      -- Triple engine exhaust
+      local flicker = math.sin(time * 20 + ey) * 1.5
+      love.graphics.setColor(0.3, 0.5, 1, 0.5 * alpha)
+      love.graphics.polygon("fill", ex - 5, ey - 12, ex - 3, ey - 12, ex - 4, ey - 18 - flicker)
+      love.graphics.polygon("fill", ex - 1, ey - 12, ex + 1, ey - 12, ex, ey - 17 - flicker)
+      love.graphics.polygon("fill", ex + 3, ey - 12, ex + 5, ey - 12, ex + 4, ey - 18 - flicker)
+      -- Elite wing-tip energy trails
+      love.graphics.setColor(0.3, 0.6, 1, 0.3 * alpha * bluePulse)
+      love.graphics.circle("fill", ex - 24, ey - 10, 3)
+      love.graphics.circle("fill", ex + 24, ey - 10, 3)
+      love.graphics.setColor(0.7, 0.85, 1, 0.2 * alpha)
+      love.graphics.circle("fill", ex - 24, ey - 10, 1.5)
+      love.graphics.circle("fill", ex + 24, ey - 10, 1.5)
+
+    else
+      -- Default fighter (fallback)
+      love.graphics.setColor(0.6, 0.3, 0.3, 0.7 * alpha)
+      love.graphics.polygon("fill", ex, ey + 15, ex - 12, ey - 10, ex + 12, ey - 10)
+      love.graphics.setColor(1, 0.5, 0.4, alpha)
+      love.graphics.polygon("line", ex, ey + 15, ex - 12, ey - 10, ex + 12, ey - 10)
     end
 
-    love.graphics.setColor(r, g, b, alpha)
-    love.graphics.polygon("fill", enemy.x, enemy.y + 15, enemy.x - 12, enemy.y - 10, enemy.x + 12, enemy.y - 10)
-
-    -- Draw health bar for enemies with > 1 max health
-    if enemy.maxHealth and enemy.maxHealth > 1 then
+    -- Draw health bar for enemies with > 1 max health (but not squadron)
+    if enemy.maxHealth and enemy.maxHealth > 1 and enemy.color ~= "squadron" then
       local barWidth = 30
       local barHeight = 4
       local healthPercent = enemy.health / enemy.maxHealth
+      local r, g, b = 1, 0.3, 0.3
+      if enemy.color == "green" then r, g, b = 0.3, 1, 0.3
+      elseif enemy.color == "blue" then r, g, b = 0.3, 0.5, 1 end
 
-      -- Background
       love.graphics.setColor(0.2, 0.2, 0.2, alpha)
-      love.graphics.rectangle("fill", enemy.x - barWidth/2, enemy.y - 20, barWidth, barHeight)
-
-      -- Health
+      love.graphics.rectangle("fill", ex - barWidth/2, ey - 22, barWidth, barHeight)
       love.graphics.setColor(r * 0.7, g * 0.7, b * 0.7, alpha)
-      love.graphics.rectangle("fill", enemy.x - barWidth/2, enemy.y - 20, barWidth * healthPercent, barHeight)
-
-      -- Border
+      love.graphics.rectangle("fill", ex - barWidth/2, ey - 22, barWidth * healthPercent, barHeight)
       love.graphics.setColor(1, 1, 1, alpha * 0.5)
-      love.graphics.rectangle("line", enemy.x - barWidth/2, enemy.y - 20, barWidth, barHeight)
+      love.graphics.rectangle("line", ex - barWidth/2, ey - 22, barWidth, barHeight)
     end
 
     ::continue::
@@ -760,10 +1075,37 @@ function M.drawTurrets()
         if alpha <= 0.01 then goto continue end
       end
 
-      love.graphics.setColor(0.5, 0.5, 0.5, alpha)
-      love.graphics.rectangle("fill", turret.x - 15, turret.y, 30, 15)
-      love.graphics.setColor(0.8, 0.3, 0.3, alpha)
-      love.graphics.circle("fill", turret.x, turret.y, 10)
+      local time = love.timer.getTime()
+      local tPulse = 0.7 + 0.3 * math.sin(time * 5 + turret.x * 0.1)
+      local tx, ty = turret.x, turret.y
+
+      -- Base platform (armored trapezoid)
+      love.graphics.setColor(0.3, 0.3, 0.35, alpha)
+      love.graphics.polygon("fill", tx - 18, ty + 8, tx + 18, ty + 8, tx + 14, ty + 16, tx - 14, ty + 16)
+      -- Armored housing
+      love.graphics.setColor(0.38, 0.38, 0.42, alpha)
+      love.graphics.polygon("fill", tx - 12, ty, tx + 12, ty, tx + 15, ty + 8, tx - 15, ty + 8)
+      -- Barrel
+      love.graphics.setColor(0.5, 0.3, 0.3, alpha)
+      love.graphics.rectangle("fill", tx - 3, ty - 8, 6, 10)
+      -- Gun tip glow
+      love.graphics.setColor(1, 0.3, 0.2, 0.4 * alpha * tPulse)
+      love.graphics.circle("fill", tx, ty - 8, 4)
+      love.graphics.setColor(1, 0.6, 0.4, 0.3 * alpha * tPulse)
+      love.graphics.circle("fill", tx, ty - 8, 2)
+      -- Sensor dome (glowing red)
+      love.graphics.setColor(0.65, 0.2, 0.2, alpha)
+      love.graphics.arc("fill", tx, ty, 8, -math.pi, 0)
+      love.graphics.setColor(1, 0.4, 0.3, 0.5 * alpha * tPulse)
+      love.graphics.arc("fill", tx, ty, 5, -math.pi, 0)
+      -- Wireframe edges
+      love.graphics.setColor(0.65, 0.5, 0.4, 0.6 * alpha)
+      love.graphics.polygon("line", tx - 18, ty + 8, tx + 18, ty + 8, tx + 14, ty + 16, tx - 14, ty + 16)
+      love.graphics.polygon("line", tx - 12, ty, tx + 12, ty, tx + 15, ty + 8, tx - 15, ty + 8)
+      -- Status indicator lights
+      love.graphics.setColor(1, 0.2, 0.1, 0.8 * alpha * tPulse)
+      love.graphics.circle("fill", tx - 8, ty + 4, 1.5)
+      love.graphics.circle("fill", tx + 8, ty + 4, 1.5)
 
       ::continue::
     end
@@ -788,31 +1130,74 @@ function M.drawCapitalShips()
       if alpha <= 0.01 then goto continue end
     end
 
-    -- Main hull
-    love.graphics.setColor(0.4, 0.4, 0.5, alpha)
-    love.graphics.rectangle("fill", ship.x - ship.width/2, ship.y - ship.height/2, ship.width, ship.height)
+    local time = love.timer.getTime()
+    local cPulse = 0.7 + 0.3 * math.sin(time * 3 + ship.x * 0.05)
+    local sx, sy = ship.x, ship.y
+    local hw, hh = ship.width/2, ship.height/2
 
-    -- Bridge
-    love.graphics.setColor(0.3, 0.3, 0.4, alpha)
-    love.graphics.rectangle("fill", ship.x - 30, ship.y - ship.height/2 - 15, 60, 20)
+    -- Hull ambient glow
+    love.graphics.setColor(0.3, 0.3, 0.5, 0.04 * alpha)
+    love.graphics.circle("fill", sx, sy, hw * 1.3)
 
-    -- Engine glow
-    love.graphics.setColor(0.3, 0.5, 1, 0.8 * alpha)
-    love.graphics.rectangle("fill", ship.x - 60, ship.y + ship.height/2 - 5, 30, 10)
-    love.graphics.rectangle("fill", ship.x + 30, ship.y + ship.height/2 - 5, 30, 10)
+    -- Main hull (angular carrier shape)
+    love.graphics.setColor(0.25, 0.25, 0.35, 0.8 * alpha)
+    love.graphics.polygon("fill", sx - hw, sy - hh + 10, sx - hw + 20, sy - hh, sx + hw - 20, sy - hh, sx + hw, sy - hh + 10, sx + hw, sy + hh, sx - hw, sy + hh)
+    -- Hull detail panels
+    love.graphics.setColor(0.3, 0.3, 0.4, 0.6 * alpha)
+    love.graphics.rectangle("fill", sx - hw + 10, sy - hh + 5, hw * 2 - 20, 12)
+    love.graphics.setColor(0.2, 0.2, 0.3, 0.7 * alpha)
+    love.graphics.rectangle("fill", sx - hw + 5, sy + 5, hw * 2 - 10, 15)
 
-    -- Cannons
-    love.graphics.setColor(0.6, 0.3, 0.3, alpha)
-    love.graphics.circle("fill", ship.x - 60, ship.y + 20, 8)
-    love.graphics.circle("fill", ship.x, ship.y + 30, 8)
-    love.graphics.circle("fill", ship.x + 60, ship.y + 20, 8)
+    -- Bridge (command tower)
+    love.graphics.setColor(0.3, 0.3, 0.42, alpha)
+    love.graphics.polygon("fill", sx - 25, sy - hh - 12, sx + 25, sy - hh - 12, sx + 30, sy - hh + 2, sx - 30, sy - hh + 2)
+    love.graphics.setColor(0.4, 0.5, 0.7, 0.5 * alpha * cPulse)
+    love.graphics.rectangle("fill", sx - 15, sy - hh - 9, 30, 5)  -- Bridge windows
+
+    -- Engine blocks (glowing blue)
+    love.graphics.setColor(0.15, 0.3, 0.7, 0.6 * alpha * cPulse)
+    love.graphics.rectangle("fill", sx - 55, sy + hh - 8, 25, 12)
+    love.graphics.rectangle("fill", sx + 30, sy + hh - 8, 25, 12)
+    love.graphics.setColor(0.3, 0.5, 1, 0.4 * alpha * cPulse)
+    love.graphics.rectangle("fill", sx - 50, sy + hh - 5, 15, 6)
+    love.graphics.rectangle("fill", sx + 35, sy + hh - 5, 15, 6)
+    -- Engine exhaust flames
+    local flicker = math.sin(time * 18) * 2
+    love.graphics.setColor(0.3, 0.5, 1, 0.5 * alpha * cPulse)
+    love.graphics.polygon("fill", sx - 50, sy + hh + 4, sx - 38, sy + hh + 4, sx - 44, sy + hh + 12 + flicker)
+    love.graphics.polygon("fill", sx + 38, sy + hh + 4, sx + 50, sy + hh + 4, sx + 44, sy + hh + 12 + flicker)
+
+    -- Weapon hardpoints (glowing red turrets)
+    love.graphics.setColor(0.5, 0.15, 0.15, alpha)
+    love.graphics.circle("fill", sx - 55, sy + 18, 7)
+    love.graphics.circle("fill", sx, sy + 28, 7)
+    love.graphics.circle("fill", sx + 55, sy + 18, 7)
+    love.graphics.setColor(1, 0.3, 0.2, 0.5 * alpha * cPulse)
+    love.graphics.circle("fill", sx - 55, sy + 18, 4)
+    love.graphics.circle("fill", sx, sy + 28, 4)
+    love.graphics.circle("fill", sx + 55, sy + 18, 4)
+
+    -- Wireframe edges
+    love.graphics.setColor(0.5, 0.5, 0.65, 0.6 * alpha)
+    love.graphics.polygon("line", sx - hw, sy - hh + 10, sx - hw + 20, sy - hh, sx + hw - 20, sy - hh, sx + hw, sy - hh + 10, sx + hw, sy + hh, sx - hw, sy + hh)
+    love.graphics.polygon("line", sx - 25, sy - hh - 12, sx + 25, sy - hh - 12, sx + 30, sy - hh + 2, sx - 30, sy - hh + 2)
+
+    -- Running lights
+    love.graphics.setColor(1, 0.2, 0.1, 0.7 * alpha * cPulse)
+    love.graphics.circle("fill", sx - hw + 3, sy - hh + 12, 2)
+    love.graphics.circle("fill", sx + hw - 3, sy - hh + 12, 2)
+    love.graphics.setColor(0.2, 1, 0.3, 0.6 * alpha * (1 - cPulse))
+    love.graphics.circle("fill", sx - hw + 3, sy + hh - 5, 2)
+    love.graphics.circle("fill", sx + hw - 3, sy + hh - 5, 2)
 
     -- Health bar
     local healthPct = ship.health / ship.maxHealth
-    love.graphics.setColor(0.2, 0.2, 0.2, alpha)
-    love.graphics.rectangle("fill", ship.x - 40, ship.y - ship.height/2 - 25, 80, 6)
+    love.graphics.setColor(0.15, 0.15, 0.15, alpha)
+    love.graphics.rectangle("fill", sx - 40, sy - hh - 28, 80, 6)
     love.graphics.setColor(1, 0.3, 0.3, alpha)
-    love.graphics.rectangle("fill", ship.x - 40, ship.y - ship.height/2 - 25, 80 * healthPct, 6)
+    love.graphics.rectangle("fill", sx - 40, sy - hh - 28, 80 * healthPct, 6)
+    love.graphics.setColor(1, 1, 1, 0.3 * alpha)
+    love.graphics.rectangle("line", sx - 40, sy - hh - 28, 80, 6)
 
     ::continue::
   end
@@ -869,32 +1254,59 @@ function M.drawMothership()
 end
 
 function M.drawAllies()
+  local time = love.timer.getTime()
   for _, ally in ipairs(allies.allies) do
+    local ax, ay = ally.x, ally.y
+    local c, ac
     if ally.converted then
-      -- Purple glow for converted wingmen
-      love.graphics.setColor(0.6, 0.1, 1, 0.2)
-      love.graphics.circle("fill", ally.x, ally.y, 20)
-      love.graphics.setColor(0.5, 0.1, 0.9)
-      love.graphics.polygon("fill", ally.x, ally.y - 12, ally.x - 10, ally.y + 10, ally.x + 10, ally.y + 10)
-      love.graphics.setColor(0.7, 0.3, 1)
-      love.graphics.polygon("fill", ally.x - 18, ally.y + 5, ally.x - 10, ally.y, ally.x - 10, ally.y + 10, ally.x - 18, ally.y + 10)
-      love.graphics.polygon("fill", ally.x + 18, ally.y + 5, ally.x + 10, ally.y, ally.x + 10, ally.y + 10, ally.x + 18, ally.y + 10)
-      love.graphics.setColor(0.8, 0.5, 1, 0.6)
-      love.graphics.polygon("line", ally.x, ally.y - 12, ally.x - 10, ally.y + 10, ally.x + 10, ally.y + 10)
+      c = {0.5, 0.1, 0.9}
+      ac = {0.7, 0.3, 1}
     else
-      -- Blue triangle (friendly color)
-      love.graphics.setColor(0.2, 0.6, 1)
-      love.graphics.polygon("fill", ally.x, ally.y - 12, ally.x - 10, ally.y + 10, ally.x + 10, ally.y + 10)
-
-      -- Wings
-      love.graphics.setColor(0.3, 0.7, 1)
-      love.graphics.polygon("fill", ally.x - 18, ally.y + 5, ally.x - 10, ally.y, ally.x - 10, ally.y + 10, ally.x - 18, ally.y + 10)
-      love.graphics.polygon("fill", ally.x + 18, ally.y + 5, ally.x + 10, ally.y, ally.x + 10, ally.y + 10, ally.x + 18, ally.y + 10)
-
-      -- Outline
-      love.graphics.setColor(1, 1, 1, 0.6)
-      love.graphics.polygon("line", ally.x, ally.y - 12, ally.x - 10, ally.y + 10, ally.x + 10, ally.y + 10)
+      c = {0.2, 0.6, 1}
+      ac = {0.4, 0.8, 1}
     end
+
+    local thrustPulse = 0.7 + 0.3 * math.sin(time * 16 + ax * 0.5)
+
+    -- Engine glow
+    love.graphics.setColor(ac[1], ac[2], ac[3], 0.06 * thrustPulse)
+    love.graphics.circle("fill", ax, ay + 8, 16)
+
+    -- Thruster flame
+    local flicker = math.sin(time * 30 + ax) * 2
+    love.graphics.setColor(ac[1], ac[2], ac[3], 0.5 * thrustPulse)
+    love.graphics.polygon("fill", ax - 2, ay + 8, ax + 2, ay + 8, ax, ay + 14 + flicker)
+
+    if ally.converted then
+      -- Purple ambient glow for converted
+      love.graphics.setColor(0.6, 0.1, 1, 0.12)
+      love.graphics.circle("fill", ax, ay, 18)
+    end
+
+    -- Fuselage
+    love.graphics.setColor(c[1] * 0.4, c[2] * 0.4, c[3] * 0.4, 0.7)
+    love.graphics.polygon("fill", ax, ay - 14, ax - 7, ay + 6, ax - 2, ay + 8, ax + 2, ay + 8, ax + 7, ay + 6)
+    -- Wings
+    love.graphics.setColor(c[1] * 0.35, c[2] * 0.35, c[3] * 0.35, 0.65)
+    love.graphics.polygon("fill", ax - 7, ay, ax - 18, ay + 4, ax - 16, ay + 8, ax - 7, ay + 6)
+    love.graphics.polygon("fill", ax + 7, ay, ax + 18, ay + 4, ax + 16, ay + 8, ax + 7, ay + 6)
+    -- Wing fins
+    love.graphics.setColor(c[1] * 0.5, c[2] * 0.5, c[3] * 0.5, 0.55)
+    love.graphics.polygon("fill", ax - 16, ay + 2, ax - 19, ay - 3, ax - 18, ay + 4)
+    love.graphics.polygon("fill", ax + 16, ay + 2, ax + 19, ay - 3, ax + 18, ay + 4)
+
+    -- Wireframe
+    love.graphics.setColor(c[1], c[2], c[3], 0.9)
+    love.graphics.polygon("line", ax, ay - 14, ax - 7, ay + 6, ax + 7, ay + 6)
+    love.graphics.setColor(ac[1], ac[2], ac[3], 0.7)
+    love.graphics.line(ax - 7, ay, ax - 18, ay + 4)
+    love.graphics.line(ax + 7, ay, ax + 18, ay + 4)
+
+    -- Cockpit
+    love.graphics.setColor(0.5, 0.85, 1, 0.5)
+    love.graphics.ellipse("fill", ax, ay - 4, 2.5, 4)
+    love.graphics.setColor(1, 1, 1, 0.3)
+    love.graphics.circle("fill", ax - 0.5, ay - 6, 1)
   end
 end
 
@@ -902,70 +1314,275 @@ function M.drawBoss()
   local b = boss.currentBoss
   if not b or not b.active then return end
 
+  local time = love.timer.getTime()
+
   if b.type == "midboss" then
-    love.graphics.setColor(0.6, 0.2, 0.2)
-    love.graphics.rectangle("fill", b.x - b.width/2, b.y - b.height/2, b.width, b.height)
-    love.graphics.setColor(1, 0.3, 0.3)
-    love.graphics.circle("fill", b.x, b.y, 20)
+    love.graphics.push()
+    love.graphics.translate(b.x, b.y)
+
+    -- Armored hull - angular wedge shape
+    love.graphics.setColor(0.5, 0.15, 0.15)
+    love.graphics.polygon("fill",
+      0, -b.height/2,
+      b.width/2, -b.height/4,
+      b.width/2 - 5, b.height/2,
+      -b.width/2 + 5, b.height/2,
+      -b.width/2, -b.height/4)
+    -- Wireframe edge
+    love.graphics.setColor(0.8, 0.3, 0.3, 0.7)
+    love.graphics.setLineWidth(1.5)
+    love.graphics.polygon("line",
+      0, -b.height/2,
+      b.width/2, -b.height/4,
+      b.width/2 - 5, b.height/2,
+      -b.width/2 + 5, b.height/2,
+      -b.width/2, -b.height/4)
+    love.graphics.setLineWidth(1)
+
+    -- Inner armor plates
+    love.graphics.setColor(0.4, 0.12, 0.12, 0.8)
+    love.graphics.polygon("fill", 0, -b.height/3, 25, 0, 15, b.height/3, -15, b.height/3, -25, 0)
+
+    -- Glowing red eye
+    local eyePulse = 0.6 + math.sin(time * 5) * 0.4
+    love.graphics.setColor(1, 0.2, 0.1, eyePulse)
+    love.graphics.circle("fill", 0, -5, 12)
+    love.graphics.setColor(1, 0.5, 0.3, eyePulse * 0.4)
+    love.graphics.circle("fill", 0, -5, 20)
+    love.graphics.setColor(1, 0.9, 0.8, eyePulse * 0.8)
+    love.graphics.circle("fill", 0, -5, 5)
+
+    -- Engine exhaust vents
+    local flickerA = 0.6 + math.random() * 0.4
+    love.graphics.setColor(1, 0.4, 0.1, flickerA * 0.7)
+    love.graphics.polygon("fill", -15, b.height/2, -10, b.height/2 + 12 + math.random() * 6, -5, b.height/2)
+    love.graphics.polygon("fill", 5, b.height/2, 10, b.height/2 + 12 + math.random() * 6, 15, b.height/2)
+    love.graphics.setColor(1, 0.8, 0.3, flickerA * 0.5)
+    love.graphics.polygon("fill", -12, b.height/2, -10, b.height/2 + 8 + math.random() * 4, -8, b.height/2)
+    love.graphics.polygon("fill", 8, b.height/2, 10, b.height/2 + 8 + math.random() * 4, 12, b.height/2)
+
+    love.graphics.pop()
 
   elseif b.type == "finalboss" then
-    love.graphics.setColor(0.4, 0.4, 0.4)
-    love.graphics.rectangle("fill", b.x - b.width/2, b.y - b.height/2, b.width, b.height)
+    love.graphics.push()
+    love.graphics.translate(b.x, b.y)
 
+    -- Main hull - heavy armored cruiser
+    love.graphics.setColor(0.3, 0.3, 0.35)
+    love.graphics.polygon("fill",
+      0, -b.height/2,
+      b.width/2 - 10, -b.height/3,
+      b.width/2, 0,
+      b.width/2 - 10, b.height/2 - 10,
+      10, b.height/2,
+      -10, b.height/2,
+      -b.width/2 + 10, b.height/2 - 10,
+      -b.width/2, 0,
+      -b.width/2 + 10, -b.height/3)
+
+    -- Wireframe
+    love.graphics.setColor(0.5, 0.5, 0.55, 0.6)
+    love.graphics.setLineWidth(1.5)
+    love.graphics.polygon("line",
+      0, -b.height/2,
+      b.width/2 - 10, -b.height/3,
+      b.width/2, 0,
+      b.width/2 - 10, b.height/2 - 10,
+      10, b.height/2,
+      -10, b.height/2,
+      -b.width/2 + 10, b.height/2 - 10,
+      -b.width/2, 0,
+      -b.width/2 + 10, -b.height/3)
+    love.graphics.setLineWidth(1)
+
+    -- Armored plating detail
+    love.graphics.setColor(0.25, 0.25, 0.3, 0.8)
+    love.graphics.polygon("fill", -40, -20, 40, -20, 35, 10, -35, 10)
+    love.graphics.setColor(0.2, 0.2, 0.25, 0.7)
+    love.graphics.polygon("fill", -50, 15, 50, 15, 45, 35, -45, 35)
+
+    -- Arm weapon pods
     if not b.leftArm.destroyed then
-      love.graphics.setColor(0.5, 0.3, 0.3)
-      love.graphics.rectangle("fill", b.x + b.leftArm.x - 25, b.y + 20, 50, 30)
+      love.graphics.setColor(0.4, 0.25, 0.25)
+      love.graphics.polygon("fill",
+        b.leftArm.x - 25, 15, b.leftArm.x + 25, 15,
+        b.leftArm.x + 20, 50, b.leftArm.x - 20, 50)
+      love.graphics.setColor(0.6, 0.3, 0.3, 0.6)
+      love.graphics.polygon("line",
+        b.leftArm.x - 25, 15, b.leftArm.x + 25, 15,
+        b.leftArm.x + 20, 50, b.leftArm.x - 20, 50)
+      -- Barrel glow
+      local armGlow = 0.5 + math.sin(time * 4) * 0.3
+      love.graphics.setColor(1, 0.3, 0.1, armGlow)
+      love.graphics.circle("fill", b.leftArm.x, 52, 6)
     end
     if not b.rightArm.destroyed then
-      love.graphics.setColor(0.5, 0.3, 0.3)
-      love.graphics.rectangle("fill", b.x + b.rightArm.x - 25, b.y + 20, 50, 30)
+      love.graphics.setColor(0.4, 0.25, 0.25)
+      love.graphics.polygon("fill",
+        b.rightArm.x - 25, 15, b.rightArm.x + 25, 15,
+        b.rightArm.x + 20, 50, b.rightArm.x - 20, 50)
+      love.graphics.setColor(0.6, 0.3, 0.3, 0.6)
+      love.graphics.polygon("line",
+        b.rightArm.x - 25, 15, b.rightArm.x + 25, 15,
+        b.rightArm.x + 20, 50, b.rightArm.x - 20, 50)
+      local armGlow = 0.5 + math.sin(time * 4 + math.pi) * 0.3
+      love.graphics.setColor(1, 0.3, 0.1, armGlow)
+      love.graphics.circle("fill", b.rightArm.x, 52, 6)
     end
 
+    -- Central core
     if b.phase >= 2 then
-      love.graphics.setColor(1, 0.5, 0)
-      love.graphics.circle("fill", b.x, b.y, 25)
+      local corePulse = 0.6 + math.abs(math.sin(time * 5)) * 0.4
+      love.graphics.setColor(1, 0.5, 0, corePulse * 0.3)
+      love.graphics.circle("fill", 0, 0, 35)
+      love.graphics.setColor(1, 0.5, 0, corePulse)
+      love.graphics.circle("fill", 0, 0, 20)
+      love.graphics.setColor(1, 0.9, 0.6, corePulse * 0.8)
+      love.graphics.circle("fill", 0, 0, 10)
+    else
+      love.graphics.setColor(0.4, 0.4, 0.45)
+      love.graphics.circle("fill", 0, 0, 18)
+      love.graphics.setColor(0.6, 0.3, 0.2, 0.5 + math.sin(time * 2) * 0.2)
+      love.graphics.circle("fill", 0, 0, 10)
     end
+
+    -- Engine glow
+    local flickerB = 0.5 + math.random() * 0.5
+    love.graphics.setColor(0.3, 0.5, 1, flickerB * 0.6)
+    love.graphics.circle("fill", -20, b.height/2, 5 + math.random() * 3)
+    love.graphics.circle("fill", 20, b.height/2, 5 + math.random() * 3)
+
+    love.graphics.pop()
 
   elseif b.type == "area6boss" then
-    -- Main body
-    love.graphics.setColor(0.3, 0.3, 0.5)
-    love.graphics.rectangle("fill", b.x - b.width/2, b.y - b.height/2, b.width, b.height)
+    love.graphics.push()
+    love.graphics.translate(b.x, b.y)
 
-    -- Shield generators (Phase 1)
+    -- Main hull - heavy angular cruiser
+    love.graphics.setColor(0.25, 0.25, 0.42)
+    love.graphics.polygon("fill",
+      0, -b.height/2 - 10,
+      b.width/2, -b.height/4,
+      b.width/2 + 10, b.height/4,
+      b.width/2 - 5, b.height/2,
+      -b.width/2 + 5, b.height/2,
+      -b.width/2 - 10, b.height/4,
+      -b.width/2, -b.height/4)
+    -- Wireframe
+    love.graphics.setColor(0.4, 0.45, 0.7, 0.6)
+    love.graphics.setLineWidth(1.5)
+    love.graphics.polygon("line",
+      0, -b.height/2 - 10,
+      b.width/2, -b.height/4,
+      b.width/2 + 10, b.height/4,
+      b.width/2 - 5, b.height/2,
+      -b.width/2 + 5, b.height/2,
+      -b.width/2 - 10, b.height/4,
+      -b.width/2, -b.height/4)
+    love.graphics.setLineWidth(1)
+
+    -- Hull panel detail
+    love.graphics.setColor(0.2, 0.2, 0.35, 0.7)
+    love.graphics.polygon("fill", -45, -30, 45, -30, 50, -5, -50, -5)
+    love.graphics.polygon("fill", -55, 5, 55, 5, 50, 30, -50, 30)
+
+    -- Bridge tower (top)
+    love.graphics.setColor(0.3, 0.3, 0.5)
+    love.graphics.polygon("fill", -15, -b.height/2 - 10, 15, -b.height/2 - 10, 10, -b.height/2 - 25, -10, -b.height/2 - 25)
+    love.graphics.setColor(0.5, 0.7, 1, 0.4 + math.sin(time * 3) * 0.2)
+    love.graphics.rectangle("fill", -8, -b.height/2 - 22, 16, 6)
+
+    -- Shield generators on BOTTOM (Phase 1)
     if b.phase == 1 then
+      local shieldY = b.height/2 + 20
       if not b.leftShield.destroyed then
+        local shPulse = 0.5 + math.sin(time * 4) * 0.3
+        -- Generator housing
+        love.graphics.setColor(0.15, 0.35, 0.6)
+        love.graphics.polygon("fill", -65, b.height/2 - 5, -55, b.height/2 - 5, -50, shieldY + 15, -70, shieldY + 15)
+        -- Core
         love.graphics.setColor(0.2, 0.5, 0.8)
-        love.graphics.circle("fill", b.x - 70, b.y, 25)
-        love.graphics.setColor(0.4, 0.7, 1, 0.5)
-        love.graphics.circle("line", b.x - 70, b.y, 30)
+        love.graphics.circle("fill", -60, shieldY, 18)
+        -- Energy ring
+        love.graphics.setColor(0.4, 0.7, 1, shPulse)
+        love.graphics.circle("line", -60, shieldY, 24)
+        love.graphics.circle("line", -60, shieldY, 28)
+        -- Inner glow
+        love.graphics.setColor(0.6, 0.9, 1, shPulse * 0.6)
+        love.graphics.circle("fill", -60, shieldY, 8)
+        -- Label
+        love.graphics.setColor(0.4, 0.7, 1, shPulse * 0.7)
+        love.graphics.setFont(love.graphics.newFont(7))
+        love.graphics.printf("SHIELD", -80, shieldY + 18, 40, "center")
       end
       if not b.rightShield.destroyed then
+        local shPulse = 0.5 + math.sin(time * 4 + math.pi) * 0.3
+        love.graphics.setColor(0.15, 0.35, 0.6)
+        love.graphics.polygon("fill", 55, b.height/2 - 5, 65, b.height/2 - 5, 70, shieldY + 15, 50, shieldY + 15)
         love.graphics.setColor(0.2, 0.5, 0.8)
-        love.graphics.circle("fill", b.x + 70, b.y, 25)
-        love.graphics.setColor(0.4, 0.7, 1, 0.5)
-        love.graphics.circle("line", b.x + 70, b.y, 30)
+        love.graphics.circle("fill", 60, shieldY, 18)
+        love.graphics.setColor(0.4, 0.7, 1, shPulse)
+        love.graphics.circle("line", 60, shieldY, 24)
+        love.graphics.circle("line", 60, shieldY, 28)
+        love.graphics.setColor(0.6, 0.9, 1, shPulse * 0.6)
+        love.graphics.circle("fill", 60, shieldY, 8)
+        love.graphics.setColor(0.4, 0.7, 1, shPulse * 0.7)
+        love.graphics.setFont(love.graphics.newFont(7))
+        love.graphics.printf("SHIELD", 40, shieldY + 18, 40, "center")
       end
     end
 
     -- Core (visible in Phase 2+)
     if b.phase >= 2 then
       local coreColor = b.phase == 3 and {1, 0.3, 0.1} or {1, 0.6, 0.2}
-      love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3])
-      love.graphics.circle("fill", b.x, b.y, 35)
+      -- Outer bloom
+      love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], 0.15)
+      love.graphics.circle("fill", 0, 0, 50)
+      love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], 0.3)
+      love.graphics.circle("fill", 0, 0, 38)
+      love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], 0.9)
+      love.graphics.circle("fill", 0, 0, 25)
+      love.graphics.setColor(1, 0.9, 0.7, 0.7)
+      love.graphics.circle("fill", 0, 0, 12)
 
-      -- Pulsing effect in Phase 3
       if b.phase == 3 then
-        local pulse = math.abs(math.sin(love.timer.getTime() * 5))
-        love.graphics.setColor(1, 0.2, 0.1, pulse * 0.5)
-        love.graphics.circle("fill", b.x, b.y, 45)
+        local pulse = math.abs(math.sin(time * 5))
+        love.graphics.setColor(1, 0.2, 0.1, pulse * 0.4)
+        love.graphics.circle("fill", 0, 0, 55)
+        -- Danger arcs
+        love.graphics.setColor(1, 0.4, 0.2, pulse * 0.6)
+        love.graphics.setLineWidth(2)
+        for i = 0, 3 do
+          local arcA = time * 3 + i * math.pi / 2
+          love.graphics.arc("line", "open", 0, 0, 45, arcA, arcA + 0.8)
+        end
+        love.graphics.setLineWidth(1)
       end
+    else
+      -- Dormant core
+      love.graphics.setColor(0.3, 0.3, 0.5, 0.5)
+      love.graphics.circle("fill", 0, 0, 20)
     end
 
-    -- Weapon ports
-    love.graphics.setColor(0.6, 0.2, 0.2)
-    love.graphics.rectangle("fill", b.x - 50, b.y + 40, 20, 15)
-    love.graphics.rectangle("fill", b.x + 30, b.y + 40, 20, 15)
-    love.graphics.rectangle("fill", b.x - 10, b.y + 50, 20, 15)
+    -- Weapon ports (with glow)
+    local portGlow = 0.5 + math.sin(time * 3) * 0.3
+    love.graphics.setColor(0.5, 0.15, 0.15)
+    love.graphics.polygon("fill", -50, 35, -30, 35, -28, 55, -52, 55)
+    love.graphics.polygon("fill", 30, 35, 50, 35, 52, 55, 28, 55)
+    love.graphics.polygon("fill", -12, 42, 12, 42, 10, 60, -10, 60)
+    -- Port glow
+    love.graphics.setColor(1, 0.3, 0.2, portGlow * 0.6)
+    love.graphics.circle("fill", -40, 56, 4)
+    love.graphics.circle("fill", 40, 56, 4)
+    love.graphics.circle("fill", 0, 61, 4)
+
+    -- Engine exhausts
+    local flickerC = 0.5 + math.random() * 0.5
+    love.graphics.setColor(0.3, 0.4, 1, flickerC * 0.5)
+    love.graphics.polygon("fill", -30, -b.height/2 - 10, -25, -b.height/2 - 22 - math.random() * 8, -20, -b.height/2 - 10)
+    love.graphics.polygon("fill", 20, -b.height/2 - 10, 25, -b.height/2 - 22 - math.random() * 8, 30, -b.height/2 - 10)
+
+    love.graphics.pop()
   end
 end
 
@@ -1137,44 +1754,108 @@ function M.drawVenomBoss()
   local vb = venomboss.boss
   if not vb or not vb.active then return end
 
+  local time = love.timer.getTime()
+
   love.graphics.push()
   love.graphics.translate(vb.x, vb.y)
 
   local alpha = vb.fadeAlpha
 
-  -- Main body
-  love.graphics.setColor(0.25 * alpha, 0.2 * alpha, 0.35 * alpha, alpha)
-  love.graphics.rectangle("fill", -vb.width/2, -vb.height/2, vb.width, vb.height)
+  -- Main hull - sinister angular face-like shape
+  love.graphics.setColor(0.2 * alpha, 0.15 * alpha, 0.3 * alpha, alpha)
+  love.graphics.polygon("fill",
+    0, -vb.height/2 - 10,
+    vb.width/2 + 15, -vb.height/4,
+    vb.width/2 + 5, vb.height/4,
+    vb.width/2 - 10, vb.height/2,
+    -vb.width/2 + 10, vb.height/2,
+    -vb.width/2 - 5, vb.height/4,
+    -vb.width/2 - 15, -vb.height/4)
+  -- Wireframe
+  love.graphics.setColor(0.4 * alpha, 0.3 * alpha, 0.55 * alpha, 0.7 * alpha)
+  love.graphics.setLineWidth(1.5)
+  love.graphics.polygon("line",
+    0, -vb.height/2 - 10,
+    vb.width/2 + 15, -vb.height/4,
+    vb.width/2 + 5, vb.height/4,
+    vb.width/2 - 10, vb.height/2,
+    -vb.width/2 + 10, vb.height/2,
+    -vb.width/2 - 5, vb.height/4,
+    -vb.width/2 - 15, -vb.height/4)
+  love.graphics.setLineWidth(1)
 
-  -- Body details
-  love.graphics.setColor(0.35 * alpha, 0.3 * alpha, 0.45 * alpha, alpha)
-  love.graphics.rectangle("fill", -50, -30, 100, 20)
-  love.graphics.rectangle("fill", -60, 10, 120, 25)
+  -- Armored face plates
+  love.graphics.setColor(0.3 * alpha, 0.25 * alpha, 0.4 * alpha, alpha)
+  love.graphics.polygon("fill", -45, -35, 45, -35, 50, -10, -50, -10)
+  love.graphics.polygon("fill", -55, 5, 55, 5, 50, 35, -50, 35)
 
-  -- Central eye/core
+  -- Jaw structure
+  love.graphics.setColor(0.18 * alpha, 0.12 * alpha, 0.25 * alpha, alpha)
+  love.graphics.polygon("fill", -35, 35, 35, 35, 25, vb.height/2, -25, vb.height/2)
+
+  -- Brow ridge / crest
+  love.graphics.setColor(0.35 * alpha, 0.2 * alpha, 0.45 * alpha, alpha)
+  love.graphics.polygon("fill", -50, -30, 50, -30, 40, -42, 0, -50, -40, -42)
+
+  -- Central eye/core - menacing
   local coreColor = {0.8, 0.2, 0.6}
   if vb.phase >= 2 then coreColor = {1, 0.3, 0.2} end
   if vb.phase == 3 then
-    local pulse = math.abs(math.sin(love.timer.getTime() * 6))
+    local pulse = math.abs(math.sin(time * 6))
     coreColor[1] = 1
     coreColor[2] = 0.2 + pulse * 0.3
     coreColor[3] = 0.1
   end
+  -- Eye socket (dark recess)
+  love.graphics.setColor(0.05 * alpha, 0.02 * alpha, 0.05 * alpha, alpha)
+  love.graphics.circle("fill", 0, -5, 35)
+  -- Outer bloom
+  love.graphics.setColor(coreColor[1] * alpha, coreColor[2] * alpha, coreColor[3] * alpha, 0.15 * alpha)
+  love.graphics.circle("fill", 0, -5, 45)
+  -- Eye glow
   love.graphics.setColor(coreColor[1] * alpha, coreColor[2] * alpha, coreColor[3] * alpha, alpha)
-  love.graphics.circle("fill", 0, 0, 30)
+  love.graphics.circle("fill", 0, -5, 25)
+  -- Iris ring
+  love.graphics.setColor(coreColor[1] * 1.2, coreColor[2] * 0.5, coreColor[3] * 0.3, 0.7 * alpha)
+  love.graphics.circle("line", 0, -5, 20)
+  -- Pupil
+  love.graphics.setColor(0.05, 0.02, 0.02, alpha)
+  love.graphics.circle("fill", 0, -5, 10)
+  -- Eye highlight
+  love.graphics.setColor(1, 1, 0.9, 0.6 * alpha)
+  love.graphics.circle("fill", -5, -9, 4)
 
-  -- Core glow
+  -- Core glow bloom (phases 2+)
   if vb.phase >= 2 then
-    local pulse = math.abs(math.sin(love.timer.getTime() * 4))
-    love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], pulse * 0.4 * alpha)
-    love.graphics.circle("fill", 0, 0, 40)
+    local pulse = math.abs(math.sin(time * 4))
+    love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], pulse * 0.3 * alpha)
+    love.graphics.circle("fill", 0, -5, 55)
+    -- Energy arcs
+    love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], pulse * 0.5 * alpha)
+    love.graphics.setLineWidth(1.5)
+    for i = 0, 3 do
+      local arcA = time * 2.5 + i * math.pi / 2
+      love.graphics.arc("line", "open", 0, -5, 35, arcA, arcA + 0.7)
+    end
+    love.graphics.setLineWidth(1)
   end
 
-  -- Weapon ports
-  love.graphics.setColor(0.6 * alpha, 0.15 * alpha, 0.15 * alpha, alpha)
-  love.graphics.rectangle("fill", -50, 35, 25, 20)
-  love.graphics.rectangle("fill", 25, 35, 25, 20)
-  love.graphics.rectangle("fill", -12, 45, 24, 15)
+  -- Weapon ports (with barrel detail)
+  love.graphics.setColor(0.5 * alpha, 0.12 * alpha, 0.12 * alpha, alpha)
+  love.graphics.polygon("fill", -52, 32, -28, 32, -26, 55, -54, 55)
+  love.graphics.polygon("fill", 28, 32, 52, 32, 54, 55, 26, 55)
+  love.graphics.polygon("fill", -14, 40, 14, 40, 12, 58, -12, 58)
+  -- Barrel glow
+  local portGlow = 0.4 + math.sin(time * 5) * 0.3
+  love.graphics.setColor(1, 0.2, 0.3, portGlow * alpha)
+  love.graphics.circle("fill", -40, 56, 5)
+  love.graphics.circle("fill", 40, 56, 5)
+  love.graphics.circle("fill", 0, 59, 5)
+
+  -- Side wing-like protrusions
+  love.graphics.setColor(0.25 * alpha, 0.18 * alpha, 0.35 * alpha, alpha * 0.8)
+  love.graphics.polygon("fill", -vb.width/2 - 15, -10, -vb.width/2 - 30, 5, -vb.width/2 - 15, 20, -vb.width/2, 5)
+  love.graphics.polygon("fill", vb.width/2 + 15, -10, vb.width/2 + 30, 5, vb.width/2 + 15, 20, vb.width/2, 5)
 
   love.graphics.pop()
 
@@ -1390,37 +2071,86 @@ function M.drawWardenBoss()
   }
   local baseColor = phaseColors[wb.phase] or phaseColors[1]
 
-  -- Main body - imposing armored form
+  -- Main body - imposing angular armored fortress
   love.graphics.setColor(baseColor[1] * alpha, baseColor[2] * alpha, baseColor[3] * alpha, alpha)
-  love.graphics.rectangle("fill", -wb.width/2, -wb.height/2, wb.width, wb.height)
+  love.graphics.polygon("fill",
+    0, -wb.height/2 - 15,
+    wb.width/2 + 10, -wb.height/4,
+    wb.width/2 + 5, wb.height/4,
+    wb.width/2 - 10, wb.height/2,
+    -wb.width/2 + 10, wb.height/2,
+    -wb.width/2 - 5, wb.height/4,
+    -wb.width/2 - 10, -wb.height/4)
+  -- Wireframe
+  love.graphics.setColor(baseColor[1] * 2, baseColor[2] * 1.5, baseColor[3] * 1.2, 0.5 * alpha)
+  love.graphics.setLineWidth(1.5)
+  love.graphics.polygon("line",
+    0, -wb.height/2 - 15,
+    wb.width/2 + 10, -wb.height/4,
+    wb.width/2 + 5, wb.height/4,
+    wb.width/2 - 10, wb.height/2,
+    -wb.width/2 + 10, wb.height/2,
+    -wb.width/2 - 5, wb.height/4,
+    -wb.width/2 - 10, -wb.height/4)
+  love.graphics.setLineWidth(1)
 
-  -- Heavy armored plating (layered)
-  love.graphics.setColor(0.12 * alpha, 0.08 * alpha, 0.04 * alpha, alpha)
-  love.graphics.rectangle("fill", -65, -50, 130, 35)
-  love.graphics.rectangle("fill", -75, 10, 150, 40)
+  -- Heavy armored plating (layered fortress panels)
+  love.graphics.setColor(0.1 * alpha, 0.07 * alpha, 0.03 * alpha, alpha)
+  love.graphics.polygon("fill", -60, -45, 60, -45, 55, -20, -55, -20)
+  love.graphics.polygon("fill", -70, 5, 70, 5, 65, 35, -65, 35)
+  -- Panel rivets
+  love.graphics.setColor(0.3 * alpha, 0.2 * alpha, 0.1 * alpha, alpha)
+  for rx = -50, 50, 20 do
+    love.graphics.circle("fill", rx, -32, 2.5)
+    love.graphics.circle("fill", rx, 20, 2.5)
+  end
 
-  -- Shoulder pauldrons
-  love.graphics.setColor(0.3 * alpha, 0.18 * alpha, 0.06 * alpha, alpha)
-  love.graphics.polygon("fill", -80, -20, -95, 10, -70, 15, -60, -15)
-  love.graphics.polygon("fill", 80, -20, 95, 10, 70, 15, 60, -15)
+  -- Shoulder pauldrons (massive angular armor)
+  love.graphics.setColor(0.28 * alpha, 0.16 * alpha, 0.05 * alpha, alpha)
+  love.graphics.polygon("fill", -80, -25, -100, 5, -90, 25, -65, 18, -60, -18)
+  love.graphics.polygon("fill", 80, -25, 100, 5, 90, 25, 65, 18, 60, -18)
+  -- Pauldron wireframe
+  love.graphics.setColor(0.5 * alpha, 0.3 * alpha, 0.1 * alpha, 0.5 * alpha)
+  love.graphics.setLineWidth(1)
+  love.graphics.polygon("line", -80, -25, -100, 5, -90, 25, -65, 18, -60, -18)
+  love.graphics.polygon("line", 80, -25, 100, 5, 90, 25, 65, 18, 60, -18)
+  -- Pauldron spikes
+  love.graphics.setColor(0.4 * alpha, 0.25 * alpha, 0.08 * alpha, alpha)
+  love.graphics.polygon("fill", -95, -5, -108, 0, -95, 5)
+  love.graphics.polygon("fill", 95, -5, 108, 0, 95, 5)
 
-  -- Guards (shield generators) - Phase 1 only
+  -- Guards (shield generators) on BOTTOM
   if not wb.guardsDown then
+    local guardY = wb.height/2 + 22
     if not wb.leftGuard.destroyed then
+      love.graphics.setColor(0.5 * alpha, 0.3 * alpha, 0.08 * alpha, alpha)
+      love.graphics.polygon("fill", -65, wb.height/2 - 5, -55, wb.height/2 - 5, -50, guardY + 12, -70, guardY + 12)
       love.graphics.setColor(0.6 * alpha, 0.35 * alpha, 0.1 * alpha, alpha)
-      love.graphics.circle("fill", -70, 0, 22)
+      love.graphics.circle("fill", -60, guardY, 18)
       local shieldPulse = 0.5 + math.sin(time * 4) * 0.3
       love.graphics.setColor(0.8, 0.5, 0.15, shieldPulse * alpha)
-      love.graphics.circle("line", -70, 0, 28)
-      love.graphics.circle("line", -70, 0, 32)
+      love.graphics.circle("line", -60, guardY, 24)
+      love.graphics.circle("line", -60, guardY, 28)
+      love.graphics.setColor(1, 0.8, 0.3, shieldPulse * 0.5 * alpha)
+      love.graphics.circle("fill", -60, guardY, 8)
+      love.graphics.setColor(0.8, 0.5, 0.15, shieldPulse * 0.7 * alpha)
+      love.graphics.setFont(love.graphics.newFont(7))
+      love.graphics.printf("SHIELD", -80, guardY + 16, 40, "center")
     end
     if not wb.rightGuard.destroyed then
+      love.graphics.setColor(0.5 * alpha, 0.3 * alpha, 0.08 * alpha, alpha)
+      love.graphics.polygon("fill", 55, wb.height/2 - 5, 65, wb.height/2 - 5, 70, guardY + 12, 50, guardY + 12)
       love.graphics.setColor(0.6 * alpha, 0.35 * alpha, 0.1 * alpha, alpha)
-      love.graphics.circle("fill", 70, 0, 22)
+      love.graphics.circle("fill", 60, guardY, 18)
       local shieldPulse = 0.5 + math.sin(time * 4 + math.pi) * 0.3
       love.graphics.setColor(0.8, 0.5, 0.15, shieldPulse * alpha)
-      love.graphics.circle("line", 70, 0, 28)
-      love.graphics.circle("line", 70, 0, 32)
+      love.graphics.circle("line", 60, guardY, 24)
+      love.graphics.circle("line", 60, guardY, 28)
+      love.graphics.setColor(1, 0.8, 0.3, shieldPulse * 0.5 * alpha)
+      love.graphics.circle("fill", 60, guardY, 8)
+      love.graphics.setColor(0.8, 0.5, 0.15, shieldPulse * 0.7 * alpha)
+      love.graphics.setFont(love.graphics.newFont(7))
+      love.graphics.printf("SHIELD", 40, guardY + 16, 40, "center")
     end
   end
 
@@ -1442,15 +2172,22 @@ function M.drawWardenBoss()
     pulse = 0.5 + math.abs(math.sin(time * 8)) * 0.5
   end
 
-  -- Visor slit (wide horizontal eye)
-  love.graphics.setColor(0.05, 0.02, 0.02, alpha)
-  love.graphics.rectangle("fill", -40, -15, 80, 12)
+  -- Visor housing (recessed)
+  love.graphics.setColor(0.04, 0.02, 0.02, alpha)
+  love.graphics.rectangle("fill", -45, -18, 90, 16, 2, 2)
+  -- Visor glow bloom
+  love.graphics.setColor(coreColor[1] * pulse, coreColor[2] * pulse, coreColor[3] * pulse, 0.15 * alpha)
+  love.graphics.rectangle("fill", -50, -22, 100, 24)
+  -- Visor slit
   love.graphics.setColor(coreColor[1] * pulse * alpha, coreColor[2] * pulse * alpha, coreColor[3] * pulse * alpha, alpha)
   love.graphics.rectangle("fill", -35, -13, 70, 8)
-
   -- Inner eye glow
   love.graphics.setColor(1 * alpha, 1 * alpha, 1 * alpha, 0.5 * alpha * pulse)
   love.graphics.rectangle("fill", -15, -12, 30, 6)
+  -- Visor scan sweep
+  local scanX = math.sin(time * 2) * 30
+  love.graphics.setColor(1, 1, 1, 0.3 * alpha * pulse)
+  love.graphics.rectangle("fill", scanX - 3, -13, 6, 8)
 
   -- Outer glow during phase transitions
   if wb.phaseTransitioning then
@@ -1462,29 +2199,53 @@ function M.drawWardenBoss()
   -- Crown/crest (appears Phase 3+)
   if wb.phase >= 3 then
     love.graphics.setColor(0.5 * alpha, 0.3 * alpha, 0.08 * alpha, alpha)
-    love.graphics.polygon("fill", 0, -65, -20, -50, -15, -45, 0, -55, 15, -45, 20, -50)
+    love.graphics.polygon("fill",
+      0, -wb.height/2 - 30,
+      -25, -wb.height/2 - 12,
+      -18, -wb.height/2 - 8,
+      0, -wb.height/2 - 20,
+      18, -wb.height/2 - 8,
+      25, -wb.height/2 - 12)
+    -- Crown jewel
     love.graphics.setColor(coreColor[1] * 0.8, coreColor[2] * 0.8, coreColor[3] * 0.8, 0.7 * alpha)
-    love.graphics.circle("fill", 0, -52, 5)
+    love.graphics.circle("fill", 0, -wb.height/2 - 18, 5)
+    -- Crown glow
+    love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], 0.2 * alpha)
+    love.graphics.circle("fill", 0, -wb.height/2 - 18, 12)
   end
 
-  -- Weapon ports (glow in later phases)
+  -- Weapon ports (with glow in later phases)
   local weaponGlow = wb.phase >= 4 and (0.5 + math.sin(time * 6) * 0.3) or 0
-  love.graphics.setColor((0.5 + weaponGlow) * alpha, 0.15 * alpha, 0.08 * alpha, alpha)
-  love.graphics.rectangle("fill", -55, 45, 25, 18)
-  love.graphics.rectangle("fill", 30, 45, 25, 18)
-  love.graphics.rectangle("fill", -12, 52, 24, 14)
+  love.graphics.setColor((0.45 + weaponGlow) * alpha, 0.12 * alpha, 0.06 * alpha, alpha)
+  love.graphics.polygon("fill", -55, 40, -30, 40, -28, 60, -57, 60)
+  love.graphics.polygon("fill", 30, 40, 55, 40, 57, 60, 28, 60)
+  love.graphics.polygon("fill", -14, 48, 14, 48, 12, 64, -12, 64)
+  -- Barrel glow
+  love.graphics.setColor(1, 0.3 + weaponGlow, 0.1, (0.4 + weaponGlow) * alpha)
+  love.graphics.circle("fill", -42, 61, 4)
+  love.graphics.circle("fill", 42, 61, 4)
+  love.graphics.circle("fill", 0, 65, 4)
 
-  -- Phase 4+ chains (swinging appendages)
+  -- Phase 4+ chains (swinging appendages with flail detail)
   if wb.phase >= 4 then
     love.graphics.setColor(0.4 * alpha, 0.25 * alpha, 0.1 * alpha, alpha * 0.9)
     local chainAngle = math.sin(time * 3) * 0.4
     love.graphics.push()
     love.graphics.rotate(chainAngle)
-    love.graphics.polygon("fill", -85, -5, -95, 5, -90, 25, -80, 15)
+    love.graphics.polygon("fill", -85, -5, -98, 5, -92, 28, -78, 15)
+    -- Chain links
+    love.graphics.setColor(0.5, 0.3, 0.12, alpha * 0.7)
+    for cl = 0, 2 do
+      love.graphics.circle("line", -88 - cl * 3, 5 + cl * 7, 3)
+    end
     love.graphics.pop()
     love.graphics.push()
     love.graphics.rotate(-chainAngle)
-    love.graphics.polygon("fill", 85, -5, 95, 5, 90, 25, 80, 15)
+    love.graphics.polygon("fill", 85, -5, 98, 5, 92, 28, 78, 15)
+    love.graphics.setColor(0.5, 0.3, 0.12, alpha * 0.7)
+    for cl = 0, 2 do
+      love.graphics.circle("line", 88 + cl * 3, 5 + cl * 7, 3)
+    end
     love.graphics.pop()
   end
 
@@ -1585,58 +2346,99 @@ function M.drawSentinelBoss()
   }
   local baseColor = phaseColors[sb.phase] or phaseColors[1]
 
-  -- Main body - angular armored sentinel form
+  -- Main body - angular hexagonal sentinel hull
   love.graphics.setColor(baseColor[1] * alpha, baseColor[2] * alpha, baseColor[3] * alpha, alpha)
-  -- Central hexagonal body
   love.graphics.polygon("fill",
     -sb.width/2, -20,
     -sb.width/2 + 15, -sb.height/2,
     sb.width/2 - 15, -sb.height/2,
     sb.width/2, -20,
     sb.width/2 - 15, sb.height/2,
-    -sb.width/2 + 15, sb.height/2
-  )
+    -sb.width/2 + 15, sb.height/2)
+  -- Wireframe edge
+  love.graphics.setColor(baseColor[1] * 1.8, baseColor[2] * 1.5, baseColor[3] * 1.3, 0.5 * alpha)
+  love.graphics.setLineWidth(1.5)
+  love.graphics.polygon("line",
+    -sb.width/2, -20,
+    -sb.width/2 + 15, -sb.height/2,
+    sb.width/2 - 15, -sb.height/2,
+    sb.width/2, -20,
+    sb.width/2 - 15, sb.height/2,
+    -sb.width/2 + 15, sb.height/2)
+  love.graphics.setLineWidth(1)
 
   -- Armored plating (angular tech panels)
-  love.graphics.setColor(0.06 * alpha, 0.1 * alpha, 0.18 * alpha, alpha)
+  love.graphics.setColor(0.05 * alpha, 0.08 * alpha, 0.15 * alpha, alpha)
   love.graphics.polygon("fill", -60, -40, -45, -50, 45, -50, 60, -40, 50, -30, -50, -30)
   love.graphics.polygon("fill", -65, 10, 65, 10, 60, 30, -60, 30)
+  -- Panel detail lines
+  love.graphics.setColor(baseColor[1] * 0.5, baseColor[2] * 0.5, baseColor[3] * 0.5, 0.3 * alpha)
+  love.graphics.line(-40, -40, -40, -30)
+  love.graphics.line(0, -50, 0, -30)
+  love.graphics.line(40, -40, 40, -30)
+  love.graphics.line(-50, 10, -50, 30)
+  love.graphics.line(0, 10, 0, 30)
+  love.graphics.line(50, 10, 50, 30)
 
-  -- Angular shoulder pylons
-  love.graphics.setColor(0.15 * alpha, 0.3 * alpha, 0.45 * alpha, alpha)
+  -- Angular shoulder pylons with tech detail
+  love.graphics.setColor(0.12 * alpha, 0.25 * alpha, 0.4 * alpha, alpha)
   love.graphics.polygon("fill", -80, -25, -95, 5, -85, 20, -65, 10, -70, -20)
   love.graphics.polygon("fill", 80, -25, 95, 5, 85, 20, 65, 10, 70, -20)
+  -- Pylon wireframe
+  love.graphics.setColor(0.2, 0.4, 0.6, 0.4 * alpha)
+  love.graphics.polygon("line", -80, -25, -95, 5, -85, 20, -65, 10, -70, -20)
+  love.graphics.polygon("line", 80, -25, 95, 5, 85, 20, 65, 10, 70, -20)
+  -- Pylon indicator lights
+  local pylonPulse = 0.4 + math.sin(time * 3) * 0.3
+  love.graphics.setColor(baseColor[1], baseColor[2], baseColor[3], pylonPulse * alpha)
+  love.graphics.circle("fill", -82, 0, 3)
+  love.graphics.circle("fill", 82, 0, 3)
 
-  -- Guards (drone shield generators) - Phase 1 only
+  -- Guards (drone shield generators) on BOTTOM
   if not sb.guardsDown then
+    local guardY = sb.height/2 + 20
     if not sb.leftGuard.destroyed then
+      -- Hexagonal shield node housing
+      love.graphics.setColor(0.1 * alpha, 0.35 * alpha, 0.5 * alpha, alpha)
+      love.graphics.polygon("fill", -65, sb.height/2 - 5, -55, sb.height/2 - 5, -50, guardY + 15, -70, guardY + 15)
       love.graphics.setColor(0.2 * alpha, 0.6 * alpha, 0.8 * alpha, alpha)
-      -- Hexagonal shield node
-      local gx, gy = -70, 0
+      local gx, gy = -60, guardY
       love.graphics.polygon("fill",
-        gx, gy-18, gx+16, gy-9, gx+16, gy+9,
-        gx, gy+18, gx-16, gy+9, gx-16, gy-9)
+        gx, gy-16, gx+14, gy-8, gx+14, gy+8,
+        gx, gy+16, gx-14, gy+8, gx-14, gy-8)
       local shieldPulse = 0.5 + math.sin(time * 5) * 0.3
       love.graphics.setColor(0.3, 0.8, 1, shieldPulse * alpha)
       love.graphics.setLineWidth(2)
       love.graphics.polygon("line",
-        gx, gy-24, gx+21, gy-12, gx+21, gy+12,
-        gx, gy+24, gx-21, gy+12, gx-21, gy-12)
+        gx, gy-22, gx+19, gy-11, gx+19, gy+11,
+        gx, gy+22, gx-19, gy+11, gx-19, gy-11)
       love.graphics.setLineWidth(1)
+      love.graphics.setColor(0.5, 0.9, 1, shieldPulse * 0.5 * alpha)
+      love.graphics.circle("fill", gx, gy, 6)
+      love.graphics.setColor(0.3, 0.8, 1, shieldPulse * 0.7 * alpha)
+      love.graphics.setFont(love.graphics.newFont(7))
+      love.graphics.printf("SHIELD", gx - 20, gy + 18, 40, "center")
     end
     if not sb.rightGuard.destroyed then
+      love.graphics.setColor(0.1 * alpha, 0.35 * alpha, 0.5 * alpha, alpha)
+      love.graphics.polygon("fill", 55, sb.height/2 - 5, 65, sb.height/2 - 5, 70, guardY + 15, 50, guardY + 15)
       love.graphics.setColor(0.2 * alpha, 0.6 * alpha, 0.8 * alpha, alpha)
-      local gx, gy = 70, 0
+      local gx, gy = 60, guardY
       love.graphics.polygon("fill",
-        gx, gy-18, gx+16, gy-9, gx+16, gy+9,
-        gx, gy+18, gx-16, gy+9, gx-16, gy-9)
+        gx, gy-16, gx+14, gy-8, gx+14, gy+8,
+        gx, gy+16, gx-14, gy+8, gx-14, gy-8)
       local shieldPulse = 0.5 + math.sin(time * 5 + math.pi) * 0.3
       love.graphics.setColor(0.3, 0.8, 1, shieldPulse * alpha)
       love.graphics.setLineWidth(2)
       love.graphics.polygon("line",
-        gx, gy-24, gx+21, gy-12, gx+21, gy+12,
-        gx, gy+24, gx-21, gy+12, gx-21, gy-12)
+        gx, gy-22, gx+19, gy-11, gx+19, gy+11,
+        gx, gy+22, gx-19, gy+11, gx-19, gy-11)
       love.graphics.setLineWidth(1)
+      love.graphics.setColor(0.5, 0.9, 1, shieldPulse * 0.5 * alpha)
+      love.graphics.circle("fill", gx, gy, 6)
+      love.graphics.setColor(0.3, 0.8, 1, shieldPulse * 0.7 * alpha)
+      love.graphics.setFont(love.graphics.newFont(7))
+      love.graphics.printf("SHIELD", gx - 20, gy + 18, 40, "center")
     end
   end
 
@@ -1658,20 +2460,29 @@ function M.drawSentinelBoss()
     pulse = 0.5 + math.abs(math.sin(time * 10)) * 0.5
   end
 
-  -- Visor housing
-  love.graphics.setColor(0.03, 0.05, 0.08, alpha)
-  love.graphics.rectangle("fill", -45, -18, 90, 16, 3, 3)
+  -- Visor housing (recessed slot)
+  love.graphics.setColor(0.02, 0.04, 0.07, alpha)
+  love.graphics.rectangle("fill", -48, -20, 96, 18, 3, 3)
+  -- Visor bloom
+  love.graphics.setColor(coreColor[1] * pulse, coreColor[2] * pulse, coreColor[3] * pulse, 0.12 * alpha)
+  love.graphics.rectangle("fill", -55, -25, 110, 28)
   -- Scanning beam visor
   love.graphics.setColor(coreColor[1] * pulse * alpha, coreColor[2] * pulse * alpha, coreColor[3] * pulse * alpha, alpha)
-  love.graphics.rectangle("fill", -40, -16, 80, 12, 2, 2)
+  love.graphics.rectangle("fill", -42, -17, 84, 12, 2, 2)
+  -- Data ticker lines scrolling across visor
+  love.graphics.setColor(1, 1, 1, 0.15 * alpha * pulse)
+  for i = 0, 6 do
+    local tickX = ((time * 60 + i * 14) % 84) - 42
+    love.graphics.rectangle("fill", tickX, -16, 2, 10)
+  end
   -- Scanning sweep line
-  local scanX = math.sin(time * 4) * 35
+  local scanX = math.sin(time * 4) * 38
   love.graphics.setColor(1, 1, 1, 0.7 * alpha * pulse)
-  love.graphics.rectangle("fill", scanX - 2, -16, 4, 12)
+  love.graphics.rectangle("fill", scanX - 2, -17, 4, 12)
 
   -- Inner core glow
   love.graphics.setColor(1 * alpha, 1 * alpha, 1 * alpha, 0.4 * alpha * pulse)
-  love.graphics.rectangle("fill", -12, -15, 24, 10)
+  love.graphics.rectangle("fill", -14, -16, 28, 10)
 
   -- Phase transition glow
   if sb.phaseTransitioning then
@@ -1682,30 +2493,49 @@ function M.drawSentinelBoss()
 
   -- Antenna array (appears Phase 2+)
   if sb.phase >= 2 then
-    love.graphics.setColor(0.3 * alpha, 0.5 * alpha, 0.7 * alpha, alpha)
-    love.graphics.polygon("fill", -8, -58, 0, -72, 8, -58, 4, -50, -4, -50)
+    love.graphics.setColor(0.25 * alpha, 0.45 * alpha, 0.65 * alpha, alpha)
+    love.graphics.polygon("fill", -8, -58, 0, -75, 8, -58, 4, -50, -4, -50)
+    -- Antenna tip glow
+    love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], 0.6 * alpha)
+    love.graphics.circle("fill", 0, -75, 3)
     -- Signal waves from antenna
     local wavePulse = math.sin(time * 6) * 0.4 + 0.5
     love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], wavePulse * 0.4 * alpha)
-    love.graphics.arc("line", "open", 0, -65, 15, -2.5, -0.6)
-    love.graphics.arc("line", "open", 0, -65, 22, -2.5, -0.6)
+    love.graphics.arc("line", "open", 0, -68, 12, -2.3, -0.8)
+    love.graphics.arc("line", "open", 0, -68, 18, -2.3, -0.8)
+    love.graphics.arc("line", "open", 0, -68, 24, -2.3, -0.8)
   end
 
   -- Weapon emitter ports (glow in later phases)
   local weaponGlow = sb.phase >= 4 and (0.5 + math.sin(time * 7) * 0.3) or 0
-  love.graphics.setColor((0.2 + weaponGlow * 0.5) * alpha, (0.5 + weaponGlow * 0.3) * alpha, (0.8 + weaponGlow * 0.2) * alpha, alpha)
-  love.graphics.rectangle("fill", -55, 40, 22, 16, 2, 2)
-  love.graphics.rectangle("fill", 33, 40, 22, 16, 2, 2)
-  love.graphics.rectangle("fill", -10, 48, 20, 12, 2, 2)
+  love.graphics.setColor((0.15 + weaponGlow * 0.5) * alpha, (0.4 + weaponGlow * 0.3) * alpha, (0.7 + weaponGlow * 0.2) * alpha, alpha)
+  love.graphics.polygon("fill", -55, 36, -33, 36, -31, 54, -57, 54)
+  love.graphics.polygon("fill", 33, 36, 55, 36, 57, 54, 31, 54)
+  love.graphics.polygon("fill", -12, 44, 12, 44, 10, 58, -10, 58)
+  -- Emitter glow tips
+  love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], (0.4 + weaponGlow) * alpha)
+  love.graphics.circle("fill", -44, 55, 4)
+  love.graphics.circle("fill", 44, 55, 4)
+  love.graphics.circle("fill", 0, 59, 4)
 
-  -- Phase 4+ orbital drone anchors
+  -- Phase 4+ orbital drone anchors with arcs
   if sb.phase >= 4 then
     love.graphics.setColor(0.5 * alpha, 0.3 * alpha, 0.8 * alpha, alpha * 0.8)
     local droneAngle1 = time * 2.5
     local droneAngle2 = time * 2.5 + math.pi
-    love.graphics.setLineWidth(1)
+    love.graphics.setLineWidth(1.5)
+    -- Energy tethers with glow
+    love.graphics.setColor(0.4, 0.2, 0.7, 0.3 * alpha)
+    love.graphics.line(0, 0, math.cos(droneAngle1) * 55, math.sin(droneAngle1) * 55)
+    love.graphics.line(0, 0, math.cos(droneAngle2) * 55, math.sin(droneAngle2) * 55)
+    love.graphics.setColor(0.6, 0.4, 1, 0.6 * alpha)
     love.graphics.line(0, 0, math.cos(droneAngle1) * 50, math.sin(droneAngle1) * 50)
     love.graphics.line(0, 0, math.cos(droneAngle2) * 50, math.sin(droneAngle2) * 50)
+    love.graphics.setLineWidth(1)
+    -- Anchor points
+    love.graphics.setColor(0.7, 0.4, 1, 0.8 * alpha)
+    love.graphics.circle("fill", math.cos(droneAngle1) * 50, math.sin(droneAngle1) * 50, 4)
+    love.graphics.circle("fill", math.cos(droneAngle2) * 50, math.sin(droneAngle2) * 50, 4)
   end
 
   love.graphics.pop()
@@ -2231,7 +3061,7 @@ function M.drawMegalith()
   end
 
   -- ===============================================================
-  -- BOSS BODY
+  -- BOSS BODY (High-End PC Storage Component — RGB Enhanced)
   -- ===============================================================
   love.graphics.push()
   love.graphics.translate(mb.x, mb.y)
@@ -2249,25 +3079,86 @@ function M.drawMegalith()
   local phaseInAct = ((mb.phase - 1) % 3) + 1
   local baseColor = palette[math.min(phaseInAct, #palette)]
 
-  -- Main body
+  -- RGB ambient underglow
+  local ugHue1 = (time * 0.12) % 1
+  local ugHue2 = (time * 0.12 + 0.33) % 1
+  local ugHue3 = (time * 0.12 + 0.66) % 1
+  local ugR1, ugG1, ugB1 = M.hsvToRgb(ugHue1, 0.9, 1)
+  local ugR2, ugG2, ugB2 = M.hsvToRgb(ugHue2, 0.9, 1)
+  local ugR3, ugG3, ugB3 = M.hsvToRgb(ugHue3, 0.9, 1)
+  love.graphics.setColor(ugR1, ugG1, ugB1, 0.05 * alpha)
+  love.graphics.circle("fill", -40, -25, 80)
+  love.graphics.setColor(ugR2, ugG2, ugB2, 0.05 * alpha)
+  love.graphics.circle("fill", 40, 20, 80)
+  love.graphics.setColor(ugR3, ugG3, ugB3, 0.04 * alpha)
+  love.graphics.circle("fill", 0, 0, 70)
+
+  -- Main body — angular component casing
   love.graphics.setColor(baseColor[1] * alpha, baseColor[2] * alpha, baseColor[3] * alpha, alpha)
-  love.graphics.rectangle("fill", -mb.width/2, -mb.height/2, mb.width, mb.height)
+  love.graphics.polygon("fill",
+    -mb.width/2, -mb.height/2,
+    mb.width/2, -mb.height/2,
+    mb.width/2 + 6, -mb.height/4,
+    mb.width/2 + 6, mb.height/4,
+    mb.width/2, mb.height/2,
+    -mb.width/2, mb.height/2,
+    -mb.width/2 - 6, mb.height/4,
+    -mb.width/2 - 6, -mb.height/4)
+  -- Wireframe edge
+  love.graphics.setColor(baseColor[1] * 2, baseColor[2] * 1.5, baseColor[3] * 1.2, 0.4 * alpha)
+  love.graphics.setLineWidth(1.5)
+  love.graphics.polygon("line",
+    -mb.width/2, -mb.height/2,
+    mb.width/2, -mb.height/2,
+    mb.width/2 + 6, -mb.height/4,
+    mb.width/2 + 6, mb.height/4,
+    mb.width/2, mb.height/2,
+    -mb.width/2, mb.height/2,
+    -mb.width/2 - 6, mb.height/4,
+    -mb.width/2 - 6, -mb.height/4)
+  love.graphics.setLineWidth(1)
 
-  -- Armored plating layers
-  love.graphics.setColor(0.08 * alpha, 0.06 * alpha, 0.06 * alpha, alpha)
-  love.graphics.rectangle("fill", -70, -50, 140, 30)
-  love.graphics.rectangle("fill", -80, 10, 160, 40)
+  -- Armored plating layers with panel line detail
+  love.graphics.setColor(0.06 * alpha, 0.04 * alpha, 0.04 * alpha, alpha)
+  love.graphics.polygon("fill", -70, -50, 70, -50, 65, -25, -65, -25)
+  love.graphics.polygon("fill", -80, 10, 80, 10, 75, 45, -75, 45)
+  -- Panel lines
+  love.graphics.setColor(baseColor[1] * 0.4, baseColor[2] * 0.3, baseColor[3] * 0.3, 0.35 * alpha)
+  love.graphics.line(-40, -50, -40, -25)
+  love.graphics.line(0, -50, 0, -25)
+  love.graphics.line(40, -50, 40, -25)
 
-  -- Act-specific body details
+  -- RGB LED strip along top edge
+  for i = 0, 8 do
+    local ledHue = (time * 0.25 + i * 0.09) % 1
+    local lr, lg, lb = M.hsvToRgb(ledHue, 1, 1)
+    local ledPulse = 0.35 + math.sin(time * 3.5 + i * 0.8) * 0.35
+    love.graphics.setColor(lr, lg, lb, ledPulse * alpha)
+    love.graphics.rectangle("fill", -mb.width/2 + 5 + i * 16, -mb.height/2, 13, 3)
+    -- LED bloom
+    love.graphics.setColor(lr, lg, lb, ledPulse * 0.12 * alpha)
+    love.graphics.circle("fill", -mb.width/2 + 11 + i * 16, -mb.height/2 + 1, 10)
+  end
+
+  -- RGB LED strip along bottom edge
+  for i = 0, 8 do
+    local ledHue = (time * 0.25 + 0.5 + i * 0.09) % 1
+    local lr, lg, lb = M.hsvToRgb(ledHue, 1, 1)
+    local ledPulse = 0.3 + math.sin(time * 3.5 + i * 0.8 + math.pi) * 0.3
+    love.graphics.setColor(lr, lg, lb, ledPulse * alpha)
+    love.graphics.rectangle("fill", -mb.width/2 + 5 + i * 16, mb.height/2 - 3, 13, 3)
+  end
+
+  -- Act-specific body details (enhanced with RGB)
   if mb.act == 1 then
-    -- RAM chip pins along edges
+    -- RAM chip pins along edges (gold contacts)
     love.graphics.setColor(0.7 * alpha, 0.6 * alpha, 0.15 * alpha, alpha)
     for p = 0, 7 do
       local px = -65 + p * 18
       love.graphics.rectangle("fill", px, -mb.height/2 - 6, 8, 6)
       love.graphics.rectangle("fill", px, mb.height/2, 8, 6)
     end
-    -- PCB traces
+    -- PCB traces with flowing data pulses
     local tracePulse = 0.4 + math.sin(time * 5) * 0.3
     love.graphics.setColor(0.1 * alpha, 0.7 * alpha * tracePulse, 0.15 * alpha, alpha * 0.6)
     love.graphics.line(-50, -20, -10, -20)
@@ -2275,31 +3166,61 @@ function M.drawMegalith()
     love.graphics.line(-10, 20, 30, 20)
     love.graphics.line(30, -30, 50, -30)
     love.graphics.line(50, -30, 50, 10)
+    -- Data pulse dots along traces
+    local dpX = -50 + ((time * 40) % 80)
+    love.graphics.setColor(0.2, 1, 0.4, 0.6 * alpha)
+    love.graphics.circle("fill", math.min(dpX, -10), -20, 3)
+    -- DIMM slot RGB accent
+    for d = 0, 2 do
+      local dHue = (time * 0.3 + d * 0.3) % 1
+      local dR, dG, dB = M.hsvToRgb(dHue, 0.8, 1)
+      love.graphics.setColor(dR, dG, dB, 0.25 * alpha)
+      love.graphics.rectangle("fill", -60 + d * 45, -mb.height/2 + 4, 35, 4)
+    end
   elseif mb.act == 2 then
-    -- Sector tracks (concentric arcs on body)
+    -- Sector tracks (concentric arcs on body) with RGB glow
     for i = 1, 3 do
       local r = 20 + i * 15
-      love.graphics.setColor(0.5 * alpha, 0.15 * alpha, 0.6 * alpha, 0.5 * alpha)
+      local trackHue = (time * 0.2 + i * 0.25) % 1
+      local tR, tG, tB = M.hsvToRgb(trackHue, 0.6, 0.8)
+      love.graphics.setColor(tR, tG, tB, 0.4 * alpha)
       love.graphics.arc("line", "open", 0, 0, r, -math.pi/3, math.pi/3)
     end
-    -- Read head indicator
+    -- Read head indicator with bloom
     love.graphics.setColor(0.8 * alpha, 0.3 * alpha, 0.9 * alpha, 0.8 * alpha)
     love.graphics.polygon("fill", -5, 55, 5, 55, 0, 65)
+    love.graphics.setColor(0.8, 0.3, 0.9, 0.2 * alpha)
+    love.graphics.circle("fill", 0, 60, 12)
+    -- Platter surface RGB accent lines
+    love.graphics.setColor(0.6, 0.2, 0.8, 0.2 * alpha)
+    love.graphics.circle("line", 0, 0, 35)
+    love.graphics.circle("line", 0, 0, 52)
   else
-    -- Core: spinning inner mechanism
+    -- Core: spinning inner mechanism with RGB glow
     local coreSpin = time * 2
-    love.graphics.setColor(0.3 * alpha, 0.08 * alpha, 0.08 * alpha, alpha * 0.7)
     for i = 0, 2 do
       local a = coreSpin + i * (math.pi * 2 / 3)
+      local armHue = (time * 0.3 + i * 0.33) % 1
+      local aR, aG, aB = M.hsvToRgb(armHue, 0.7, 0.8)
+      love.graphics.setColor(aR, aG, aB, alpha * 0.6)
+      love.graphics.setLineWidth(2)
       love.graphics.line(0, 0, math.cos(a) * 50, math.sin(a) * 50)
+      love.graphics.setLineWidth(1)
+      -- Arm tip RGB glow
+      love.graphics.setColor(aR, aG, aB, 0.3 * alpha)
+      love.graphics.circle("fill", math.cos(a) * 50, math.sin(a) * 50, 6)
     end
-    -- Glowing spindle hub
+    -- Glowing spindle hub with bloom
     local hubPulse = 0.5 + math.sin(time * 4) * 0.3
     love.graphics.setColor(0.8 * alpha * hubPulse, 0.15 * alpha, 0.15 * alpha, alpha)
     love.graphics.circle("fill", 0, 0, 15)
+    love.graphics.setColor(0.9, 0.2, 0.15, hubPulse * 0.2 * alpha)
+    love.graphics.circle("fill", 0, 0, 28)
+    love.graphics.setColor(1, 0.4, 0.3, hubPulse * 0.1 * alpha)
+    love.graphics.circle("fill", 0, 0, 40)
   end
 
-  -- Central core eye
+  -- Central core eye (enhanced with bloom and RGB arcs)
   local coreGlow = {
     {0.2, 0.9, 0.3},   -- Act I: Green
     {0.7, 0.2, 0.9},   -- Act II: Purple
@@ -2315,17 +3236,59 @@ function M.drawMegalith()
     pulse = 0.4 + math.abs(math.sin(time * 12)) * 0.6
   end
 
+  -- Outer bloom layers
+  love.graphics.setColor(coreC[1], coreC[2], coreC[3], 0.08 * alpha * pulse)
+  love.graphics.circle("fill", 0, -5, 55)
+  love.graphics.setColor(coreC[1], coreC[2], coreC[3], 0.15 * alpha * pulse)
+  love.graphics.circle("fill", 0, -5, 40)
+
+  -- RGB rotating arcs around core
+  love.graphics.setLineWidth(2)
+  for ri = 0, 4 do
+    local riHue = (time * 0.2 + ri * 0.2) % 1
+    local riR, riG, riB = M.hsvToRgb(riHue, 1, 1)
+    local riA = time * 1.8 + ri * math.pi / 2.5
+    love.graphics.setColor(riR, riG, riB, 0.45 * alpha * pulse)
+    love.graphics.arc("line", "open", 0, -5, 34, riA, riA + math.pi / 4)
+  end
+  love.graphics.setLineWidth(1)
+
+  -- Core fill
   love.graphics.setColor(coreC[1] * pulse * alpha, coreC[2] * pulse * alpha, coreC[3] * pulse * alpha, alpha)
   love.graphics.circle("fill", 0, -5, 30)
   -- Inner glow
-  love.graphics.setColor(1 * alpha, 1 * alpha, 1 * alpha, 0.5 * alpha)
+  love.graphics.setColor(1 * alpha, 1 * alpha, 1 * alpha, 0.55 * alpha * pulse)
   love.graphics.circle("fill", 0, -5, 12)
+  -- White-hot centre
+  love.graphics.setColor(1, 1, 0.95, 0.35 * alpha * pulse)
+  love.graphics.circle("fill", 0, -5, 6)
 
   -- Phase transition / enrage outer glow
   if mb.phaseTransitioning or mb.enraged then
     local glowPulse = math.abs(math.sin(time * 8))
     love.graphics.setColor(coreC[1], coreC[2], coreC[3], glowPulse * 0.4 * alpha)
-    love.graphics.circle("fill", 0, -5, 60)
+    love.graphics.circle("fill", 0, -5, 65)
+  end
+
+  -- Heatsink fin details on sides
+  love.graphics.setColor(baseColor[1] * 1.5, baseColor[2] * 1.2, baseColor[3] * 1.2, 0.3 * alpha)
+  for fi = 0, 4 do
+    local fy = -35 + fi * 16
+    love.graphics.line(-mb.width/2 - 6, fy, -mb.width/2 + 8, fy)
+    love.graphics.line(mb.width/2 + 6, fy, mb.width/2 - 8, fy)
+  end
+
+  -- VRM module corner accents with RGB
+  for ci = 0, 3 do
+    local cx = (ci < 2) and (-mb.width/2 + 15) or (mb.width/2 - 15)
+    local cy = (ci % 2 == 0) and (-mb.height/2 + 15) or (mb.height/2 - 15)
+    local vrmHue = (time * 0.3 + ci * 0.25) % 1
+    local vR, vG, vB = M.hsvToRgb(vrmHue, 0.7, 1)
+    local vPulse = 0.2 + math.sin(time * 4 + ci * 1.5) * 0.2
+    love.graphics.setColor(vR, vG, vB, vPulse * alpha)
+    love.graphics.rectangle("fill", cx - 5, cy - 5, 10, 10)
+    love.graphics.setColor(vR, vG, vB, vPulse * 0.3 * alpha)
+    love.graphics.circle("fill", cx, cy, 9)
   end
 
   -- Stagger visual (stunned state)
@@ -2335,7 +3298,6 @@ function M.drawMegalith()
     love.graphics.circle("line", 0, 0, mb.width/2 + 10)
     love.graphics.setColor(1, 1, 0.3, stPulse * 0.3)
     love.graphics.circle("line", 0, 0, mb.width/2 + 20)
-    -- "STAGGERED" text
     love.graphics.setColor(1, 1, 0.5, stPulse)
     love.graphics.setFont(love.graphics.newFont(14))
     love.graphics.printf("STAGGERED", -60, -mb.height/2 - 25, 120, "center")
@@ -2697,53 +3659,150 @@ function M.drawDynamoBoss()
   }
   local baseColor = phaseColors[db.phase] or phaseColors[1]
 
-  -- Main PSU body
+  -- RGB ambient glow behind PSU body
+  local rgbHue1 = (time * 0.15) % 1
+  local rgbHue2 = (time * 0.15 + 0.33) % 1
+  local rgbHue3 = (time * 0.15 + 0.66) % 1
+  local rgbR1, rgbG1, rgbB1 = M.hsvToRgb(rgbHue1, 0.9, 1)
+  local rgbR2, rgbG2, rgbB2 = M.hsvToRgb(rgbHue2, 0.9, 1)
+  local rgbR3, rgbG3, rgbB3 = M.hsvToRgb(rgbHue3, 0.9, 1)
+  -- RGB bloom halo
+  love.graphics.setColor(rgbR1, rgbG1, rgbB1, 0.06 * alpha)
+  love.graphics.circle("fill", -30, -20, 90)
+  love.graphics.setColor(rgbR2, rgbG2, rgbB2, 0.06 * alpha)
+  love.graphics.circle("fill", 30, 10, 90)
+  love.graphics.setColor(rgbR3, rgbG3, rgbB3, 0.06 * alpha)
+  love.graphics.circle("fill", 0, 30, 80)
+
+  -- Main PSU body - angular component shape
   love.graphics.setColor(baseColor[1] * alpha, baseColor[2] * alpha, baseColor[3] * alpha, alpha)
-  love.graphics.rectangle("fill", -db.width / 2, -db.height / 2, db.width, db.height)
+  love.graphics.polygon("fill",
+    -db.width/2, -db.height/2,
+    db.width/2, -db.height/2,
+    db.width/2 + 8, -db.height/4,
+    db.width/2 + 8, db.height/4,
+    db.width/2, db.height/2,
+    -db.width/2, db.height/2,
+    -db.width/2 - 8, db.height/4,
+    -db.width/2 - 8, -db.height/4)
+  -- Wireframe edge
+  love.graphics.setColor(baseColor[1] * 2, baseColor[2] * 1.5, baseColor[3] * 1.2, 0.5 * alpha)
+  love.graphics.setLineWidth(1.5)
+  love.graphics.polygon("line",
+    -db.width/2, -db.height/2,
+    db.width/2, -db.height/2,
+    db.width/2 + 8, -db.height/4,
+    db.width/2 + 8, db.height/4,
+    db.width/2, db.height/2,
+    -db.width/2, db.height/2,
+    -db.width/2 - 8, db.height/4,
+    -db.width/2 - 8, -db.height/4)
+  love.graphics.setLineWidth(1)
 
-  -- Casing plating
-  love.graphics.setColor(0.15 * alpha, 0.08 * alpha, 0.03 * alpha, alpha)
-  love.graphics.rectangle("fill", -75, -58, 150, 35)
-  love.graphics.rectangle("fill", -80, 12, 160, 42)
+  -- Casing plating with panel lines
+  love.graphics.setColor(0.12 * alpha, 0.06 * alpha, 0.02 * alpha, alpha)
+  love.graphics.polygon("fill", -70, -55, 70, -55, 65, -30, -65, -30)
+  love.graphics.polygon("fill", -75, 8, 75, 8, 70, 42, -70, 42)
+  -- Panel line detail
+  love.graphics.setColor(baseColor[1] * 0.4, baseColor[2] * 0.3, baseColor[3] * 0.3, 0.4 * alpha)
+  love.graphics.line(-50, -55, -50, -30)
+  love.graphics.line(0, -55, 0, -30)
+  love.graphics.line(50, -55, 50, -30)
 
-  -- Ventilation grilles
-  love.graphics.setColor(0.08 * alpha, 0.04 * alpha, 0.02 * alpha, alpha)
+  -- Ventilation grilles with RGB LED strips
+  love.graphics.setColor(0.06 * alpha, 0.03 * alpha, 0.01 * alpha, alpha)
   for i = 0, 5 do
     love.graphics.rectangle("fill", -60 + i * 22, -52, 18, 4)
   end
+  -- RGB LED strip along grilles
+  for i = 0, 5 do
+    local ledHue = (time * 0.3 + i * 0.1) % 1
+    local lr, lg, lb = M.hsvToRgb(ledHue, 1, 1)
+    local ledPulse = 0.4 + math.sin(time * 4 + i * 1.2) * 0.4
+    love.graphics.setColor(lr, lg, lb, ledPulse * alpha)
+    love.graphics.rectangle("fill", -60 + i * 22, -48, 18, 2)
+    -- LED bloom
+    love.graphics.setColor(lr, lg, lb, ledPulse * 0.15 * alpha)
+    love.graphics.circle("fill", -51 + i * 22, -47, 12)
+  end
 
-  -- Power connector shoulders
-  love.graphics.setColor(0.4 * alpha, 0.2 * alpha, 0.05 * alpha, alpha)
-  love.graphics.polygon("fill", -90, -25, -105, 10, -80, 18, -70, -18)
-  love.graphics.polygon("fill", 90, -25, 105, 10, 80, 18, 70, -18)
+  -- Power connector shoulders (heatsink tower shape)
+  love.graphics.setColor(0.35 * alpha, 0.18 * alpha, 0.04 * alpha, alpha)
+  love.graphics.polygon("fill", -88, -28, -105, 5, -95, 22, -78, 18, -72, -20)
+  love.graphics.polygon("fill", 88, -28, 105, 5, 95, 22, 78, 18, 72, -20)
+  -- Shoulder wireframe
+  love.graphics.setColor(0.6, 0.35, 0.1, 0.4 * alpha)
+  love.graphics.polygon("line", -88, -28, -105, 5, -95, 22, -78, 18, -72, -20)
+  love.graphics.polygon("line", 88, -28, 105, 5, 95, 22, 78, 18, 72, -20)
+  -- Heatsink fin lines on shoulders
+  love.graphics.setColor(0.3, 0.15, 0.05, 0.5 * alpha)
+  for fi = 0, 3 do
+    local fy = -20 + fi * 10
+    love.graphics.line(-100, fy, -75, fy)
+    love.graphics.line(100, fy, 75, fy)
+  end
+  -- Shoulder RGB accent
+  local shoulderHue = (time * 0.2 + 0.5) % 1
+  local sr, sg, sbb = M.hsvToRgb(shoulderHue, 0.8, 1)
+  love.graphics.setColor(sr, sg, sbb, 0.3 * alpha)
+  love.graphics.circle("fill", -90, 0, 8)
+  love.graphics.circle("fill", 90, 0, 8)
 
-  -- Regulator nodes (shield generators)
+  -- Regulator nodes (shield generators) on BOTTOM
   if not db.regulatorsDown then
+    local regY = db.height/2 + 22
     if not db.leftRegulator.destroyed then
+      -- Housing pylon
+      love.graphics.setColor(0.4 * alpha, 0.2 * alpha, 0.05 * alpha, alpha)
+      love.graphics.polygon("fill", -70, db.height/2 - 5, -60, db.height/2 - 5, -55, regY + 14, -75, regY + 14)
+      -- Core
       love.graphics.setColor(0.9 * alpha, 0.5 * alpha, 0.1 * alpha, alpha)
-      love.graphics.circle("fill", -75, 0, 24)
+      love.graphics.circle("fill", -65, regY, 18)
       local regPulse = 0.5 + math.sin(time * 4.5) * 0.3
       love.graphics.setColor(1, 0.7, 0.2, regPulse * alpha)
-      love.graphics.circle("line", -75, 0, 30)
-      love.graphics.circle("line", -75, 0, 35)
+      love.graphics.circle("line", -65, regY, 24)
+      love.graphics.circle("line", -65, regY, 28)
+      love.graphics.setColor(1, 0.9, 0.5, regPulse * 0.5 * alpha)
+      love.graphics.circle("fill", -65, regY, 7)
+      -- RGB ring on regulator
+      local regHue = (time * 0.4) % 1
+      local rr, rg, rb = M.hsvToRgb(regHue, 1, 1)
+      love.graphics.setColor(rr, rg, rb, regPulse * 0.4 * alpha)
+      love.graphics.circle("line", -65, regY, 21)
+      -- HP bar
       local regHpPct = db.leftRegulator.health / 40
       love.graphics.setColor(1, regHpPct, 0, 0.7 * alpha)
-      love.graphics.rectangle("fill", -90, -35, 30 * regHpPct, 4)
+      love.graphics.rectangle("fill", -80, regY + 16, 30 * regHpPct, 3)
+      -- Label
+      love.graphics.setColor(1, 0.7, 0.2, regPulse * 0.7 * alpha)
+      love.graphics.setFont(love.graphics.newFont(7))
+      love.graphics.printf("SHIELD", -85, regY + 21, 40, "center")
     end
     if not db.rightRegulator.destroyed then
+      love.graphics.setColor(0.4 * alpha, 0.2 * alpha, 0.05 * alpha, alpha)
+      love.graphics.polygon("fill", 60, db.height/2 - 5, 70, db.height/2 - 5, 75, regY + 14, 55, regY + 14)
       love.graphics.setColor(0.9 * alpha, 0.5 * alpha, 0.1 * alpha, alpha)
-      love.graphics.circle("fill", 75, 0, 24)
+      love.graphics.circle("fill", 65, regY, 18)
       local regPulse = 0.5 + math.sin(time * 4.5 + math.pi) * 0.3
       love.graphics.setColor(1, 0.7, 0.2, regPulse * alpha)
-      love.graphics.circle("line", 75, 0, 30)
-      love.graphics.circle("line", 75, 0, 35)
+      love.graphics.circle("line", 65, regY, 24)
+      love.graphics.circle("line", 65, regY, 28)
+      love.graphics.setColor(1, 0.9, 0.5, regPulse * 0.5 * alpha)
+      love.graphics.circle("fill", 65, regY, 7)
+      local regHue = (time * 0.4 + 0.5) % 1
+      local rr, rg, rb = M.hsvToRgb(regHue, 1, 1)
+      love.graphics.setColor(rr, rg, rb, regPulse * 0.4 * alpha)
+      love.graphics.circle("line", 65, regY, 21)
       local regHpPct = db.rightRegulator.health / 40
       love.graphics.setColor(1, regHpPct, 0, 0.7 * alpha)
-      love.graphics.rectangle("fill", 60, -35, 30 * regHpPct, 4)
+      love.graphics.rectangle("fill", 50, regY + 16, 30 * regHpPct, 3)
+      love.graphics.setColor(1, 0.7, 0.2, regPulse * 0.7 * alpha)
+      love.graphics.setFont(love.graphics.newFont(7))
+      love.graphics.printf("SHIELD", 45, regY + 21, 40, "center")
     end
   end
 
-  -- Central hexagonal core
+  -- Central hexagonal core with RGB
   local coreColors = {
     {1, 0.6, 0.1},
     {1, 0.5, 0.15},
@@ -2762,8 +3821,8 @@ function M.drawDynamoBoss()
   if db.enraged then pulse = 0.4 + math.abs(math.sin(time * 12)) * 0.6 end
 
   -- Hex outline
-  love.graphics.setColor(0.05, 0.02, 0.01, alpha)
-  local hexR = 38
+  love.graphics.setColor(0.04, 0.02, 0.01, alpha)
+  local hexR = 40
   local hexVerts = {}
   for i = 0, 5 do
     local a = (i / 6) * math.pi * 2 - math.pi / 6
@@ -2772,10 +3831,22 @@ function M.drawDynamoBoss()
   end
   love.graphics.polygon("fill", unpack(hexVerts))
 
+  -- RGB rotating ring around core
+  love.graphics.setLineWidth(2)
+  for ri = 0, 5 do
+    local riHue = (time * 0.25 + ri * 0.167) % 1
+    local riR, riG, riB = M.hsvToRgb(riHue, 1, 1)
+    local riA = (ri / 6) * math.pi * 2 + time * 1.5
+    local riA2 = riA + math.pi / 4
+    love.graphics.setColor(riR, riG, riB, 0.5 * alpha * pulse)
+    love.graphics.arc("line", "open", 0, 0, hexR - 2, riA, riA2)
+  end
+  love.graphics.setLineWidth(1)
+
   -- Core glow
   love.graphics.setColor(coreColor[1] * pulse * alpha, coreColor[2] * pulse * alpha, coreColor[3] * pulse * alpha, alpha)
-  local innerHexVerts = {}
   local innerR = 30
+  local innerHexVerts = {}
   for i = 0, 5 do
     local a = (i / 6) * math.pi * 2 - math.pi / 6
     table.insert(innerHexVerts, math.cos(a) * innerR)
@@ -2783,9 +3854,27 @@ function M.drawDynamoBoss()
   end
   love.graphics.polygon("fill", unpack(innerHexVerts))
 
+  -- Core bloom layers
+  love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], 0.2 * alpha * pulse)
+  love.graphics.circle("fill", 0, 0, 45)
+  love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], 0.1 * alpha * pulse)
+  love.graphics.circle("fill", 0, 0, 55)
+
   -- White-hot centre
   love.graphics.setColor(1 * alpha, 1 * alpha, 0.9 * alpha, 0.5 * alpha * pulse)
   love.graphics.circle("fill", 0, 0, 14)
+  love.graphics.setColor(1, 1, 1, 0.3 * alpha * pulse)
+  love.graphics.circle("fill", 0, 0, 8)
+
+  -- PCB trace circuit lines radiating from core
+  love.graphics.setColor(coreColor[1] * 0.5, coreColor[2] * 0.3, coreColor[3] * 0.2, 0.4 * alpha)
+  love.graphics.setLineWidth(1)
+  love.graphics.line(0, -30, 0, -50)
+  love.graphics.line(0, 30, 0, 50)
+  love.graphics.line(-28, -12, -55, -25)
+  love.graphics.line(28, -12, 55, -25)
+  love.graphics.line(-28, 12, -55, 30)
+  love.graphics.line(28, 12, 55, 30)
 
   -- Phase transition glow
   if db.phaseTransitioning then
@@ -2801,38 +3890,65 @@ function M.drawDynamoBoss()
     love.graphics.circle("fill", 0, 0, 70)
   end
 
-  -- Power output ports
+  -- Power output ports with RGB accent
   local portGlow = db.phase >= 3 and (0.4 + math.sin(time * 6) * 0.3) or 0
-  love.graphics.setColor((0.6 + portGlow) * alpha, (0.25 + portGlow * 0.3) * alpha, 0.08 * alpha, alpha)
-  love.graphics.rectangle("fill", -60, 48, 28, 18)
-  love.graphics.rectangle("fill", 32, 48, 28, 18)
-  love.graphics.rectangle("fill", -14, 55, 28, 14)
+  love.graphics.setColor((0.5 + portGlow) * alpha, (0.2 + portGlow * 0.3) * alpha, 0.06 * alpha, alpha)
+  love.graphics.polygon("fill", -58, 45, -32, 45, -30, 65, -60, 65)
+  love.graphics.polygon("fill", 32, 45, 58, 45, 60, 65, 30, 65)
+  love.graphics.polygon("fill", -16, 52, 16, 52, 14, 68, -14, 68)
+  -- Port RGB glow
+  local portHue = (time * 0.3 + 0.7) % 1
+  local pr, pg, pb = M.hsvToRgb(portHue, 0.8, 1)
+  love.graphics.setColor(pr, pg, pb, (0.3 + portGlow * 0.4) * alpha)
+  love.graphics.circle("fill", -45, 66, 5)
+  love.graphics.circle("fill", 45, 66, 5)
+  love.graphics.circle("fill", 0, 69, 5)
 
-  -- Cable appendages (Phase 5+)
+  -- Cable appendages (Phase 5+) with energy glow
   if db.phase >= 5 then
-    love.graphics.setColor(0.5 * alpha, 0.25 * alpha, 0.05 * alpha, alpha * 0.9)
+    love.graphics.setColor(0.45 * alpha, 0.22 * alpha, 0.04 * alpha, alpha * 0.9)
     local cableWave = math.sin(time * 3.5) * 0.35
     love.graphics.push()
     love.graphics.rotate(cableWave)
-    love.graphics.polygon("fill", -95, -8, -110, 8, -100, 28, -88, 12)
+    love.graphics.polygon("fill", -95, -8, -112, 8, -102, 30, -88, 12)
     love.graphics.pop()
     love.graphics.push()
     love.graphics.rotate(-cableWave)
-    love.graphics.polygon("fill", 95, -8, 110, 8, 100, 28, 88, 12)
+    love.graphics.polygon("fill", 95, -8, 112, 8, 102, 30, 88, 12)
     love.graphics.pop()
+    -- Cable tip RGB
+    local cableHue = (time * 0.5) % 1
+    local cr, cg, cb = M.hsvToRgb(cableHue, 1, 1)
+    love.graphics.setColor(cr, cg, cb, 0.5 * alpha)
+    love.graphics.circle("fill", -102 + math.sin(cableWave) * 5, 30, 4)
+    love.graphics.circle("fill", 102 - math.sin(cableWave) * 5, 30, 4)
   end
 
-  -- Overload crown (Phase 7+)
+  -- Overload crown (Phase 7+) with RGB jewel
   if db.phase >= 7 then
-    love.graphics.setColor(1 * alpha, 0.6 * alpha, 0.1 * alpha, alpha * 0.8)
-    love.graphics.polygon("fill", 0, -72, -25, -55, -18, -48, 0, -60, 18, -48, 25, -55)
-    love.graphics.setColor(coreColor[1] * 0.9, coreColor[2] * 0.9, coreColor[3] * 0.9, 0.8 * alpha)
-    love.graphics.circle("fill", 0, -58, 6)
+    love.graphics.setColor(0.9 * alpha, 0.5 * alpha, 0.08 * alpha, alpha * 0.8)
+    love.graphics.polygon("fill",
+      0, -db.height/2 - 28,
+      -28, -db.height/2 - 10,
+      -20, -db.height/2 - 5,
+      0, -db.height/2 - 18,
+      20, -db.height/2 - 5,
+      28, -db.height/2 - 10)
+    -- Crown jewel RGB
+    local crownHue = (time * 0.8) % 1
+    local cjr, cjg, cjb = M.hsvToRgb(crownHue, 1, 1)
+    love.graphics.setColor(cjr, cjg, cjb, 0.9 * alpha)
+    love.graphics.circle("fill", 0, -db.height/2 - 15, 5)
+    love.graphics.setColor(cjr, cjg, cjb, 0.3 * alpha)
+    love.graphics.circle("fill", 0, -db.height/2 - 15, 12)
   end
 
-  -- Meltdown cracks (Phase 8)
+  -- Meltdown cracks with molten RGB (Phase 8)
   if db.enraged then
-    love.graphics.setColor(1, 0.4, 0.05, 0.7 + math.sin(time * 15) * 0.3)
+    local crackPulse = 0.7 + math.sin(time * 15) * 0.3
+    local crackHue = (time * 1.5) % 1
+    local ckr, ckg, ckb = M.hsvToRgb(crackHue, 0.8, 1)
+    love.graphics.setColor(ckr, ckg, ckb, crackPulse * alpha)
     love.graphics.setLineWidth(2)
     love.graphics.line(-40, -30, -20, 10)
     love.graphics.line(-20, 10, -35, 40)
@@ -2841,6 +3957,20 @@ function M.drawDynamoBoss()
     love.graphics.line(-5, -40, 10, -10)
     love.graphics.line(10, -10, -10, 35)
     love.graphics.setLineWidth(1)
+    -- Molten drip glow along cracks
+    love.graphics.setColor(1, 0.8, 0.3, crackPulse * 0.5 * alpha)
+    love.graphics.circle("fill", -20, 10, 4)
+    love.graphics.circle("fill", 15, 15, 4)
+    love.graphics.circle("fill", 10, -10, 4)
+  end
+
+  -- Bottom RGB LED strip (like a high-end PSU)
+  for i = 0, 9 do
+    local stripHue = (time * 0.2 + i * 0.08) % 1
+    local stR, stG, stB = M.hsvToRgb(stripHue, 1, 1)
+    local stripPulse = 0.3 + math.sin(time * 3 + i * 0.7) * 0.3
+    love.graphics.setColor(stR, stG, stB, stripPulse * alpha)
+    love.graphics.rectangle("fill", -db.width/2 + 5 + i * 15, db.height/2 - 3, 12, 3)
   end
 
   love.graphics.pop()
@@ -2971,6 +4101,12 @@ function M.drawGameOver(score)
   love.graphics.setColor(1, 1, 1)
   love.graphics.printf("Final Score: " .. score, 0, 280, screen.WIDTH, "center")
   love.graphics.printf("Press R to retry", 0, 340, screen.WIDTH, "center")
+end
+
+function M.drawRespawnCountdown(timer)
+  love.graphics.setFont(fonts.large)
+  love.graphics.setColor(1, 1, 1, 0.9)
+  love.graphics.printf("Respawning in " .. math.ceil(timer) .. "...", 0, screen.HEIGHT / 2 - 20, screen.WIDTH, "center")
 end
 
 function M.startVictoryAnimation(enemiesDefeated, totalEnemies, notesEarned)
@@ -3969,7 +5105,7 @@ function M.drawSphereBoss()
   end
 
   -- ============================================================
-  -- BOSS BODY
+  -- BOSS BODY (Ancient Artifact + RGB Bloom)
   -- ============================================================
   love.graphics.push()
   love.graphics.translate(sb.x, sb.y)
@@ -3983,33 +5119,155 @@ function M.drawSphereBoss()
   }
   local baseColor = phaseColors[sb.phase] or phaseColors[1]
 
-  -- Outer sphere shell
+  -- RGB ambient bloom halo behind sphere
+  local ugHue1 = (time * 0.1) % 1
+  local ugHue2 = (time * 0.1 + 0.33) % 1
+  local ugHue3 = (time * 0.1 + 0.66) % 1
+  local ugR1, ugG1, ugB1 = M.hsvToRgb(ugHue1, 0.7, 1)
+  local ugR2, ugG2, ugB2 = M.hsvToRgb(ugHue2, 0.7, 1)
+  local ugR3, ugG3, ugB3 = M.hsvToRgb(ugHue3, 0.7, 1)
+  love.graphics.setColor(ugR1, ugG1, ugB1, 0.04 * alpha)
+  love.graphics.circle("fill", -20, -15, sb.width / 2 + 35)
+  love.graphics.setColor(ugR2, ugG2, ugB2, 0.04 * alpha)
+  love.graphics.circle("fill", 20, 10, sb.width / 2 + 35)
+  love.graphics.setColor(ugR3, ugG3, ugB3, 0.035 * alpha)
+  love.graphics.circle("fill", 0, 0, sb.width / 2 + 30)
+
+  -- Outer golden ornamental ring (ancient artifact border)
+  local ornPulse = 0.6 + math.sin(time * 1.5) * 0.15
+  love.graphics.setColor(0.85, 0.7, 0.25, ornPulse * alpha)
+  love.graphics.setLineWidth(3)
+  love.graphics.circle("line", 0, 0, sb.width / 2 + 6)
+  love.graphics.setLineWidth(1)
+  love.graphics.setColor(0.75, 0.6, 0.2, ornPulse * 0.5 * alpha)
+  love.graphics.circle("line", 0, 0, sb.width / 2 + 10)
+  -- Gold bloom
+  love.graphics.setColor(0.9, 0.75, 0.3, ornPulse * 0.06 * alpha)
+  love.graphics.circle("fill", 0, 0, sb.width / 2 + 18)
+
+  -- Weathered stone sphere surface (dark base)
   local shellPulse = 0.85 + math.sin(time * 2) * 0.15
-  love.graphics.setColor(baseColor[1] * shellPulse * alpha, baseColor[2] * shellPulse * alpha, baseColor[3] * shellPulse * alpha, alpha)
+  love.graphics.setColor(baseColor[1] * shellPulse * 0.7 * alpha, baseColor[2] * shellPulse * 0.7 * alpha, baseColor[3] * shellPulse * 0.7 * alpha, alpha)
   love.graphics.circle("fill", 0, 0, sb.width / 2)
 
-  -- Inner glow ring
-  love.graphics.setColor(baseColor[1] * 1.4, baseColor[2] * 1.4, baseColor[3] * 1.4, 0.3 * alpha)
-  love.graphics.circle("line", 0, 0, sb.width / 2 - 8)
-  love.graphics.circle("line", 0, 0, sb.width / 2 - 12)
+  -- Stone texture cracks (ancient weathering)
+  love.graphics.setColor(0.15, 0.12, 0.1, 0.4 * alpha)
+  love.graphics.setLineWidth(1)
+  love.graphics.line(-25, -30, -10, -5)
+  love.graphics.line(-10, -5, -20, 20)
+  love.graphics.line(15, -25, 28, -8)
+  love.graphics.line(28, -8, 18, 15)
+  love.graphics.line(-5, 22, 10, 30)
+  love.graphics.line(-30, 5, -18, -3)
 
-  -- Surface tech lines (rotating)
-  love.graphics.setColor(0.5, 0.5, 0.6, 0.4 * alpha)
+  -- Hieroglyphic panels (rotating inscribed segments)
+  local hieroR = sb.width / 2 - 12
+  for i = 0, 5 do
+    local angle = (i / 6) * math.pi * 2 + time * 0.4
+    local nextAngle = ((i + 1) / 6) * math.pi * 2 + time * 0.4
+    local hx1 = math.cos(angle) * hieroR
+    local hy1 = math.sin(angle) * hieroR
+    local hx2 = math.cos(nextAngle) * hieroR
+    local hy2 = math.sin(nextAngle) * hieroR
+    -- Panel border line
+    love.graphics.setColor(0.7, 0.55, 0.2, 0.35 * alpha)
+    love.graphics.line(hx1, hy1, hx2, hy2)
+    -- Hieroglyphic mark (small symbol at midpoint)
+    local mx = (hx1 + hx2) / 2 * 0.75
+    local my = (hy1 + hy2) / 2 * 0.75
+    local glyphHue = (time * 0.15 + i * 0.167) % 1
+    local gR, gG, gB = M.hsvToRgb(glyphHue, 0.6, 1)
+    local glyphPulse = 0.3 + math.sin(time * 2.5 + i * 1.2) * 0.25
+    love.graphics.setColor(gR, gG, gB, glyphPulse * alpha)
+    -- Different glyph shapes per segment
+    if i % 3 == 0 then
+      love.graphics.polygon("fill", mx, my - 5, mx + 4, my + 3, mx - 4, my + 3)
+    elseif i % 3 == 1 then
+      love.graphics.rectangle("fill", mx - 4, my - 4, 8, 8)
+    else
+      love.graphics.circle("fill", mx, my, 4)
+    end
+    -- Glyph bloom
+    love.graphics.setColor(gR, gG, gB, glyphPulse * 0.12 * alpha)
+    love.graphics.circle("fill", mx, my, 12)
+  end
+
+  -- Runic inscriptions (slowly rotating text-like marks on outer band)
+  local runeR = sb.width / 2 - 4
+  for ri = 0, 11 do
+    local rAngle = (ri / 12) * math.pi * 2 + time * (-0.25)
+    local rx = math.cos(rAngle) * runeR
+    local ry = math.sin(rAngle) * runeR
+    local runeHue = (time * 0.08 + ri * 0.083) % 1
+    local rR, rG, rB = M.hsvToRgb(runeHue, 0.5, 0.9)
+    local runePulse = 0.25 + math.sin(time * 3 + ri * 0.6) * 0.2
+    love.graphics.setColor(rR, rG, rB, runePulse * alpha)
+    -- Tiny rune tick marks
+    local inR = runeR - 5
+    love.graphics.line(rx, ry, math.cos(rAngle) * inR, math.sin(rAngle) * inR)
+  end
+
+  -- Inner ancient sigil ring (second ornamental ring)
+  love.graphics.setColor(0.6, 0.45, 0.15, 0.35 * alpha)
+  love.graphics.circle("line", 0, 0, sb.width / 2 - 18)
+  -- Inner ring RGB cycling
+  local innerRingHue = (time * 0.12) % 1
+  local irR, irG, irB = M.hsvToRgb(innerRingHue, 0.7, 1)
+  love.graphics.setColor(irR, irG, irB, 0.2 * alpha)
+  love.graphics.circle("line", 0, 0, sb.width / 2 - 20)
+
+  -- Surface tech lines (rotating, ancient-meets-tech)
   love.graphics.setLineWidth(1)
   for i = 0, 7 do
     local angle = (i / 8) * math.pi * 2 + time * 0.3
-    local r1 = sb.width / 2 - 15
-    local r2 = sb.width / 2 - 5
+    local r1 = sb.width / 2 - 22
+    local r2 = sb.width / 2 - 8
+    local techHue = (time * 0.2 + i * 0.125) % 1
+    local tR, tG, tB = M.hsvToRgb(techHue, 0.5, 0.8)
+    love.graphics.setColor(tR, tG, tB, 0.35 * alpha)
     love.graphics.line(math.cos(angle) * r1, math.sin(angle) * r1,
                        math.cos(angle) * r2, math.sin(angle) * r2)
   end
 
-  -- Central eye/core
+  -- Central eye/core with ancient artifact bloom
   local corePulse = 0.6 + math.abs(math.sin(time * 4)) * 0.4
+  -- Multi-layer bloom
+  love.graphics.setColor(1, 0.8, 0.3, corePulse * 0.08 * alpha)
+  love.graphics.circle("fill", 0, 0, 40)
+  love.graphics.setColor(1, 0.75, 0.35, corePulse * 0.15 * alpha)
+  love.graphics.circle("fill", 0, 0, 25)
+  -- RGB cycling arcs around core
+  love.graphics.setLineWidth(2)
+  for ai = 0, 3 do
+    local arcHue = (time * 0.35 + ai * 0.25) % 1
+    local aR, aG, aB = M.hsvToRgb(arcHue, 0.9, 1)
+    local arcA = time * 2.2 + ai * math.pi / 2
+    love.graphics.setColor(aR, aG, aB, 0.5 * alpha * corePulse)
+    love.graphics.arc("line", "open", 0, 0, 16, arcA, arcA + math.pi / 3)
+  end
+  love.graphics.setLineWidth(1)
+  -- Core fill (golden ancient glow)
   love.graphics.setColor(1, 0.8, 0.4, corePulse * alpha)
   love.graphics.circle("fill", 0, 0, 12)
-  love.graphics.setColor(1, 1, 0.9, corePulse * 0.5 * alpha)
+  -- White-hot centre
+  love.graphics.setColor(1, 1, 0.9, corePulse * 0.6 * alpha)
   love.graphics.circle("fill", 0, 0, 6)
+  love.graphics.setColor(1, 1, 1, corePulse * 0.35 * alpha)
+  love.graphics.circle("fill", 0, 0, 3)
+
+  -- Ancient energy wisps (slow orbiting particles)
+  for wi = 0, 4 do
+    local wAngle = time * 0.8 + wi * math.pi * 2 / 5
+    local wR = 20 + math.sin(time * 1.5 + wi) * 8
+    local wx = math.cos(wAngle) * wR
+    local wy = math.sin(wAngle) * wR
+    local wHue = (time * 0.1 + wi * 0.2) % 1
+    local wR2, wG2, wB2 = M.hsvToRgb(wHue, 0.6, 1)
+    love.graphics.setColor(wR2, wG2, wB2, 0.4 * alpha)
+    love.graphics.circle("fill", wx, wy, 2)
+    love.graphics.setColor(wR2, wG2, wB2, 0.1 * alpha)
+    love.graphics.circle("fill", wx, wy, 6)
+  end
 
   love.graphics.pop()
 
@@ -4942,9 +6200,25 @@ function M.drawSynesthesia()
       end
     end
 
-    -- BOSS BODY (GPU Core Architect)
+    -- BOSS BODY (GPU Core Architect — High-End PC Component)
     love.graphics.push()
     love.graphics.translate(sb.x, sb.y)
+
+    local hw, hh = sb.width / 2, sb.height / 2
+
+    -- RGB ambient underglow beneath GPU body
+    local ugHue1 = (time * 0.12) % 1
+    local ugHue2 = (time * 0.12 + 0.33) % 1
+    local ugHue3 = (time * 0.12 + 0.66) % 1
+    local ugR1, ugG1, ugB1 = M.hsvToRgb(ugHue1, 0.9, 1)
+    local ugR2, ugG2, ugB2 = M.hsvToRgb(ugHue2, 0.9, 1)
+    local ugR3, ugG3, ugB3 = M.hsvToRgb(ugHue3, 0.9, 1)
+    love.graphics.setColor(ugR1, ugG1, ugB1, 0.06 * alpha)
+    love.graphics.circle("fill", -hw * 0.4, hh * 0.3, 70)
+    love.graphics.setColor(ugR2, ugG2, ugB2, 0.06 * alpha)
+    love.graphics.circle("fill", hw * 0.4, -hh * 0.3, 70)
+    love.graphics.setColor(ugR3, ugG3, ugB3, 0.05 * alpha)
+    love.graphics.circle("fill", 0, 0, 80)
 
     -- Phase transition glow
     if sb.phaseTransitioning then
@@ -4953,22 +6227,23 @@ function M.drawSynesthesia()
       love.graphics.circle("fill", 0, 0, sb.width * 0.6)
     end
 
-    -- Ascension aura (Phase 10)
+    -- Ascension aura (Phase 10) — multi-ring rainbow chromatic halo with bloom
     if sb.ascended then
       local auraPulse = 0.3 + math.sin(time * 3) * 0.15
-      -- Rainbow chromatic halo
-      for ring = 1, 5 do
-        local rHue = (synesthesia.vizHue + ring * 0.15) % 1
-        local ar, ag, ab = M.hsvToRgb(rHue, 0.6, 1)
-        love.graphics.setColor(ar, ag, ab, auraPulse / ring)
-        love.graphics.circle("line", 0, 0, sb.width * 0.5 + ring * 15 + math.sin(time * 2 + ring) * 5)
+      for ring = 1, 7 do
+        local rHue = (synesthesia.vizHue + ring * 0.12) % 1
+        local ar, ag, ab = M.hsvToRgb(rHue, 0.7, 1)
+        local rr = sb.width * 0.5 + ring * 14 + math.sin(time * 2 + ring) * 5
+        love.graphics.setColor(ar, ag, ab, auraPulse / ring * 0.8)
+        love.graphics.circle("line", 0, 0, rr)
+        -- Bloom haze per ring
+        love.graphics.setColor(ar, ag, ab, auraPulse / ring * 0.08)
+        love.graphics.circle("fill", 0, 0, rr + 6)
       end
     end
 
-    -- Main body: GPU die shape (square with beveled corners)
-    -- Outer casing
-    love.graphics.setColor(0.12, 0.12, 0.15, alpha)
-    local hw, hh = sb.width / 2, sb.height / 2
+    -- Main GPU die body — beveled corners, dark substrate
+    love.graphics.setColor(0.1, 0.1, 0.13, alpha)
     love.graphics.polygon("fill",
       -hw + 15, -hh,
       hw - 15, -hh,
@@ -4978,98 +6253,260 @@ function M.drawSynesthesia()
       -hw + 15, hh,
       -hw, hh - 15,
       -hw, -hh + 15)
-
-    -- Circuit trace pattern on body
-    love.graphics.setColor(pc[1] * 0.3, pc[2] * 0.3, pc[3] * 0.3, alpha * 0.5)
+    -- Wireframe edge
+    love.graphics.setColor(pc[1] * 0.5, pc[2] * 0.5, pc[3] * 0.5, 0.4 * alpha)
+    love.graphics.setLineWidth(1.5)
+    love.graphics.polygon("line",
+      -hw + 15, -hh,
+      hw - 15, -hh,
+      hw, -hh + 15,
+      hw, hh - 15,
+      hw - 15, hh,
+      -hw + 15, hh,
+      -hw, hh - 15,
+      -hw, -hh + 15)
     love.graphics.setLineWidth(1)
-    for tx = -hw + 25, hw - 25, 20 do
-      love.graphics.line(tx, -hh + 20, tx, hh - 20)
+
+    -- PCB circuit traces with flowing data highlights
+    love.graphics.setColor(pc[1] * 0.2, pc[2] * 0.2, pc[3] * 0.2, alpha * 0.5)
+    love.graphics.setLineWidth(1)
+    for tx = -hw + 25, hw - 25, 18 do
+      love.graphics.line(tx, -hh + 18, tx, hh - 18)
     end
-    for ty = -hh + 25, hh - 25, 20 do
-      love.graphics.line(-hw + 20, ty, hw - 20, ty)
+    for ty = -hh + 25, hh - 25, 18 do
+      love.graphics.line(-hw + 18, ty, hw - 18, ty)
+    end
+    -- Flowing data pulses along traces
+    for tx = -hw + 25, hw - 25, 36 do
+      local dataY = ((time * 60 + tx * 2) % (sb.height - 36)) - hh + 18
+      local dataHue = (time * 0.3 + tx * 0.01) % 1
+      local dr, dg, db = M.hsvToRgb(dataHue, 0.8, 1)
+      love.graphics.setColor(dr, dg, db, 0.5 * alpha)
+      love.graphics.circle("fill", tx, dataY, 2.5)
+      love.graphics.setColor(dr, dg, db, 0.15 * alpha)
+      love.graphics.circle("fill", tx, dataY, 7)
     end
 
-    -- Inner die (processor core)
-    local innerScale = 0.65
-    love.graphics.setColor(pc[1] * 0.15, pc[2] * 0.15, pc[3] * 0.15, alpha)
+    -- Inner die (processor core) with glow border
+    local innerScale = 0.62
+    love.graphics.setColor(pc[1] * 0.1, pc[2] * 0.1, pc[3] * 0.1, alpha)
     love.graphics.rectangle("fill", -hw * innerScale, -hh * innerScale,
       sb.width * innerScale, sb.height * innerScale)
-    -- Die border glow
+    -- Die border RGB cycling glow
     local diePulse = 0.4 + math.sin(time * 2.5) * 0.3
-    love.graphics.setColor(pc[1], pc[2], pc[3], diePulse * alpha)
+    local dieHue = (time * 0.15) % 1
+    local dbR, dbG, dbB = M.hsvToRgb(dieHue, 0.7, 1)
+    love.graphics.setColor(dbR, dbG, dbB, diePulse * alpha)
     love.graphics.setLineWidth(2)
     love.graphics.rectangle("line", -hw * innerScale, -hh * innerScale,
       sb.width * innerScale, sb.height * innerScale)
     love.graphics.setLineWidth(1)
+    -- Die bloom
+    love.graphics.setColor(dbR, dbG, dbB, diePulse * 0.08 * alpha)
+    love.graphics.rectangle("fill", -hw * innerScale - 5, -hh * innerScale - 5,
+      sb.width * innerScale + 10, sb.height * innerScale + 10)
 
-    -- Central core eye (GPU compute unit)
-    local eyePulse = 0.5 + math.sin(time * 3 + sb.phase) * 0.4
-    love.graphics.setColor(pc[1], pc[2], pc[3], eyePulse * alpha)
-    love.graphics.circle("fill", 0, 0, 18)
-    love.graphics.setColor(1, 1, 1, eyePulse * alpha * 0.6)
-    love.graphics.circle("fill", 0, 0, 8)
-    -- Eye ring
-    love.graphics.setColor(pc[1], pc[2], pc[3], alpha * 0.7)
-    love.graphics.circle("line", 0, 0, 22)
-
-    -- BGA solder ball grid (bottom of chip)
-    love.graphics.setColor(0.6, 0.6, 0.5, alpha * 0.3)
-    for bx = -hw * 0.5, hw * 0.5, 16 do
-      for by = -hh * 0.5, hh * 0.5, 16 do
-        local dist = math.sqrt(bx*bx + by*by)
-        if dist > 25 then  -- Not in central eye
-          love.graphics.circle("fill", bx, by, 2)
+    -- Shader core array (grid of tiny compute units inside die)
+    for sx = -hw * 0.5, hw * 0.5, 14 do
+      for sy = -hh * 0.5, hh * 0.5, 14 do
+        local dist = math.sqrt(sx*sx + sy*sy)
+        if dist > 28 and dist < hw * innerScale * 0.85 then
+          local coreHue = (time * 0.2 + sx * 0.005 + sy * 0.005) % 1
+          local cR, cG, cB = M.hsvToRgb(coreHue, 0.6, 0.8)
+          local corePulse = 0.2 + math.sin(time * 5 + sx * 0.1 + sy * 0.15) * 0.15
+          love.graphics.setColor(cR, cG, cB, corePulse * alpha)
+          love.graphics.rectangle("fill", sx - 3, sy - 3, 6, 6)
         end
       end
     end
 
-    -- Shield cores (sides of boss body)
-    if not sb.shieldCoresDown then
-      -- Left shield core
-      if not sb.leftShieldCore.destroyed then
-        local scPulse = 0.6 + math.sin(time * 4) * 0.3
-        love.graphics.setColor(0.2, 0.6, 1, scPulse * alpha)
-        love.graphics.circle("fill", sb.leftShieldCore.x, 0, 15)
-        love.graphics.setColor(0.3, 0.8, 1, alpha * 0.8)
-        love.graphics.circle("line", sb.leftShieldCore.x, 0, 18)
-        -- Shield energy line to center
-        love.graphics.setColor(0.2, 0.5, 1, 0.3)
-        love.graphics.line(sb.leftShieldCore.x, 0, 0, 0)
-      end
-      -- Right shield core
-      if not sb.rightShieldCore.destroyed then
-        local scPulse = 0.6 + math.sin(time * 4 + math.pi) * 0.3
-        love.graphics.setColor(0.2, 0.6, 1, scPulse * alpha)
-        love.graphics.circle("fill", sb.rightShieldCore.x, 0, 15)
-        love.graphics.setColor(0.3, 0.8, 1, alpha * 0.8)
-        love.graphics.circle("line", sb.rightShieldCore.x, 0, 18)
-        love.graphics.setColor(0.2, 0.5, 1, 0.3)
-        love.graphics.line(sb.rightShieldCore.x, 0, 0, 0)
-      end
-      -- Shield barrier between cores
-      if not sb.leftShieldCore.destroyed and not sb.rightShieldCore.destroyed then
-        local shieldAlpha = 0.15 + math.sin(time * 3) * 0.08
-        love.graphics.setColor(0.2, 0.5, 1, shieldAlpha)
-        love.graphics.rectangle("fill", sb.leftShieldCore.x, -hh * 0.4,
-          sb.rightShieldCore.x - sb.leftShieldCore.x, hh * 0.8)
+    -- Central core eye (GPU compute unit) with bloom
+    local eyePulse = 0.5 + math.sin(time * 3 + sb.phase) * 0.4
+    -- Outer bloom
+    love.graphics.setColor(pc[1], pc[2], pc[3], eyePulse * 0.12 * alpha)
+    love.graphics.circle("fill", 0, 0, 45)
+    love.graphics.setColor(pc[1], pc[2], pc[3], eyePulse * 0.2 * alpha)
+    love.graphics.circle("fill", 0, 0, 30)
+    -- Core ring
+    love.graphics.setColor(pc[1], pc[2], pc[3], alpha * 0.7)
+    love.graphics.setLineWidth(2)
+    love.graphics.circle("line", 0, 0, 24)
+    -- RGB rotating arcs around core
+    for ai = 0, 3 do
+      local arcHue = (time * 0.4 + ai * 0.25) % 1
+      local aR, aG, aB = M.hsvToRgb(arcHue, 1, 1)
+      local arcA = time * 2 + ai * math.pi / 2
+      love.graphics.setColor(aR, aG, aB, 0.6 * alpha * eyePulse)
+      love.graphics.arc("line", "open", 0, 0, 22, arcA, arcA + math.pi / 3)
+    end
+    love.graphics.setLineWidth(1)
+    -- Core fill
+    love.graphics.setColor(pc[1], pc[2], pc[3], eyePulse * alpha)
+    love.graphics.circle("fill", 0, 0, 18)
+    -- White-hot centre
+    love.graphics.setColor(1, 1, 1, eyePulse * alpha * 0.7)
+    love.graphics.circle("fill", 0, 0, 9)
+    love.graphics.setColor(1, 1, 0.95, eyePulse * alpha * 0.4)
+    love.graphics.circle("fill", 0, 0, 5)
+
+    -- BGA solder ball grid (subtle)
+    love.graphics.setColor(0.55, 0.55, 0.45, alpha * 0.25)
+    for bx = -hw * 0.5, hw * 0.5, 16 do
+      for by = -hh * 0.5, hh * 0.5, 16 do
+        local dist = math.sqrt(bx*bx + by*by)
+        if dist > 28 then
+          love.graphics.circle("fill", bx, by, 1.5)
+        end
       end
     end
 
-    -- Pin array (edge connectors around GPU die)
+    -- Memory bus traces on edges (VRAM channels)
+    love.graphics.setColor(0.6, 0.5, 0.15, alpha * 0.4)
+    for mx = -hw + 22, hw - 22, 8 do
+      love.graphics.rectangle("fill", mx - 1, -hh + 5, 3, 8)
+      love.graphics.rectangle("fill", mx - 1, hh - 13, 3, 8)
+    end
+    -- Memory bus RGB glow
+    for mi = 0, 3 do
+      local memHue = (time * 0.25 + mi * 0.2) % 1
+      local mR, mG, mB = M.hsvToRgb(memHue, 0.8, 1)
+      local memPulse = 0.2 + math.sin(time * 6 + mi * 1.5) * 0.2
+      local memX = -hw + 22 + mi * (sb.width - 44) / 3
+      love.graphics.setColor(mR, mG, mB, memPulse * alpha)
+      love.graphics.rectangle("fill", memX, -hh + 2, 30, 3)
+      love.graphics.rectangle("fill", memX, hh - 5, 30, 3)
+    end
+
+    -- Shield cores on BOTTOM of body
+    if not sb.shieldCoresDown then
+      local scY = hh + 22
+      -- Left shield core
+      if not sb.leftShieldCore.destroyed then
+        -- Pylon housing
+        love.graphics.setColor(0.15, 0.15, 0.2, alpha)
+        love.graphics.polygon("fill", -60, hh - 5, -50, hh - 5, -45, scY + 14, -65, scY + 14)
+        -- Core body
+        local scPulse = 0.6 + math.sin(time * 4) * 0.3
+        love.graphics.setColor(0.2, 0.6, 1, scPulse * alpha)
+        love.graphics.circle("fill", -55, scY, 16)
+        -- RGB cycling ring
+        local scHue = (time * 0.35) % 1
+        local scR, scG, scB = M.hsvToRgb(scHue, 1, 1)
+        love.graphics.setColor(scR, scG, scB, scPulse * 0.5 * alpha)
+        love.graphics.circle("line", -55, scY, 20)
+        love.graphics.circle("line", -55, scY, 24)
+        -- Bloom
+        love.graphics.setColor(0.3, 0.7, 1, scPulse * 0.15 * alpha)
+        love.graphics.circle("fill", -55, scY, 30)
+        -- Inner glow
+        love.graphics.setColor(0.5, 0.9, 1, scPulse * 0.6 * alpha)
+        love.graphics.circle("fill", -55, scY, 7)
+        -- Shield energy tether to center
+        love.graphics.setColor(0.2, 0.5, 1, 0.25 * alpha)
+        love.graphics.line(-55, scY - 16, -55, hh - 5)
+        -- HP bar
+        local scHpPct = sb.leftShieldCore.health / (sb.leftShieldCore.maxHealth or 30)
+        love.graphics.setColor(0.3, 0.8, 1, 0.7 * alpha)
+        love.graphics.rectangle("fill", -70, scY + 16, 30 * scHpPct, 3)
+        -- Label
+        love.graphics.setColor(0.3, 0.8, 1, scPulse * 0.7 * alpha)
+        love.graphics.setFont(love.graphics.newFont(7))
+        love.graphics.printf("SHIELD", -75, scY + 21, 40, "center")
+      end
+      -- Right shield core
+      if not sb.rightShieldCore.destroyed then
+        love.graphics.setColor(0.15, 0.15, 0.2, alpha)
+        love.graphics.polygon("fill", 50, hh - 5, 60, hh - 5, 65, scY + 14, 45, scY + 14)
+        local scPulse = 0.6 + math.sin(time * 4 + math.pi) * 0.3
+        love.graphics.setColor(0.2, 0.6, 1, scPulse * alpha)
+        love.graphics.circle("fill", 55, scY, 16)
+        local scHue = (time * 0.35 + 0.5) % 1
+        local scR, scG, scB = M.hsvToRgb(scHue, 1, 1)
+        love.graphics.setColor(scR, scG, scB, scPulse * 0.5 * alpha)
+        love.graphics.circle("line", 55, scY, 20)
+        love.graphics.circle("line", 55, scY, 24)
+        love.graphics.setColor(0.3, 0.7, 1, scPulse * 0.15 * alpha)
+        love.graphics.circle("fill", 55, scY, 30)
+        love.graphics.setColor(0.5, 0.9, 1, scPulse * 0.6 * alpha)
+        love.graphics.circle("fill", 55, scY, 7)
+        love.graphics.setColor(0.2, 0.5, 1, 0.25 * alpha)
+        love.graphics.line(55, scY - 16, 55, hh - 5)
+        local scHpPct = sb.rightShieldCore.health / (sb.rightShieldCore.maxHealth or 30)
+        love.graphics.setColor(0.3, 0.8, 1, 0.7 * alpha)
+        love.graphics.rectangle("fill", 40, scY + 16, 30 * scHpPct, 3)
+        love.graphics.setColor(0.3, 0.8, 1, scPulse * 0.7 * alpha)
+        love.graphics.setFont(love.graphics.newFont(7))
+        love.graphics.printf("SHIELD", 35, scY + 21, 40, "center")
+      end
+      -- Shield barrier glow (between cores, bottom arc)
+      if not sb.leftShieldCore.destroyed and not sb.rightShieldCore.destroyed then
+        local shieldAlpha = 0.12 + math.sin(time * 3) * 0.06
+        love.graphics.setColor(0.2, 0.5, 1, shieldAlpha)
+        love.graphics.arc("fill", "pie", 0, hh, 60, 0.2, math.pi - 0.2)
+      end
+    end
+
+    -- Pin array (edge connectors around GPU die) — gold contacts
     love.graphics.setColor(0.7, 0.65, 0.3, alpha * 0.4)
-    for pin = -hw + 20, hw - 20, 10 do
+    for pin = -hw + 20, hw - 20, 9 do
       love.graphics.rectangle("fill", pin - 1, -hh - 6, 3, 6)
       love.graphics.rectangle("fill", pin - 1, hh, 3, 6)
     end
-    for pin = -hh + 20, hh - 20, 10 do
+    for pin = -hh + 20, hh - 20, 9 do
       love.graphics.rectangle("fill", -hw - 6, pin - 1, 6, 3)
       love.graphics.rectangle("fill", hw, pin - 1, 6, 3)
     end
 
-    -- Weapon emitter ports (phase-colored)
-    love.graphics.setColor(pc[1], pc[2], pc[3], alpha * 0.7)
-    love.graphics.rectangle("fill", -20, hh - 5, 10, 10)
-    love.graphics.rectangle("fill", 10, hh - 5, 10, 10)
+    -- Heatsink spreader plate on top (IHS)
+    love.graphics.setColor(0.35, 0.35, 0.38, alpha * 0.3)
+    love.graphics.polygon("fill", -hw * 0.7, -hh - 10, hw * 0.7, -hh - 10,
+      hw * 0.65, -hh - 3, -hw * 0.65, -hh - 3)
+    -- IHS brand label
+    love.graphics.setColor(pc[1] * 0.6, pc[2] * 0.6, pc[3] * 0.6, 0.3 * alpha)
+    love.graphics.setFont(love.graphics.newFont(6))
+    love.graphics.printf("GPU CORE ARCHITECT", -hw * 0.4, -hh - 9, hw * 0.8, "center")
+
+    -- RGB LED strip along bottom edge
+    for i = 0, 11 do
+      local stripHue = (time * 0.2 + i * 0.07) % 1
+      local stR, stG, stB = M.hsvToRgb(stripHue, 1, 1)
+      local stripPulse = 0.35 + math.sin(time * 3.5 + i * 0.6) * 0.35
+      love.graphics.setColor(stR, stG, stB, stripPulse * alpha)
+      love.graphics.rectangle("fill", -hw + 8 + i * 12, hh - 3, 10, 3)
+      -- LED bloom dot
+      love.graphics.setColor(stR, stG, stB, stripPulse * 0.12 * alpha)
+      love.graphics.circle("fill", -hw + 13 + i * 12, hh - 1, 8)
+    end
+
+    -- RGB LED strip along top edge
+    for i = 0, 11 do
+      local stripHue = (time * 0.2 + 0.5 + i * 0.07) % 1
+      local stR, stG, stB = M.hsvToRgb(stripHue, 1, 1)
+      local stripPulse = 0.3 + math.sin(time * 3.5 + i * 0.6 + math.pi) * 0.3
+      love.graphics.setColor(stR, stG, stB, stripPulse * alpha)
+      love.graphics.rectangle("fill", -hw + 8 + i * 12, -hh, 10, 3)
+    end
+
+    -- Weapon emitter ports (phase-colored with bloom)
+    love.graphics.setColor(pc[1], pc[2], pc[3], alpha * 0.8)
+    love.graphics.rectangle("fill", -22, hh - 5, 12, 10)
+    love.graphics.rectangle("fill", 10, hh - 5, 12, 10)
+    love.graphics.setColor(pc[1], pc[2], pc[3], alpha * 0.15)
+    love.graphics.circle("fill", -16, hh + 2, 12)
+    love.graphics.circle("fill", 16, hh + 2, 12)
+
+    -- Phase-specific VRM module accents (corner details)
+    for ci = 0, 3 do
+      local cx = (ci < 2) and (-hw + 22) or (hw - 22)
+      local cy = (ci % 2 == 0) and (-hh + 22) or (hh - 22)
+      local vrmHue = (time * 0.3 + ci * 0.25) % 1
+      local vR, vG, vB = M.hsvToRgb(vrmHue, 0.7, 1)
+      local vPulse = 0.2 + math.sin(time * 4 + ci * 1.5) * 0.2
+      love.graphics.setColor(vR, vG, vB, vPulse * alpha)
+      love.graphics.rectangle("fill", cx - 6, cy - 6, 12, 12)
+      love.graphics.setColor(vR, vG, vB, vPulse * 0.4 * alpha)
+      love.graphics.circle("fill", cx, cy, 10)
+    end
 
     love.graphics.pop()
 
@@ -5473,7 +6910,7 @@ function M.drawMachineBoss()
   end
 
   -- ============================================================
-  -- DRAW THE BOSS
+  -- DRAW THE BOSS (Las Vegas Show Pyrotechnics)
   -- ============================================================
 
   love.graphics.push()
@@ -5485,17 +6922,14 @@ function M.drawMachineBoss()
 
   local baseColor, coreColor, accentColor
   if act == 1 then
-    -- Act I: Dark iron / rust
     baseColor = {0.12 + phaseInAct * 0.01, 0.1, 0.08}
     coreColor = {0.8 + phaseInAct * 0.02, 0.4 - phaseInAct * 0.02, 0.1}
     accentColor = {0.6, 0.3, 0.1}
   elseif act == 2 then
-    -- Act II: Molten forge / orange-red
     baseColor = {0.15 + phaseInAct * 0.02, 0.08, 0.05}
     coreColor = {1, 0.5 - phaseInAct * 0.03, 0.1}
     accentColor = {1, 0.4, 0.05}
   else
-    -- Act III: Cosmic / purple-white
     baseColor = {0.1 + phaseInAct * 0.02, 0.05, 0.15 + phaseInAct * 0.02}
     coreColor = {0.8, 0.3 + phaseInAct * 0.05, 1}
     accentColor = {0.6, 0.2, 0.9}
@@ -5508,23 +6942,159 @@ function M.drawMachineBoss()
     love.graphics.circle("fill", 0, 0, 120)
   end
 
-  -- Outer hull - main body
-  love.graphics.setColor(baseColor[1] * alpha, baseColor[2] * alpha, baseColor[3] * alpha, alpha)
-  love.graphics.rectangle("fill", -mb.width / 2, -mb.height / 2, mb.width, mb.height)
+  -- ===== FLAME JETS (multi-color, Vegas pyrotechnic style) =====
+  -- Blue flame jets from shoulders
+  local flamePhase1 = math.sin(time * 8) * 0.5 + 0.5
+  local flamePhase2 = math.sin(time * 8 + math.pi) * 0.5 + 0.5
+  -- Left shoulder blue flame
+  love.graphics.setColor(0.1, 0.3, 1, flamePhase1 * 0.35 * alpha)
+  love.graphics.polygon("fill", -90, -20, -105, -50 - flamePhase1 * 25, -75, -20)
+  love.graphics.setColor(0.3, 0.6, 1, flamePhase1 * 0.5 * alpha)
+  love.graphics.polygon("fill", -88, -20, -98, -40 - flamePhase1 * 15, -78, -20)
+  love.graphics.setColor(0.6, 0.85, 1, flamePhase1 * 0.6 * alpha)
+  love.graphics.polygon("fill", -86, -20, -93, -30 - flamePhase1 * 8, -80, -20)
+  -- Right shoulder blue flame
+  love.graphics.setColor(0.1, 0.3, 1, flamePhase2 * 0.35 * alpha)
+  love.graphics.polygon("fill", 90, -20, 105, -50 - flamePhase2 * 25, 75, -20)
+  love.graphics.setColor(0.3, 0.6, 1, flamePhase2 * 0.5 * alpha)
+  love.graphics.polygon("fill", 88, -20, 98, -40 - flamePhase2 * 15, 78, -20)
+  love.graphics.setColor(0.6, 0.85, 1, flamePhase2 * 0.6 * alpha)
+  love.graphics.polygon("fill", 86, -20, 93, -30 - flamePhase2 * 8, 80, -20)
 
-  -- Industrial plating
-  love.graphics.setColor(baseColor[1] * 0.7 * alpha, baseColor[2] * 0.7 * alpha, baseColor[3] * 0.7 * alpha, alpha)
-  love.graphics.rectangle("fill", -70, -60, 140, 25)
-  love.graphics.rectangle("fill", -80, 10, 160, 35)
+  -- Orange/white flame jets from weapon ports
+  local wFlame = math.sin(time * 10) * 0.5 + 0.5
+  love.graphics.setColor(1, 0.4, 0.05, wFlame * 0.4 * alpha)
+  love.graphics.polygon("fill", -50, 55, -45, 85 + wFlame * 20, -35, 55)
+  love.graphics.setColor(1, 0.65, 0.2, wFlame * 0.55 * alpha)
+  love.graphics.polygon("fill", -48, 55, -45, 75 + wFlame * 12, -37, 55)
+  love.graphics.setColor(1, 0.9, 0.7, wFlame * 0.5 * alpha)
+  love.graphics.polygon("fill", -47, 55, -45, 68 + wFlame * 6, -39, 55)
+  -- Right weapon port flame
+  love.graphics.setColor(1, 0.4, 0.05, wFlame * 0.4 * alpha)
+  love.graphics.polygon("fill", 35, 55, 45, 85 + wFlame * 20, 50, 55)
+  love.graphics.setColor(1, 0.65, 0.2, wFlame * 0.55 * alpha)
+  love.graphics.polygon("fill", 37, 55, 45, 75 + wFlame * 12, 48, 55)
+  love.graphics.setColor(1, 0.9, 0.7, wFlame * 0.5 * alpha)
+  love.graphics.polygon("fill", 39, 55, 45, 68 + wFlame * 6, 47, 55)
 
-  -- Rivets / bolts
-  love.graphics.setColor(0.3 * alpha, 0.25 * alpha, 0.2 * alpha, alpha)
-  for rx = -60, 60, 30 do
-    love.graphics.circle("fill", rx, -50, 3)
-    love.graphics.circle("fill", rx, 40, 3)
+  -- Green pyro jets from sides (Vegas style)
+  local gFlame = math.sin(time * 6 + 1.5) * 0.5 + 0.5
+  love.graphics.setColor(0.1, 0.8, 0.2, gFlame * 0.3 * alpha)
+  love.graphics.polygon("fill", -mb.width/2, 0, -mb.width/2 - 20 - gFlame * 15, -15, -mb.width/2, -30)
+  love.graphics.setColor(0.3, 1, 0.4, gFlame * 0.4 * alpha)
+  love.graphics.polygon("fill", -mb.width/2, 0, -mb.width/2 - 12 - gFlame * 8, -10, -mb.width/2, -20)
+  love.graphics.setColor(0.1, 0.8, 0.2, gFlame * 0.3 * alpha)
+  love.graphics.polygon("fill", mb.width/2, 0, mb.width/2 + 20 + gFlame * 15, -15, mb.width/2, -30)
+  love.graphics.setColor(0.3, 1, 0.4, gFlame * 0.4 * alpha)
+  love.graphics.polygon("fill", mb.width/2, 0, mb.width/2 + 12 + gFlame * 8, -10, mb.width/2, -20)
+
+  -- ===== FIREWORK BURSTS (sparkle particles radiating outward) =====
+  for fw = 0, 5 do
+    local fwTime = (time * 0.7 + fw * 1.1) % 3
+    if fwTime < 1.2 then
+      local fwLife = fwTime / 1.2
+      local fwX = math.sin(fw * 3.7 + 1) * 60
+      local fwY = math.cos(fw * 2.3 + 2) * 40 - 20
+      local fwHue = (fw * 0.167 + time * 0.05) % 1
+      local fwR, fwG, fwB = M.hsvToRgb(fwHue, 0.9, 1)
+      local fwAlpha = (1 - fwLife) * 0.6
+      -- Burst rays
+      for ray = 0, 7 do
+        local rayAngle = (ray / 8) * math.pi * 2 + fw * 0.5
+        local rayLen = fwLife * 35
+        local rx2 = fwX + math.cos(rayAngle) * rayLen
+        local ry2 = fwY + math.sin(rayAngle) * rayLen
+        love.graphics.setColor(fwR, fwG, fwB, fwAlpha * alpha)
+        love.graphics.line(fwX, fwY, rx2, ry2)
+        -- Spark tip
+        love.graphics.setColor(1, 1, 0.9, fwAlpha * 0.7 * alpha)
+        love.graphics.circle("fill", rx2, ry2, 1.5)
+      end
+      -- Centre flash
+      love.graphics.setColor(1, 1, 1, fwAlpha * 0.5 * alpha)
+      love.graphics.circle("fill", fwX, fwY, 3 * (1 - fwLife))
+    end
   end
 
-  -- Central core / eye - pulsing based on phase
+  -- ===== SPOTLIGHT BEAMS (sweeping stage lights) =====
+  local spotAngle1 = math.sin(time * 1.5) * 0.6
+  local spotAngle2 = math.sin(time * 1.5 + math.pi * 0.7) * 0.6
+  -- Left spotlight
+  love.graphics.setColor(1, 0.9, 0.5, 0.06 * alpha)
+  local sx1 = math.cos(spotAngle1 - math.pi/2) * 200
+  local sy1 = math.sin(spotAngle1 - math.pi/2) * 200
+  love.graphics.polygon("fill", -60, -55, sx1 - 40, sy1, sx1 + 40, sy1)
+  -- Right spotlight
+  love.graphics.setColor(0.5, 0.7, 1, 0.05 * alpha)
+  local sx2 = math.cos(spotAngle2 - math.pi/2) * 200
+  local sy2 = math.sin(spotAngle2 - math.pi/2) * 200
+  love.graphics.polygon("fill", 60, -55, sx2 - 40, sy2, sx2 + 40, sy2)
+
+  -- ===== MAIN HULL (angular industrial body) =====
+  love.graphics.setColor(baseColor[1] * alpha, baseColor[2] * alpha, baseColor[3] * alpha, alpha)
+  love.graphics.polygon("fill",
+    -mb.width/2, -mb.height/2,
+    mb.width/2, -mb.height/2,
+    mb.width/2 + 8, -mb.height/4,
+    mb.width/2 + 8, mb.height/4,
+    mb.width/2, mb.height/2,
+    -mb.width/2, mb.height/2,
+    -mb.width/2 - 8, mb.height/4,
+    -mb.width/2 - 8, -mb.height/4)
+  -- Wireframe edge
+  love.graphics.setColor(coreColor[1] * 0.5, coreColor[2] * 0.4, coreColor[3] * 0.4, 0.4 * alpha)
+  love.graphics.setLineWidth(1.5)
+  love.graphics.polygon("line",
+    -mb.width/2, -mb.height/2,
+    mb.width/2, -mb.height/2,
+    mb.width/2 + 8, -mb.height/4,
+    mb.width/2 + 8, mb.height/4,
+    mb.width/2, mb.height/2,
+    -mb.width/2, mb.height/2,
+    -mb.width/2 - 8, mb.height/4,
+    -mb.width/2 - 8, -mb.height/4)
+  love.graphics.setLineWidth(1)
+
+  -- Industrial plating with panel lines
+  love.graphics.setColor(baseColor[1] * 0.6 * alpha, baseColor[2] * 0.6 * alpha, baseColor[3] * 0.6 * alpha, alpha)
+  love.graphics.polygon("fill", -70, -60, 70, -60, 65, -35, -65, -35)
+  love.graphics.polygon("fill", -80, 10, 80, 10, 75, 42, -75, 42)
+  -- Panel line details
+  love.graphics.setColor(baseColor[1] * 0.3, baseColor[2] * 0.25, baseColor[3] * 0.2, 0.4 * alpha)
+  love.graphics.line(-40, -60, -40, -35)
+  love.graphics.line(0, -60, 0, -35)
+  love.graphics.line(40, -60, 40, -35)
+
+  -- Rivets / bolts with subtle neon glow
+  for rx = -60, 60, 30 do
+    love.graphics.setColor(0.3 * alpha, 0.25 * alpha, 0.2 * alpha, alpha)
+    love.graphics.circle("fill", rx, -50, 3)
+    love.graphics.circle("fill", rx, 40, 3)
+    -- Neon sign-style glow around rivets
+    local rivetHue = (time * 0.2 + rx * 0.01) % 1
+    local rvR, rvG, rvB = M.hsvToRgb(rivetHue, 0.6, 1)
+    love.graphics.setColor(rvR, rvG, rvB, 0.15 * alpha)
+    love.graphics.circle("fill", rx, -50, 6)
+    love.graphics.circle("fill", rx, 40, 6)
+  end
+
+  -- ===== CASCADING SPARK SHOWERS (falling sparks from top) =====
+  for sp = 0, 7 do
+    local spX = -55 + sp * 16
+    local spY = ((time * 80 + sp * 37) % 120) - mb.height/2
+    local spLife = 1 - (spY + mb.height/2) / 120
+    if spLife > 0 then
+      local spHue = (sp * 0.12 + time * 0.1) % 1
+      local spR, spG, spB = M.hsvToRgb(spHue, 0.8, 1)
+      love.graphics.setColor(spR, spG, spB, spLife * 0.5 * alpha)
+      love.graphics.circle("fill", spX, spY, 1.5)
+      -- Spark trail
+      love.graphics.setColor(spR, spG, spB, spLife * 0.2 * alpha)
+      love.graphics.line(spX, spY, spX, spY - 8)
+    end
+  end
+
+  -- Central core / eye with pyrotechnic bloom
   local pulse = 1
   if mb.phase >= 10 then
     pulse = 0.6 + math.abs(math.sin(time * 6)) * 0.4
@@ -5533,60 +7103,166 @@ function M.drawMachineBoss()
     pulse = 0.4 + math.abs(math.sin(time * 12)) * 0.6
   end
 
+  -- Multi-color flame halo around core (Vegas fire show)
+  local flameColors = {
+    {1, 0.3, 0.05},    -- Orange fire
+    {0.1, 0.4, 1},     -- Blue fire
+    {1, 1, 0.3},       -- White/yellow fire
+    {0.2, 0.9, 0.3},   -- Green fire
+    {0.8, 0.1, 0.9},   -- Purple fire
+  }
+  for fi = 0, 4 do
+    local fc = flameColors[fi + 1]
+    local fAngle = time * 2.5 + fi * math.pi * 2 / 5
+    local fDist = 35 + math.sin(time * 5 + fi * 1.3) * 8
+    local fSize = 8 + math.sin(time * 7 + fi * 2) * 3
+    local fx = math.cos(fAngle) * fDist
+    local fy = math.sin(fAngle) * fDist - 5
+    love.graphics.setColor(fc[1], fc[2], fc[3], 0.35 * alpha * pulse)
+    love.graphics.circle("fill", fx, fy, fSize)
+    -- Flame tail
+    love.graphics.setColor(fc[1], fc[2], fc[3], 0.15 * alpha * pulse)
+    love.graphics.polygon("fill",
+      fx, fy - fSize,
+      fx - fSize * 0.6, fy + fSize,
+      fx + fSize * 0.6, fy + fSize)
+  end
+
+  -- Core bloom layers
+  love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], 0.1 * alpha * pulse)
+  love.graphics.circle("fill", 0, -5, 55)
+  love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], 0.2 * alpha * pulse)
+  love.graphics.circle("fill", 0, -5, 38)
+
+  -- Core fill
   love.graphics.setColor(coreColor[1] * pulse * alpha, coreColor[2] * pulse * alpha, coreColor[3] * pulse * alpha, alpha)
   love.graphics.circle("fill", 0, -5, 30)
-
   -- Core inner glow
-  love.graphics.setColor(1 * alpha, 1 * alpha, 1 * alpha, 0.5 * alpha * pulse)
+  love.graphics.setColor(1 * alpha, 1 * alpha, 1 * alpha, 0.55 * alpha * pulse)
   love.graphics.circle("fill", 0, -5, 12)
+  -- White-hot centre
+  love.graphics.setColor(1, 1, 0.95, 0.4 * alpha * pulse)
+  love.graphics.circle("fill", 0, -5, 6)
 
-  -- Weapon ports
-  love.graphics.setColor(accentColor[1] * 0.6 * alpha, accentColor[2] * 0.4 * alpha, accentColor[3] * 0.3 * alpha, alpha)
-  love.graphics.rectangle("fill", -60, 50, 30, 20)
-  love.graphics.rectangle("fill", 30, 50, 30, 20)
-  love.graphics.rectangle("fill", -15, 55, 30, 15)
+  -- Weapon ports with flame glow
+  love.graphics.setColor(accentColor[1] * 0.7 * alpha, accentColor[2] * 0.5 * alpha, accentColor[3] * 0.3 * alpha, alpha)
+  love.graphics.polygon("fill", -62, 50, -28, 50, -26, 68, -64, 68)
+  love.graphics.polygon("fill", 28, 50, 62, 50, 64, 68, 26, 68)
+  love.graphics.polygon("fill", -16, 55, 16, 55, 14, 70, -14, 70)
+  -- Port glow
+  love.graphics.setColor(1, 0.5, 0.15, 0.25 * alpha)
+  love.graphics.circle("fill", -45, 67, 8)
+  love.graphics.circle("fill", 45, 67, 8)
+  love.graphics.circle("fill", 0, 70, 8)
 
-  -- Phase wings/appendages (grow with phases)
+  -- Phase wings/appendages (grow with phases, fire-edged)
   if mb.phase >= 5 then
     local wingSize = math.min((mb.phase - 4) * 5, 40)
     love.graphics.setColor(accentColor[1] * 0.8 * alpha, accentColor[2] * 0.5 * alpha, accentColor[3] * 0.4 * alpha, alpha * 0.8)
     love.graphics.polygon("fill", -100, 0, -100 + wingSize, -30 - wingSize / 2, -100 + wingSize, 30 + wingSize / 2)
     love.graphics.polygon("fill", 100, 0, 100 - wingSize, -30 - wingSize / 2, 100 - wingSize, 30 + wingSize / 2)
+    -- Wing edge flames
+    local wingFlame = math.sin(time * 9) * 0.5 + 0.5
+    love.graphics.setColor(1, 0.5, 0.1, wingFlame * 0.35 * alpha)
+    love.graphics.polygon("fill", -100, 0, -110 - wingFlame * 10, -10, -100, -20)
+    love.graphics.polygon("fill", 100, 0, 110 + wingFlame * 10, -10, 100, -20)
+    love.graphics.setColor(0.1, 0.4, 1, wingFlame * 0.3 * alpha)
+    love.graphics.polygon("fill", -100, 5, -108 - wingFlame * 8, 15, -100, 25)
+    love.graphics.polygon("fill", 100, 5, 108 + wingFlame * 8, 15, 100, 25)
   end
 
-  -- Exhaust pipes (act II+)
+  -- Exhaust pipes (act II+) with multi-color exhaust flames
   if act >= 2 then
     love.graphics.setColor(0.2 * alpha, 0.15 * alpha, 0.1 * alpha, alpha)
-    love.graphics.rectangle("fill", -90, 20, 15, 40)
-    love.graphics.rectangle("fill", 75, 20, 15, 40)
-    -- Exhaust glow
+    love.graphics.rectangle("fill", -92, 20, 18, 42)
+    love.graphics.rectangle("fill", 74, 20, 18, 42)
+    -- Multi-color exhaust flame stack
     local exPulse = math.abs(math.sin(time * 4))
-    love.graphics.setColor(1, 0.5, 0.1, exPulse * 0.5 * alpha)
-    love.graphics.circle("fill", -83, 62, 8)
-    love.graphics.circle("fill", 83, 62, 8)
+    -- Orange base
+    love.graphics.setColor(1, 0.5, 0.1, exPulse * 0.4 * alpha)
+    love.graphics.polygon("fill", -92, 62, -83, 85 + exPulse * 15, -74, 62)
+    love.graphics.polygon("fill", 74, 62, 83, 85 + exPulse * 15, 92, 62)
+    -- Blue core
+    love.graphics.setColor(0.2, 0.5, 1, exPulse * 0.5 * alpha)
+    love.graphics.polygon("fill", -88, 62, -83, 75 + exPulse * 8, -78, 62)
+    love.graphics.polygon("fill", 78, 62, 83, 75 + exPulse * 8, 88, 62)
+    -- White tip
+    love.graphics.setColor(1, 1, 0.9, exPulse * 0.4 * alpha)
+    love.graphics.circle("fill", -83, 62, 4)
+    love.graphics.circle("fill", 83, 62, 4)
   end
 
-  -- God Machine aura (Phase 21)
+  -- ===== NEON SIGN GLOW EFFECT (Vegas marquee style) =====
+  -- Pulsing neon border around hull
+  local neonHue = (time * 0.15) % 1
+  local nR, nG, nB = M.hsvToRgb(neonHue, 0.9, 1)
+  local neonPulse = 0.15 + math.sin(time * 4) * 0.1
+  love.graphics.setColor(nR, nG, nB, neonPulse * alpha)
+  love.graphics.setLineWidth(3)
+  love.graphics.polygon("line",
+    -mb.width/2 + 3, -mb.height/2 + 3,
+    mb.width/2 - 3, -mb.height/2 + 3,
+    mb.width/2 + 5, -mb.height/4,
+    mb.width/2 + 5, mb.height/4,
+    mb.width/2 - 3, mb.height/2 - 3,
+    -mb.width/2 + 3, mb.height/2 - 3,
+    -mb.width/2 - 5, mb.height/4,
+    -mb.width/2 - 5, -mb.height/4)
+  love.graphics.setLineWidth(1)
+  -- Neon bloom
+  love.graphics.setColor(nR, nG, nB, neonPulse * 0.06 * alpha)
+  love.graphics.circle("fill", 0, 0, mb.width * 0.6)
+
+  -- God Machine aura (Phase 21) with spectacular pyro effects
   if mb.enraged then
     local auraPulse = math.abs(math.sin(time * 8))
-    love.graphics.setColor(coreColor[1], coreColor[2], coreColor[3], auraPulse * 0.4 * alpha)
-    love.graphics.circle("fill", 0, 0, 100)
-    love.graphics.setColor(1, 1, 1, auraPulse * 0.2 * alpha)
+    -- Multi-ring fire aura
+    for ar = 1, 4 do
+      local aHue = (time * 0.3 + ar * 0.2) % 1
+      local aR, aG, aB = M.hsvToRgb(aHue, 0.8, 1)
+      love.graphics.setColor(aR, aG, aB, auraPulse * 0.15 / ar * alpha)
+      love.graphics.circle("fill", 0, 0, 70 + ar * 20 + math.sin(time * 3 + ar) * 8)
+    end
+    -- White-hot core flash
+    love.graphics.setColor(1, 1, 1, auraPulse * 0.25 * alpha)
     love.graphics.circle("fill", 0, 0, 60)
+    -- Intense firework cascade (final form)
+    for ew = 0, 11 do
+      local ewTime = (time * 1.2 + ew * 0.5) % 2
+      if ewTime < 0.8 then
+        local ewLife = ewTime / 0.8
+        local ewAngle = ew * (math.pi * 2 / 12) + time * 0.5
+        local ewDist = ewLife * 90
+        local ewX = math.cos(ewAngle) * ewDist
+        local ewY = math.sin(ewAngle) * ewDist
+        local ewHue = (ew * 0.083 + time * 0.1) % 1
+        local ewR, ewG, ewB = M.hsvToRgb(ewHue, 1, 1)
+        love.graphics.setColor(ewR, ewG, ewB, (1 - ewLife) * 0.6 * alpha)
+        love.graphics.circle("fill", ewX, ewY, 3 * (1 - ewLife * 0.5))
+        love.graphics.setColor(1, 1, 0.9, (1 - ewLife) * 0.3 * alpha)
+        love.graphics.circle("fill", ewX, ewY, 1.5)
+      end
+    end
   end
 
   love.graphics.pop()
 
   -- ============================================================
-  -- DRAW ARMOR PLATES (Phase 1-4)
+  -- DRAW ARMOR PLATES (Phase 1-4) — enhanced with fire edges
   -- ============================================================
 
   if not mb.leftArmor.destroyed then
     local armorX = mb.x - 80
     love.graphics.setColor(0.35, 0.3, 0.25, alpha)
-    love.graphics.rectangle("fill", armorX - 17, mb.y - 40, 35, 80)
+    love.graphics.polygon("fill", armorX - 17, mb.y - 40, armorX + 18, mb.y - 40,
+      armorX + 20, mb.y + 40, armorX - 19, mb.y + 40)
     love.graphics.setColor(0.5, 0.4, 0.2, alpha)
-    love.graphics.rectangle("fill", armorX - 15, mb.y - 38, 31, 76)
+    love.graphics.polygon("fill", armorX - 15, mb.y - 38, armorX + 16, mb.y - 38,
+      armorX + 18, mb.y + 38, armorX - 17, mb.y + 38)
+    -- Fire edge glow
+    local armorFlame = math.sin(time * 6) * 0.5 + 0.5
+    love.graphics.setColor(1, 0.5, 0.1, armorFlame * 0.2 * alpha)
+    love.graphics.rectangle("fill", armorX - 20, mb.y - 42, 40, 3)
     -- Armor HP bar
     local hpPct = mb.leftArmor.health / mb.leftArmor.maxHealth
     love.graphics.setColor(0.2, 0.2, 0.2, 0.8)
@@ -5598,9 +7274,14 @@ function M.drawMachineBoss()
   if not mb.rightArmor.destroyed then
     local armorX = mb.x + 80
     love.graphics.setColor(0.35, 0.3, 0.25, alpha)
-    love.graphics.rectangle("fill", armorX - 17, mb.y - 40, 35, 80)
+    love.graphics.polygon("fill", armorX - 17, mb.y - 40, armorX + 18, mb.y - 40,
+      armorX + 20, mb.y + 40, armorX - 19, mb.y + 40)
     love.graphics.setColor(0.5, 0.4, 0.2, alpha)
-    love.graphics.rectangle("fill", armorX - 15, mb.y - 38, 31, 76)
+    love.graphics.polygon("fill", armorX - 15, mb.y - 38, armorX + 16, mb.y - 38,
+      armorX + 18, mb.y + 38, armorX - 17, mb.y + 38)
+    local armorFlame = math.sin(time * 6 + math.pi) * 0.5 + 0.5
+    love.graphics.setColor(1, 0.5, 0.1, armorFlame * 0.2 * alpha)
+    love.graphics.rectangle("fill", armorX - 20, mb.y - 42, 40, 3)
     local hpPct = mb.rightArmor.health / mb.rightArmor.maxHealth
     love.graphics.setColor(0.2, 0.2, 0.2, 0.8)
     love.graphics.rectangle("fill", armorX - 15, mb.y + 42, 30, 4)
@@ -5608,22 +7289,37 @@ function M.drawMachineBoss()
     love.graphics.rectangle("fill", armorX - 15, mb.y + 42, 30 * hpPct, 4)
   end
 
-  -- Shield Generator (Phase 8-10)
+  -- Shield Generator (Phase 8-10) — on BOTTOM, pyro-styled
   local shieldPos = machineboss.getShieldPosition()
   if shieldPos then
     local sPulse = 0.6 + math.sin(time * 5) * 0.3
+    -- Shield housing below boss
+    love.graphics.setColor(0.15, 0.15, 0.2, alpha)
+    love.graphics.polygon("fill", shieldPos.x - 15, mb.y + mb.height/2,
+      shieldPos.x + 15, mb.y + mb.height/2,
+      shieldPos.x + 18, shieldPos.y + 15,
+      shieldPos.x - 18, shieldPos.y + 15)
+    -- Core glow
     love.graphics.setColor(0.2, 0.6, 1, sPulse * 0.4)
     love.graphics.circle("fill", shieldPos.x, shieldPos.y, 40)
     love.graphics.setColor(0.3, 0.7, 1, sPulse * 0.7)
     love.graphics.circle("line", shieldPos.x, shieldPos.y, 35)
     love.graphics.setColor(0.5, 0.8, 1, sPulse)
     love.graphics.circle("fill", shieldPos.x, shieldPos.y, 10)
+    -- Fire accent ring
+    local shFlame = math.sin(time * 7) * 0.5 + 0.5
+    love.graphics.setColor(1, 0.4, 0.1, shFlame * 0.25 * alpha)
+    love.graphics.circle("line", shieldPos.x, shieldPos.y, 38)
     -- Shield HP bar
     local shpPct = shieldPos.health / shieldPos.maxHealth
     love.graphics.setColor(0.1, 0.1, 0.1, 0.8)
     love.graphics.rectangle("fill", shieldPos.x - 20, shieldPos.y + 25, 40, 4)
     love.graphics.setColor(0.3, 0.7, 1)
     love.graphics.rectangle("fill", shieldPos.x - 20, shieldPos.y + 25, 40 * shpPct, 4)
+    -- Label
+    love.graphics.setColor(0.3, 0.8, 1, sPulse * 0.7)
+    love.graphics.setFont(love.graphics.newFont(7))
+    love.graphics.printf("SHIELD", shieldPos.x - 20, shieldPos.y + 31, 40, "center")
   end
 
   -- ============================================================

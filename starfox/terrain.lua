@@ -3,11 +3,13 @@ local screen = require("starfox.screen")
 
 M.scrollOffset = 0
 M.scrollSpeed = 100
+M.starSpeedMultiplier = 1.0
 M.stars = {}
 M.groundSections = {}
 
 function M.reset()
   M.scrollOffset = 0
+  M.starSpeedMultiplier = 1.0
   M.stars = {}
 
   for i = 1, 100 do
@@ -26,7 +28,7 @@ function M.update(dt)
   M.scrollOffset = M.scrollOffset + M.scrollSpeed * dt
 
   for _, star in ipairs(M.stars) do
-    star.y = star.y + star.speed * dt
+    star.y = star.y + star.speed * M.starSpeedMultiplier * dt
 
     if star.y > screen.HEIGHT then
       star.y = 0

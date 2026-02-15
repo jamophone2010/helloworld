@@ -13,6 +13,7 @@ M.CORNERIA = {
   {time = 45, type = "callout", message = "triggerBossWarning"},
   {time = 47, type = "midboss"},
   {time = 65, type = "wave", formation = "v", x = 683, count = 7},
+  {time = 68, type = "wave", formation = "squadron3", x = 683, count = 3},
   {time = 70, type = "turret", x = 256},
   {time = 70, type = "turret", x = 1110},
   {time = 75, type = "wave", formation = "wave", x = 683, count = 8},
@@ -43,6 +44,8 @@ M.AREA6 = {
   {time = 29, type = "wave", formation = "v", x = 1025, count = 5},
   {time = 32, type = "turret", x = 683},
   {time = 35, type = "wave", formation = "wave", x = 683, count = 8},
+  {time = 37, type = "wave", formation = "squadron3", x = 512, count = 3},
+  {time = 37, type = "wave", formation = "squadron3", x = 854, count = 3},
   {time = 38, type = "callout", message = "triggerCover"},
   {time = 40, type = "wave", formation = "line", x = 512, count = 6},
   {time = 40, type = "wave", formation = "line", x = 854, count = 6},
@@ -62,6 +65,7 @@ M.AREA6 = {
   {time = 60, type = "callout", message = "triggerEnemyWarning"},
   {time = 62, type = "capitalship", x = 683},
   {time = 63, type = "wave", formation = "line", x = 683, count = 8},
+  {time = 65, type = "wave", formation = "squadron4", x = 683, count = 4},
   {time = 66, type = "wave", formation = "v", x = 683, count = 7},
   {time = 69, type = "wave", formation = "wave", x = 683, count = 10},
   {time = 72, type = "wave", formation = "v", x = 427, count = 5},
@@ -81,6 +85,7 @@ M.MACBETH = {
   {time = 22, type = "rival", hp = 35, variant = "teleport"},
   {time = 28, type = "wave", formation = "v", x = 512, count = 5},
   {time = 34, type = "wave", formation = "v", x = 854, count = 5},
+  {time = 37, type = "wave", formation = "squadron4", x = 683, count = 4},
   {time = 40, type = "wave", formation = "line", x = 683, count = 6},
   {time = 50, type = "wave", formation = "v", x = 683, count = 7},
   {time = 58, type = "callout", message = "triggerBossWarning"},
@@ -130,6 +135,7 @@ M.KATINA = {
 
   -- Heavy assault
   {time = 28, type = "wave", formation = "wave", x = 683, count = 8},
+  {time = 30, type = "wave", formation = "squadron3", x = 683, count = 3},
   {time = 33, type = "wave", formation = "v", x = 512, count = 5},
   {time = 33, type = "wave", formation = "v", x = 854, count = 5},
 

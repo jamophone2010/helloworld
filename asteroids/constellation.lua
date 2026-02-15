@@ -6,15 +6,26 @@
 local M = {}
 
 -- ===================== MAP EXPANSION TIERS =====================
+-- The world is 63x63 tiles = 9x9 grid of 7x7 constellation blocks.
+--   Tile range: -31 to +31
+--   Center 3x3 constellations (cx,cy -1..1): Named sectors (tiles -10..10)
+--   Next ring (cx or cy = ±2): Deep Space (tiles -17..17 minus named)
+--   Outer two rings (cx or cy = ±3 or ±4): Outer Space (tiles -31..31 minus above)
+--
 -- Tier 1: 7x7 (default, "The Nebula" only)
--- Tier 2: 49x49 (after Warden defeated + Antenna installed at Studio)
--- Tier 3: 343x343 (after Sentinel defeated)
+-- Tier 2: 21x21 (after Warden defeated + Mega Antenna installed → named constellations)
+-- Tier 3: 63x63 (after Sentinel defeated + Power Amplifier → full map)
 
 M.TIER_NEBULA = 1      -- 7x7 (-3 to 3)
-M.TIER_INNER_SPACE = 2 -- 49x49 (-24 to 24)
-M.TIER_OUTER_SPACE = 3 -- 343x343 (-171 to 171)
+M.TIER_INNER_SPACE = 2 -- 21x21 (-10 to 10) — the 9 named constellations
+M.TIER_OUTER_SPACE = 3 -- 63x63 (-31 to 31) — full world
 
 M.currentTier = M.TIER_NEBULA
+
+-- Zone classification constants
+M.ZONE_NAMED = "named"           -- The 9 named constellations (cx,cy -1..1)
+M.ZONE_DEEP_SPACE = "deep_space" -- 1 ring around named (cx or cy = ±2)
+M.ZONE_OUTER_SPACE = "outer_space" -- 2 outer rings (cx or cy = ±3 or ±4)
 
 -- Progression flags (synced from hub)
 M.antennaInstalled = false  -- Warden defeated + antenna brought to Studio
@@ -26,11 +37,39 @@ end
 
 function M.getGridBounds()
   if M.currentTier == M.TIER_OUTER_SPACE then
-    return -171, 171
+    return -31, 31
   elseif M.currentTier == M.TIER_INNER_SPACE then
-    return -24, 24
+    return -10, 10
   else
     return -3, 3
+  end
+end
+
+-- Get the zone classification for a tile
+function M.getZone(tileX, tileY)
+  local cx, cy = M.getConstellationCoords(tileX, tileY)
+  local maxC = math.max(math.abs(cx), math.abs(cy))
+  if maxC <= 1 then
+    return M.ZONE_NAMED
+  elseif maxC <= 2 then
+    return M.ZONE_DEEP_SPACE
+  else
+    return M.ZONE_OUTER_SPACE
+  end
+end
+
+-- Check if a tile is within radio range for fast travel
+-- With mega antenna: can reach named constellations (1st ring)
+-- With power amplifier: can reach edge of deep space
+-- Outer Space: always out of range
+function M.isInRadioRange(tileX, tileY)
+  local zone = M.getZone(tileX, tileY)
+  if zone == M.ZONE_NAMED then
+    return M.antennaInstalled  -- Need at least the mega antenna
+  elseif zone == M.ZONE_DEEP_SPACE then
+    return M.sentinelDefeated  -- Need the power amplifier
+  else
+    return false  -- Outer Space is always out of range
   end
 end
 
@@ -309,12 +348,20 @@ end
 
 -- Get constellation ID for a tile position
 function M.getConstellationId(tileX, tileY)
-  -- Check if tile is in Outer Space (beyond 49x49 inner range)
-  if math.abs(tileX) > 24 or math.abs(tileY) > 24 then
+  local cx, cy = M.getConstellationCoords(tileX, tileY)
+  local maxC = math.max(math.abs(cx), math.abs(cy))
+
+  -- Outer Space: cx or cy = ±3 or ±4
+  if maxC >= 3 then
     return "outer_space"
   end
 
-  local cx, cy = M.getConstellationCoords(tileX, tileY)
+  -- Deep Space: cx or cy = ±2
+  if maxC == 2 then
+    return "generic"  -- "Deep Space"
+  end
+
+  -- Named constellations: cx,cy = -1..1
   local key = cx .. "," .. cy
   return M.CONSTELLATION_NAMES[key] or "generic"
 end
