@@ -7,15 +7,18 @@ M.GRID_SIZE = 32
 
 M.interiors = {
   -- ═══════════════════════════════════════
-  -- LEVEL 0: ANCIENT CITADEL (Indiana Jones Maze)
+  -- LEVEL 0: INSIDE THE PC CASE (PC Hardware Maze)
   -- ═══════════════════════════════════════
   ancient_citadel_maze = {
-    name = "Ancient Citadel",
+    name = "Inside the PC Case",
     width = 40, height = 30,
     exitX = 2, exitY = 28,
     isMaze = true,
-    -- Maze layout: 1 = wall, 0 = path, 2 = dart trap, 3 = spike pit, 4 = swinging blade,
-    -- 5 = crumbling floor, 6 = fire jet, 7 = boulder trigger, 8 = treasure chest
+    theme = "pc_case",
+    -- Maze layout: 1 = wall (PCB/chassis), 0 = path, 2 = loose wires (shock),
+    -- 3 = bottomless pit (missing panel), 4 = case fan (spinning blade),
+    -- 5 = crumbling dust pile, 6 = hot object (CPU/GPU), 7 = dust bunny stampede trigger,
+    -- 8 = treasure chest (rare component), 9 = wire tangle (slow trap)
     mazeMap = {
       -- Row 0 (top wall)
       {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
@@ -80,34 +83,43 @@ M.interiors = {
     },
     -- Obstacle definitions with timing patterns
     obstacles = {
-      -- Dart traps (type 2): fire projectiles periodically
-      {type = "dart", gridX = 9, gridY = 5, direction = "down", interval = 2.0, speed = 6},
-      {type = "dart", gridX = 11, gridY = 9, direction = "right", interval = 2.5, speed = 5},
-      {type = "dart", gridX = 29, gridY = 21, direction = "left", interval = 1.8, speed = 7},
-      -- Spike pits (type 3): pop up periodically
-      {type = "spikes", gridX = 11, gridY = 9, interval = 3.0, activeTime = 1.5},
-      -- Swinging blades (type 4): swing back and forth
-      {type = "blade", gridX = 29, gridY = 9, swingSpeed = 2.5},
-      {type = "blade", gridX = 5, gridY = 19, swingSpeed = 3.0},
-      -- Crumbling floor (type 5): collapses briefly after stepping on
-      {type = "crumble", gridX = 11, gridY = 13, reformTime = 4.0},
-      -- Fire jets (type 6): burst periodically
-      {type = "fire", gridX = 9, gridY = 15, interval = 2.5, activeTime = 1.0, direction = "up"},
+      -- Loose wires (type 2): spark and zap periodically
+      {type = "loose_wire", gridX = 9, gridY = 5, direction = "down", interval = 2.0, speed = 6},
+      {type = "loose_wire", gridX = 11, gridY = 9, direction = "right", interval = 2.5, speed = 5},
+      {type = "loose_wire", gridX = 29, gridY = 21, direction = "left", interval = 1.8, speed = 7},
+      -- Bottomless pits (type 3): missing panels that open and close
+      {type = "bottomless_pit", gridX = 11, gridY = 9, interval = 3.0, activeTime = 1.5},
+      -- Case fans (type 4): spinning blades that sweep back and forth
+      {type = "case_fan", gridX = 29, gridY = 9, swingSpeed = 2.5},
+      {type = "case_fan", gridX = 5, gridY = 19, swingSpeed = 3.0},
+      -- Dust piles (type 5): crumble when stepped on
+      {type = "dust_pile", gridX = 11, gridY = 13, reformTime = 4.0},
+      -- Hot objects (type 6): CPU/GPU that overheat periodically
+      {type = "hot_object", gridX = 9, gridY = 15, interval = 2.5, activeTime = 1.0, direction = "up"},
     },
-    -- Boulder chase configuration (triggered at cell 7)
+    -- Wire tangle zones (type 9): slow the player down
+    wireTangles = {
+      {gridX = 7, gridY = 7, radius = 1},
+      {gridX = 20, gridY = 13, radius = 1},
+      {gridX = 15, gridY = 19, radius = 1},
+    },
+    -- Dust bunny stampede (triggered at cell 7)
     boulderChase = {
       triggerX = 38, triggerY = 23,
       boulderStartX = 38, boulderStartY = 23,
-      chaseDirection = "left",  -- boulder rolls left
+      chaseDirection = "left",  -- dust bunny horde rolls left
       boulderSpeed = 3.5,
       escapeX = 1, escapeY = 25,  -- safe zone
+      isDustBunny = true,
     },
-    -- Treasure chest at the end
+    -- Treasure chest at the end (rare component)
     treasureChest = {
       x = 3, y = 27,
       reward = 50000,
       rewardType = "notes",
     },
+    -- Compressed air effect: clears dust obstacles if player has it
+    compressedAirUsable = true,
     -- Entrance position (player spawns here)
     entranceX = 2, entranceY = 28,
   },

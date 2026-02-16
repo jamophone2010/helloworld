@@ -1,22 +1,27 @@
 local M = {}
 
+local galaxy = require("menu.galaxy")
+
 local fonts = {}
 
 M.onBack = nil
 
 function M.load()
-  fonts.title = love.graphics.newFont(40)
-  fonts.menu = love.graphics.newFont(28)
-  fonts.info = love.graphics.newFont(16)
+  fonts.title = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 40)
+  fonts.menu = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 28)
+  fonts.info = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 16)
 end
 
 function M.update(dt)
-  -- Nothing to update
+  galaxy.update(dt)
 end
 
 function M.draw()
-  -- Background
-  love.graphics.setColor(0.1, 0.1, 0.15)
+  -- Galaxy background
+  galaxy.draw()
+
+  -- Semi-transparent purple overlay
+  love.graphics.setColor(0.08, 0.05, 0.15, 0.75)
   love.graphics.rectangle("fill", 0, 0, 1366, 768)
 
   -- Title

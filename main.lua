@@ -71,6 +71,10 @@ function switchToGame(gameName)
 
   -- Pass credits to casino games
   if casinoGames[gameName] then
+    -- Track credits before casino for Mixia casino winnings
+    if currentHubType == "mixia" then
+      mixia.setCreditsBeforeCasino(hub.getCredits())
+    end
     currentGame.load(hub.getCredits())
   elseif gameName == "mainstage" then
     -- Mainstage: enter with random act
@@ -197,7 +201,16 @@ end
 function returnToHub(stationInfo)
   -- Retrieve credits from casino games before returning
   if currentGame.getCredits then
-    hub.setCredits(currentGame.getCredits())
+    local newCredits = currentGame.getCredits()
+    -- Track casino winnings for Mixia (Level 1 casino)
+    if currentHubType == "mixia" then
+      local creditsBefore = mixia.getCreditsBeforeCasino()
+      local profit = newCredits - creditsBefore
+      if profit > 0 then
+        mixia.addCasinoWinnings(profit)
+      end
+    end
+    hub.setCredits(newCredits)
   end
 
   -- Award notes from starfox
@@ -469,6 +482,14 @@ function loadGame(slot, saveData)
   hub.setVisitedPortalLevels(saveData.visitedPortalLevels or {})
   currency.save(saveData.notes or 0)
 
+  -- Restore Mixia-specific state
+  if saveData.mixiaCasinoWinnings then
+    mixia.addCasinoWinnings(saveData.mixiaCasinoWinnings - mixia.getCasinoWinnings())
+  end
+  if saveData.mixiaHasCompressedAir then
+    mixia.setCompressedAir(saveData.mixiaHasCompressedAir)
+  end
+
   -- Restore Prototype quest state
   local prototype = require("starfox.prototype")
   if saveData.prototypeData then
@@ -533,6 +554,8 @@ function love.load()
       unlockedQuests = hub.getUnlockedQuests(),
       visitedPortalLevels = hub.getVisitedPortalLevels(),
       prototypeData = prototype.getSaveData(),
+      mixiaCasinoWinnings = mixia.getCasinoWinnings(),
+      mixiaHasCompressedAir = mixia.hasCompressedAir(),
     }
   end
 
@@ -594,11 +617,13 @@ function love.load()
         hub.switchToGame = switchToGame
         hub.setCurrentFloor(entry.floorId)
         hub.setUnlockedQuests({quest_floor0 = true, quest_floor6 = true}) -- Unlock all
+        hub.setFadeInFromStarfox(true)  -- Fade in from white
         hub.load()
       elseif entry.hubType == "mixia" then
         currentHubType = "mixia"
         currentGame = mixia
         mixia.switchToGame = switchToGame
+        mixia.setFadeInFromStarfox(true)  -- Fade in from white
         mixia.load()
         if mixia.changeFloor then
           mixia.changeFloor(entry.floorId)
@@ -617,11 +642,13 @@ function love.load()
         currentHubType = "leucadia"
         currentGame = leucadia
         leucadia.switchToGame = switchToGame
+        leucadia.setFadeInFromStarfox(true)  -- Fade in from white
         leucadia.load()
       elseif entry.hubType == "singularity" then
         currentHubType = "singularity"
         currentGame = singularity
         singularity.switchToGame = switchToGame
+        singularity.setFadeInFromStarfox(true)  -- Fade in from white
         singularity.load()
       end
       pauseMenu.returnToShip = nil
@@ -643,6 +670,8 @@ function love.load()
         local worldmap = require("asteroids.worldmap")
         worldmap.updateBounds()
         worldmap.setPosition(entry.tileX, entry.tileY)
+        -- Fade in from white
+        gameModules.asteroids.setFadeInFromWhite()
       end
     end
   end

@@ -13,11 +13,11 @@ local fonts = {}
 local GRID_SIZE = 32
 
 function M.load()
-  fonts.normal = love.graphics.newFont(14)
-  fonts.large = love.graphics.newFont(20)
-  fonts.small = love.graphics.newFont(12)
-  fonts.title = love.graphics.newFont(24)
-  fonts.tiny = love.graphics.newFont(10)
+  fonts.normal = love.graphics.newFont("fonts/Exo2-Regular.ttf", 16)
+  fonts.large = love.graphics.newFont("fonts/Exo2-Regular.ttf", 20)
+  fonts.small = love.graphics.newFont("fonts/Exo2-Regular.ttf", 12)
+  fonts.title = love.graphics.newFont("fonts/Exo2-Regular.ttf", 24)
+  fonts.tiny = love.graphics.newFont("fonts/Exo2-Regular.ttf", 10)
   windows.init()
 end
 
@@ -1466,9 +1466,9 @@ function M.drawNPC(npcObj, neonColor, time)
 
   -- Name tag (small, above NPC, with neon tint)
   if neonColor then
-    love.graphics.setFont(fonts.tiny)
+    love.graphics.setFont(fonts.small)
     love.graphics.setColor(neonColor[1], neonColor[2], neonColor[3], 0.8)
-    love.graphics.printf(npcObj.name, nx - 40, ny - 28 + bob, 80, "center")
+    love.graphics.printf(npcObj.name, nx - 40, ny - 38 + bob, 80, "center")
   end
 end
 

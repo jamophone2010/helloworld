@@ -40,10 +40,10 @@ local C = {
 }
 
 function M.load()
-  fonts.tiny = love.graphics.newFont(10)
-  fonts.small = love.graphics.newFont(12)
-  fonts.normal = love.graphics.newFont(16)
-  fonts.large = love.graphics.newFont(28)
+  fonts.tiny = love.graphics.newFont("fonts/Exo2-Regular.ttf", 10)
+  fonts.small = love.graphics.newFont("fonts/Exo2-Regular.ttf", 12)
+  fonts.normal = love.graphics.newFont("fonts/Exo2-Regular.ttf", 16)
+  fonts.large = love.graphics.newFont("fonts/Exo2-Regular.ttf", 28)
   fonts.xlarge = love.graphics.newFont(36)
   fonts.tableNum = love.graphics.newFont(15)
   fonts.tableLabel = love.graphics.newFont(12)

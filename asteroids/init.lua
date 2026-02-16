@@ -74,7 +74,8 @@ local fadeState = {
   active = false,
   alpha = 0,
   fadeIn = false,
-  callback = nil
+  callback = nil,
+  color = {0, 0, 0}  -- Default to black
 }
 
 -- Landing state for station
@@ -171,6 +172,51 @@ local missileExplosions = {}
 local MISSILE_AOE_RADIUS = 120
 local MISSILE_DAMAGE_MULT = 2.0  -- Missiles deal 2x damage to asteroids (instant split)
 
+-- ===================== PER-TILE STATE CACHE =====================
+-- Preserves drops, asteroids, ufos, etc. when moving between sectors
+local tileStateCache = {}
+
+local function getTileCacheKey(x, y)
+  return x .. "," .. y
+end
+
+-- Save current tile state before leaving
+local function saveTileState(tileX, tileY)
+  local key = getTileCacheKey(tileX, tileY)
+  tileStateCache[key] = {
+    asteroids = gameState.asteroids,
+    ufos = gameState.ufos,
+    powerups = gameState.powerups,
+  }
+end
+
+-- Try to restore tile state when entering. Returns true if restored.
+local function restoreTileState(tileX, tileY)
+  local key = getTileCacheKey(tileX, tileY)
+  local cached = tileStateCache[key]
+  if not cached then return false end
+  gameState.asteroids = cached.asteroids or {}
+  gameState.ufos = cached.ufos or {}
+  gameState.powerups = cached.powerups or {}
+  tileStateCache[key] = nil  -- consume the cache entry
+  return true
+end
+
+-- ===================== PUZZLE SECTOR BOUNDARY SYSTEM =====================
+-- When entering a puzzle / miniboss sector, energy walls seal the sector
+-- so the player bounces off edges. A lever near a corner can be shot to
+-- deactivate the walls and allow the player to leave.
+local sectorBoundary = {
+  active = false,
+  animTimer = 0,          -- activation animation progress
+  animDuration = 1.5,     -- seconds for seal-in animation
+  wallAlpha = 0,
+  lever = nil,            -- {x, y, hit, flash}
+  deactivating = false,
+  deactTimer = 0,
+  deactDuration = 1.0,
+}
+
 -- Warp transition state (No Man's Sky style)
 local warpState = {
   active = false,
@@ -262,6 +308,11 @@ end
 function M.startGame()
   local shipDef = starfoxShips.getSelectedDef()
 
+  -- Clear tile state cache on fresh game start
+  tileStateCache = {}
+  sectorBoundary.active = false
+  sectorBoundary.wallAlpha = 0
+
   -- Preserve missile state across restarts
   local prevMaxMissiles = gameState.ship and gameState.ship.maxMissiles or 0
   local prevMissiles = gameState.ship and gameState.ship.missiles or 0
@@ -316,20 +367,27 @@ function M.spawnTileContent()
   local cId = constellation.getConstellationId(worldmap.tileX, worldmap.tileY)
   local isOort = (cId == "oort")
 
-  if tile.type == worldmap.TILE_STATION then
-    gameState.asteroids = {}
-  elseif tile.type == worldmap.TILE_PORTAL then
-    local count = worldmap.getAsteroidCount(baseCount)
-    gameState.asteroids = level.spawnAsteroids(gameState.level, gameState.width, gameState.height, count, isOort)
-  else
-    local count = worldmap.getAsteroidCount(baseCount)
-    gameState.asteroids = level.spawnAsteroids(gameState.level, gameState.width, gameState.height, count, isOort)
+  -- Try to restore cached state (preserves drops, boss health, asteroids)
+  local restored = restoreTileState(worldmap.tileX, worldmap.tileY)
+
+  if not restored then
+    -- Fresh spawn — no cached state
+    if tile.type == worldmap.TILE_STATION then
+      gameState.asteroids = {}
+    elseif tile.type == worldmap.TILE_PORTAL then
+      local count = worldmap.getAsteroidCount(baseCount)
+      gameState.asteroids = level.spawnAsteroids(gameState.level, gameState.width, gameState.height, count, isOort)
+    else
+      local count = worldmap.getAsteroidCount(baseCount)
+      gameState.asteroids = level.spawnAsteroids(gameState.level, gameState.width, gameState.height, count, isOort)
+    end
+
+    gameState.ufos = {}
+    gameState.powerups = {}
   end
 
-  -- Clear other entities on tile transition
+  -- Always clear bullets on transition (projectiles don't persist)
   gameState.bullets = {}
-  gameState.ufos = {}
-  gameState.powerups = {}
 
   -- Reset landing state
   landingState.hovering = false
@@ -341,16 +399,30 @@ function M.spawnTileContent()
   portalState.portalInfo = nil
 
   -- Try to spawn patrol robots (1/10 chance, only if no existing patrols)
-  if tile.type ~= worldmap.TILE_STATION then
+  if tile.type ~= worldmap.TILE_STATION and not restored then
     wanted.trySpawnOnTileLoad(gameState.width, gameState.height)
   end
 
-  -- Activate puzzle if this tile has one
-  puzzle.rewardDrop = nil  -- Clear any previous reward
+  -- Activate puzzle if this tile has one (will preserve existing state)
+  if not restored then
+    puzzle.rewardDrop = nil  -- Clear any previous reward
+  end
   puzzle.activatePuzzle(worldmap.tileX, worldmap.tileY, gameState.width, gameState.height)
+
+  -- Activate boundary walls for puzzle / miniboss sectors
+  local puzzleInfo = puzzle.getPuzzleAt(worldmap.tileX, worldmap.tileY)
+  if puzzleInfo and not puzzle.isCompleted(worldmap.tileX, worldmap.tileY) then
+    M.activateSectorBoundary()
+  else
+    sectorBoundary.active = false
+    sectorBoundary.wallAlpha = 0
+  end
 end
 
 function M.transitionToTile(newX, newY, shipWrapX, shipWrapY)
+  -- Save current tile state before leaving (preserves drops, boss HP, etc.)
+  saveTileState(worldmap.tileX, worldmap.tileY)
+
   worldmap.setPosition(newX, newY)
   -- Mark the new tile as discovered
   worldmap.markDiscovered(newX, newY)
@@ -374,11 +446,206 @@ function M.transitionToTile(newX, newY, shipWrapX, shipWrapY)
   nebula.init(gameState.width, gameState.height, newX, newY)
 end
 
+-- ===================== SECTOR BOUNDARY SYSTEM =====================
+
+function M.activateSectorBoundary()
+  sectorBoundary.active = true
+  sectorBoundary.animTimer = 0
+  sectorBoundary.wallAlpha = 0
+  sectorBoundary.deactivating = false
+  sectorBoundary.deactTimer = 0
+  -- Place lever in a corner (bottom-right, offset slightly inward)
+  sectorBoundary.lever = {
+    x = gameState.width - 50,
+    y = gameState.height - 50,
+    radius = 14,
+    hit = false,
+    flash = 0,
+    glowTimer = 0,
+  }
+end
+
+function M.updateSectorBoundary(dt)
+  if not sectorBoundary.active then return end
+
+  -- Seal-in animation
+  if sectorBoundary.animTimer < sectorBoundary.animDuration then
+    sectorBoundary.animTimer = sectorBoundary.animTimer + dt
+    local t = math.min(1, sectorBoundary.animTimer / sectorBoundary.animDuration)
+    sectorBoundary.wallAlpha = t
+  else
+    sectorBoundary.wallAlpha = 1
+  end
+
+  -- Deactivation animation
+  if sectorBoundary.deactivating then
+    sectorBoundary.deactTimer = sectorBoundary.deactTimer + dt
+    local t = math.min(1, sectorBoundary.deactTimer / sectorBoundary.deactDuration)
+    sectorBoundary.wallAlpha = 1 - t
+    if t >= 1 then
+      sectorBoundary.active = false
+      sectorBoundary.wallAlpha = 0
+    end
+  end
+
+  -- Update lever glow
+  local lever = sectorBoundary.lever
+  if lever and not lever.hit then
+    lever.glowTimer = lever.glowTimer + dt
+  end
+  if lever and lever.flash > 0 then
+    lever.flash = lever.flash - dt * 3
+  end
+
+  -- Check bullet collisions with the lever
+  if lever and not lever.hit and not sectorBoundary.deactivating then
+    for i = #gameState.bullets, 1, -1 do
+      local b = gameState.bullets[i]
+      local dx = b.x - lever.x
+      local dy = b.y - lever.y
+      if dx * dx + dy * dy < (lever.radius + 6) * (lever.radius + 6) then
+        lever.hit = true
+        lever.flash = 1.0
+        sectorBoundary.deactivating = true
+        sectorBoundary.deactTimer = 0
+        table.remove(gameState.bullets, i)
+        break
+      end
+    end
+  end
+
+  -- Bounce player off walls when boundary is sealed (alpha > 0.5)
+  if sectorBoundary.wallAlpha > 0.5 and not sectorBoundary.deactivating then
+    local s = gameState.ship
+    local margin = 8
+    if s.x < margin then
+      s.x = margin
+      s.vx = math.abs(s.vx or 0) * 0.5
+    end
+    if s.x > gameState.width - margin then
+      s.x = gameState.width - margin
+      s.vx = -math.abs(s.vx or 0) * 0.5
+    end
+    if s.y < margin then
+      s.y = margin
+      s.vy = math.abs(s.vy or 0) * 0.5
+    end
+    if s.y > gameState.height - margin then
+      s.y = gameState.height - margin
+      s.vy = -math.abs(s.vy or 0) * 0.5
+    end
+  end
+end
+
+function M.drawSectorBoundary()
+  if not sectorBoundary.active or sectorBoundary.wallAlpha <= 0 then return end
+  local w = gameState.width
+  local h = gameState.height
+  local alpha = sectorBoundary.wallAlpha
+  local t = love.timer.getTime()
+
+  -- Energy wall lines along all four edges
+  love.graphics.setLineWidth(3)
+  -- Pulsing neon cyan/magenta
+  local pulse = math.sin(t * 4) * 0.15
+  local r, g, b = 0.2, 0.8, 1.0
+
+  -- During seal-in animation, draw walls sweeping from corners
+  local progress = math.min(1, sectorBoundary.animTimer / sectorBoundary.animDuration)
+  if sectorBoundary.deactivating then
+    progress = 1  -- walls fully visible during deact (just fading alpha)
+  end
+
+  -- Draw energy walls
+  for layer = 1, 3 do
+    local offset = layer * 2
+    local a = alpha * (0.6 - layer * 0.15 + pulse)
+    love.graphics.setColor(r, g, b, a)
+    -- Top
+    love.graphics.line(w * (0.5 - 0.5 * progress), offset, w * (0.5 + 0.5 * progress), offset)
+    -- Bottom
+    love.graphics.line(w * (0.5 - 0.5 * progress), h - offset, w * (0.5 + 0.5 * progress), h - offset)
+    -- Left
+    love.graphics.line(offset, h * (0.5 - 0.5 * progress), offset, h * (0.5 + 0.5 * progress))
+    -- Right
+    love.graphics.line(w - offset, h * (0.5 - 0.5 * progress), w - offset, h * (0.5 + 0.5 * progress))
+  end
+
+  -- Corner energy nodes (bright glowing corners)
+  local cornerSize = 10 * alpha
+  local corners = {{4, 4}, {w - 4, 4}, {4, h - 4}, {w - 4, h - 4}}
+  for _, c in ipairs(corners) do
+    love.graphics.setColor(0.4, 0.9, 1.0, alpha * (0.7 + pulse))
+    love.graphics.circle("fill", c[1], c[2], cornerSize)
+    love.graphics.setColor(1, 1, 1, alpha * 0.5)
+    love.graphics.circle("fill", c[1], c[2], cornerSize * 0.4)
+  end
+
+  -- Scanning particle effect along walls
+  if progress >= 1 and not sectorBoundary.deactivating then
+    local scanPos = (t * 200) % (w * 2 + h * 2)
+    local sx, sy
+    if scanPos < w then
+      sx, sy = scanPos, 2
+    elseif scanPos < w + h then
+      sx, sy = w - 2, scanPos - w
+    elseif scanPos < w * 2 + h then
+      sx, sy = w - (scanPos - w - h), h - 2
+    else
+      sx, sy = 2, h - (scanPos - w * 2 - h)
+    end
+    love.graphics.setColor(1, 1, 1, alpha * 0.9)
+    love.graphics.circle("fill", sx, sy, 4)
+    love.graphics.setColor(0.3, 0.9, 1.0, alpha * 0.4)
+    love.graphics.circle("fill", sx, sy, 12)
+  end
+
+  -- Draw the lever
+  local lever = sectorBoundary.lever
+  if lever and not lever.hit then
+    local glow = math.sin(lever.glowTimer * 3) * 0.3 + 0.7
+    -- Lever base (mechanical switch look)
+    love.graphics.setColor(0.3, 0.3, 0.3, alpha)
+    love.graphics.circle("fill", lever.x, lever.y, lever.radius + 4)
+    -- Lever body (red = active lock)
+    love.graphics.setColor(1.0, 0.3, 0.2, alpha * glow)
+    love.graphics.circle("fill", lever.x, lever.y, lever.radius)
+    -- Inner core
+    love.graphics.setColor(1.0, 0.6, 0.3, alpha * glow * 0.8)
+    love.graphics.circle("fill", lever.x, lever.y, lever.radius * 0.5)
+    -- "SHOOT" hint near lever
+    love.graphics.setColor(1, 0.5, 0.3, alpha * glow * 0.6)
+    love.graphics.setFont(ui.getFont("hudSmall"))
+    love.graphics.printf("◄ RELEASE", lever.x - 80, lever.y - 6, 70, "right")
+    -- Pulsing ring
+    love.graphics.setLineWidth(1)
+    love.graphics.setColor(1.0, 0.4, 0.2, alpha * glow * 0.5)
+    love.graphics.circle("line", lever.x, lever.y, lever.radius + 8 + math.sin(lever.glowTimer * 5) * 3)
+  elseif lever and lever.hit and lever.flash > 0 then
+    -- Hit flash (green burst)
+    love.graphics.setColor(0.2, 1.0, 0.4, lever.flash)
+    love.graphics.circle("fill", lever.x, lever.y, lever.radius * 2 * (1 + (1 - lever.flash) * 2))
+    love.graphics.setColor(1, 1, 1, lever.flash * 0.8)
+    love.graphics.circle("fill", lever.x, lever.y, lever.radius * 0.5)
+  end
+
+  love.graphics.setLineWidth(1)
+end
+
 function M.startFade(callback)
   fadeState.active = true
   fadeState.alpha = 0
   fadeState.fadeIn = false
   fadeState.callback = callback
+  fadeState.color = {0, 0, 0}  -- Black fade
+end
+
+function M.setFadeInFromWhite()
+  fadeState.active = true
+  fadeState.alpha = 1.0
+  fadeState.fadeIn = true
+  fadeState.callback = nil
+  fadeState.color = {1, 1, 1}  -- White fade
 end
 
 function M.updateFade(dt)
@@ -683,6 +950,14 @@ function M.updatePlaying(dt)
   local transitioned, newTileX, newTileY, wrapX, wrapY =
     worldmap.checkEdgeTransition(gameState.ship.x, gameState.ship.y, gameState.width, gameState.height)
 
+  -- Block transitions when sector boundary walls are sealed
+  if transitioned and sectorBoundary.active and sectorBoundary.wallAlpha > 0.5 and not sectorBoundary.deactivating then
+    transitioned = false
+    -- Clamp ship to screen instead of transitioning
+    wrapX = math.max(8, math.min(gameState.width - 8, gameState.ship.x))
+    wrapY = math.max(8, math.min(gameState.height - 8, gameState.ship.y))
+  end
+
   if transitioned then
     M.transitionToTile(newTileX, newTileY, wrapX, wrapY)
   else
@@ -757,6 +1032,18 @@ function M.updatePlaying(dt)
 
   -- ===== CONSTELLATION HAZARD UPDATES =====
   M.updateConstellationHazards(dt)
+
+  -- ===== SECTOR BOUNDARY UPDATE (puzzle/miniboss walls + lever) =====
+  M.updateSectorBoundary(dt)
+
+  -- Deactivate boundary when puzzle is completed
+  if sectorBoundary.active and not sectorBoundary.deactivating then
+    local puzzleInfo = puzzle.getPuzzleAt(worldmap.tileX, worldmap.tileY)
+    if puzzleInfo and puzzle.isCompleted(worldmap.tileX, worldmap.tileY) then
+      sectorBoundary.deactivating = true
+      sectorBoundary.deactTimer = 0
+    end
+  end
 
   -- ===== PUZZLE SYSTEM UPDATE =====
   -- Scan hold detection (S key while not using toggle shield)
@@ -1894,7 +2181,8 @@ function M.draw()
 
   -- Draw fade overlay
   if fadeState.active then
-    love.graphics.setColor(0, 0, 0, fadeState.alpha)
+    local color = fadeState.color or {0, 0, 0}
+    love.graphics.setColor(color[1], color[2], color[3], fadeState.alpha)
     love.graphics.rectangle("fill", 0, 0, gameState.width, gameState.height)
   end
 
@@ -2775,6 +3063,9 @@ function M.drawPlaying()
     M.drawEdgeHit()
   end
 
+  -- Draw sector boundary walls + lever
+  M.drawSectorBoundary()
+
   -- Draw busted overlay (only for 3+ star busts, not warning catches)
   if wanted.bustedState and not wanted.warningCatch then
     M.drawBustedOverlay()
@@ -2813,21 +3104,21 @@ function M.drawPauseMenu()
 
   -- Title
   love.graphics.setColor(0.3, 0.5, 1)
-  love.graphics.setFont(ui.getFont("title"))
+  love.graphics.setFont(ui.getFont("pauseTitle"))
   love.graphics.printf("PAUSED", 0, 250, gameState.width, "center")
 
   -- Menu options
-  love.graphics.setFont(ui.getFont("small"))
+  love.graphics.setFont(ui.getFont("pauseMenu"))
   local options = {"Resume", "World Map", "Restart Level", "Options", "Exit to Station"}
   local startY = 340
 
   for i, option in ipairs(options) do
     if i == gameState.pauseMenuIndex then
       love.graphics.setColor(1, 1, 0)
-      love.graphics.printf("> " .. option .. " <", 0, startY + (i - 1) * 40, gameState.width, "center")
+      love.graphics.printf("> " .. option .. " <", 0, startY + (i - 1) * 50, gameState.width, "center")
     else
       love.graphics.setColor(0.7, 0.7, 0.7)
-      love.graphics.printf(option, 0, startY + (i - 1) * 40, gameState.width, "center")
+      love.graphics.printf(option, 0, startY + (i - 1) * 50, gameState.width, "center")
     end
   end
 

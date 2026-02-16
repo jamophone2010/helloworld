@@ -29,9 +29,9 @@ local titleFont, menuFont, smallFont
 M.onFloorChange = nil -- called with (newFloorId) when travel completes
 
 function M.load()
-  titleFont = love.graphics.newFont(28)
-  menuFont = love.graphics.newFont(20)
-  smallFont = love.graphics.newFont(14)
+  titleFont = love.graphics.newFont("fonts/Exo2-Regular.ttf", 28)
+  menuFont = love.graphics.newFont("fonts/Exo2-Regular.ttf", 20)
+  smallFont = love.graphics.newFont("fonts/Exo2-Regular.ttf", 14)
   state = "closed"
   doorOpenAmt = 0
 end

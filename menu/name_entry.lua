@@ -10,9 +10,9 @@ M.onComplete = nil
 M.onBack = nil
 
 function M.load()
-  fonts.title = love.graphics.newFont(40)
-  fonts.input = love.graphics.newFont(32)
-  fonts.info = love.graphics.newFont(16)
+  fonts.title = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 40)
+  fonts.input = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 32)
+  fonts.info = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 16)
   playerName = ""
   cursorBlink = 0
   cursorVisible = true

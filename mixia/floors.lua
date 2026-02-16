@@ -30,24 +30,24 @@ M.COLORS = {
 M.floors = {
   [0] = {
     id = 0,
-    name = "Ancient Citadel",
+    name = "Inside the PC",
     subtitle = "Temple of Peril",
     secret = true,
     unlockCondition = "quest_surface",
     ambience = "dark",
-    colorScheme = {bg = {0.08, 0.06, 0.04}, accent = {0.7, 0.5, 0.2}, light = {0.9, 0.7, 0.3}},
+    colorScheme = {bg = {0.05, 0.08, 0.06}, accent = {0.2, 0.8, 0.3}, light = {0.4, 1.0, 0.5}},
     lightLevel = 0.25,
     width = 35,
     height = 22,
     elevatorPos = {x = 17, y = 11},
     buildings = {
-      {name = "Ancient Citadel", x = 10, y = 3, w = 14, h = 7, doorX = 16, doorY = 10, interior = "ancient_citadel_maze",
-       color = {0.25, 0.2, 0.12}, accentColor = {0.7, 0.5, 0.2},
-       archStyle = "cathedral"},
+      {name = "The PC Case", x = 10, y = 3, w = 14, h = 7, doorX = 16, doorY = 10, interior = "ancient_citadel_maze",
+       color = {0.15, 0.15, 0.18}, accentColor = {0.2, 0.8, 0.3},
+       archStyle = "industrial"},
     },
     npcs = {
-      {name = "Tomb Guardian", x = 12, y = 12, dialogue = "The Citadel holds treasures beyond imagination... and traps beyond survival. Turn back while you can.", gender = "male"},
-      {name = "Ruin Scholar", x = 22, y = 12, dialogue = "Ancient inscriptions warn of a great boulder trap. Only the swift survive.", gender = "female", design = 3},
+      {name = "BIOS Guardian", x = 12, y = 12, dialogue = "The Case holds components beyond imagination... and hazards beyond survival. Dust bunnies lurk in every corner. Turn back while you can.", gender = "male"},
+      {name = "Overclocker", x = 22, y = 12, dialogue = "Beware the dust bunny stampede. Only the swift survive. If you had some Compressed Air, the dust wouldn't be so bad...", gender = "female", design = 3},
     },
     paths = {
       {x1 = 1, y1 = 9, x2 = 33, y2 = 14},
@@ -92,6 +92,7 @@ M.floors = {
       {name = "Groot Jr.", x = 9, y = 18, dialogue = "I am Groot.", species = "flora_colossus", style = "gentle_giant", gender = "male"},
       {name = "Rocket Analog", x = 34, y = 10, dialogue = "Yeah, I'm a talking raccoon-thing. You got a problem with that? Didn't think so.", species = "raccoonoid", style = "scrappy", gender = "male"},
       {name = "DJ Nebula", x = 26, y = 12, dialogue = "The Surface never sleeps! Best beats in the galaxy, right here.", species = "energy_being", style = "performer", gender = "female", design = 2},
+      {name = "Tech Scavenger Kira", x = 12, y = 18, dialogue = "Psst! I salvaged a can of Compressed Air from an old server room. Clears dust like nobody's business. 10,000 credits and it's yours... if you've got the winnings.", species = "human", style = "scavenger", gender = "female", design = 4, sellsCompressedAir = true, price = 10000},
     },
     -- Environment features for rendering
     environment = {

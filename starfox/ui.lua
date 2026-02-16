@@ -68,10 +68,12 @@ function M.isSectorX()
 end
 
 function M.load()
-  fonts.large = love.graphics.newFont(36)
-  fonts.xlarge = love.graphics.newFont(52)
-  fonts.normal = love.graphics.newFont(20)
-  fonts.small = love.graphics.newFont(14)
+  fonts.large = love.graphics.newFont("fonts/Exo2-Regular.ttf", 36)
+  fonts.xlarge = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 52)
+  fonts.normal = love.graphics.newFont("fonts/Exo2-Regular.ttf", 20)
+  fonts.small = love.graphics.newFont("fonts/Exo2-Regular.ttf", 14)
+  fonts.pauseTitle = love.graphics.newFont("fonts/Exo2-Regular.ttf", 32)
+  fonts.pauseMenu = love.graphics.newFont("fonts/Exo2-Regular.ttf", 24)
   hud.load()
 end
 
@@ -125,21 +127,32 @@ function M.drawIntro(timer, levelName, levelId, enemyCount)
     love.graphics.setColor(0, 0, 0, 0.4 * titleAlpha)
     love.graphics.rectangle("fill", 0, 0, screen.WIDTH, screen.HEIGHT)
 
-    -- Split stage name into words for stacking
+    -- Split stage name into two lines (if long enough)
     local words = {}
     for word in levelName:gmatch("%S+") do
       table.insert(words, word)
     end
+    local nameLines = {}
+    if #words <= 1 or #levelName <= 13 then
+      -- Single word or short name stays on one line
+      nameLines = { levelName }
+    else
+      -- Split longer multi-word names across two lines
+      local mid = math.ceil(#words / 2)
+      local line1 = table.concat(words, " ", 1, mid)
+      local line2 = table.concat(words, " ", mid + 1)
+      nameLines = { line1, line2 }
+    end
 
     -- Calculate vertical layout
     -- Line 1: "Stage #X:" (small text)
-    -- Line 2 (+3): Stage name words (xlarge text, stacked)
+    -- Line 2-3: Stage name (xlarge text, two lines)
     -- Last line: "Enemies Detected = X" (smaller, blue)
     local centerY = 300
     local stageLineH = 24
     local nameLineH = 60
     local enemyLineH = 24
-    local totalH = stageLineH + #words * nameLineH + 20 + enemyLineH
+    local totalH = stageLineH + #nameLines * nameLineH + 20 + enemyLineH
     local startY = centerY - totalH / 2
 
     -- Line 1: Stage number
@@ -148,11 +161,11 @@ function M.drawIntro(timer, levelName, levelId, enemyCount)
     love.graphics.printf("Stage #" .. levelId .. ":", 0, startY, screen.WIDTH, "center")
     startY = startY + stageLineH + 8
 
-    -- Line 2 (+3): Stage name - each word stacked
+    -- Line 2-3: Stage name - split across two lines
     love.graphics.setFont(fonts.xlarge)
     love.graphics.setColor(1, 1, 1, titleAlpha)
-    for _, word in ipairs(words) do
-      love.graphics.printf(word, 0, startY, screen.WIDTH, "center")
+    for _, line in ipairs(nameLines) do
+      love.graphics.printf(line, 0, startY, screen.WIDTH, "center")
       startY = startY + nameLineH
     end
     startY = startY + 12
@@ -4963,12 +4976,12 @@ function M.drawPauseMenu(selectedIndex, isLevelSelect, enteredFromPortal)
   love.graphics.rectangle("fill", 0, 0, screen.WIDTH, screen.HEIGHT)
 
   -- Title
-  love.graphics.setFont(fonts.large)
+  love.graphics.setFont(fonts.pauseTitle)
   love.graphics.setColor(0.3, 0.5, 1)
   love.graphics.printf("PAUSED", 0, 150, screen.WIDTH, "center")
 
   -- Menu options
-  love.graphics.setFont(fonts.normal)
+  love.graphics.setFont(fonts.pauseMenu)
   local options
   if isLevelSelect then
     options = {"Resume", "Options", "Exit to Station"}
@@ -4981,10 +4994,10 @@ function M.drawPauseMenu(selectedIndex, isLevelSelect, enteredFromPortal)
   for i, option in ipairs(options) do
     if i == selectedIndex then
       love.graphics.setColor(1, 1, 0)
-      love.graphics.printf("> " .. option .. " <", 0, startY + (i - 1) * 40, screen.WIDTH, "center")
+      love.graphics.printf("> " .. option .. " <", 0, startY + (i - 1) * 50, screen.WIDTH, "center")
     else
       love.graphics.setColor(0.7, 0.7, 0.7)
-      love.graphics.printf(option, 0, startY + (i - 1) * 40, screen.WIDTH, "center")
+      love.graphics.printf(option, 0, startY + (i - 1) * 50, screen.WIDTH, "center")
     end
   end
 
@@ -5000,12 +5013,12 @@ function M.drawOptionsMenu()
   love.graphics.rectangle("fill", 0, 0, screen.WIDTH, screen.HEIGHT)
 
   -- Title
-  love.graphics.setFont(fonts.large)
+  love.graphics.setFont(fonts.pauseTitle)
   love.graphics.setColor(0.3, 0.5, 1)
   love.graphics.printf("OPTIONS", 0, 200, screen.WIDTH, "center")
 
   -- Placeholder text
-  love.graphics.setFont(fonts.normal)
+  love.graphics.setFont(fonts.pauseMenu)
   love.graphics.setColor(0.7, 0.7, 0.7)
   love.graphics.printf("Options menu coming soon...", 0, 280, screen.WIDTH, "center")
 

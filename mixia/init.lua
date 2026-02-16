@@ -57,6 +57,9 @@ function M.load()
   gameState.credits = 1000000
   gameState.notes = currency.load()
   gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false, scan = false}
+  gameState.casinoWinnings = gameState.casinoWinnings or 0  -- Track total casino winnings
+  gameState.hasCompressedAir = gameState.hasCompressedAir or false  -- Compressed Air item
+  gameState.creditsBeforeCasino = 0  -- For tracking casino session winnings
   gameState.paused = false
   gameState.animationTime = 0
   gameState.unlockedQuests = gameState.unlockedQuests or {}
@@ -71,7 +74,8 @@ function M.load()
       phase = "in",
       timer = 0,
       duration = 0.5,
-      callback = nil
+      callback = nil,
+      color = {1, 1, 1}  -- White fade
     }
     gameState.fadeInFromStarfox = false
   end
@@ -103,6 +107,13 @@ end
 function M.getShopItems() return gameState.shopItems end
 function M.clearShopItems() gameState.shopItems = {lives = 0, bombs = 0, health = 0, laser = false, scan = false} end
 function M.setPaused(paused) gameState.paused = paused end
+
+function M.getCasinoWinnings() return gameState.casinoWinnings or 0 end
+function M.addCasinoWinnings(amount) gameState.casinoWinnings = (gameState.casinoWinnings or 0) + amount end
+function M.hasCompressedAir() return gameState.hasCompressedAir or false end
+function M.setCompressedAir(val) gameState.hasCompressedAir = val end
+function M.getCreditsBeforeCasino() return gameState.creditsBeforeCasino or 0 end
+function M.setCreditsBeforeCasino(amount) gameState.creditsBeforeCasino = amount end
 
 function M.setFadeInFromStarfox(enable)
   gameState.fadeInFromStarfox = enable
@@ -235,7 +246,7 @@ function M.doExitBuilding()
 end
 
 -- ═══════════════════════════════════════
--- MAZE STATE (Ancient Citadel)
+-- MAZE STATE (Inside the PC Case)
 -- ═══════════════════════════════════════
 
 function M.initMazeState(interior)
@@ -243,14 +254,15 @@ function M.initMazeState(interior)
     timer = 0,
     -- Obstacle tracking
     darts = {},
+    sparks = {},  -- For loose wire spark effects
     activeTraps = {},
     -- Per-obstacle timers
     obstacleTimers = {},
     -- Crumbling floor states: gridKey -> {state="solid"|"crumbling"|"fallen"|"reforming", timer=0}
     crumbleStates = {},
-    -- Swinging blade angles
+    -- Case fan (swinging blade) angles
     bladeAngles = {},
-    -- Boulder chase state
+    -- Dust bunny stampede state (replaces boulder)
     boulder = {
       active = false,
       x = 0, y = 0,
@@ -290,13 +302,13 @@ function M.initMazeState(interior)
   if interior.obstacles then
     for i, obs in ipairs(interior.obstacles) do
       state.obstacleTimers[i] = 0
-      if obs.type == "blade" then
+      if obs.type == "blade" or obs.type == "case_fan" then
         state.bladeAngles[i] = 0
       end
     end
   end
 
-  -- Find torch positions (placed along walls for ambience)
+  -- Find LED/indicator light positions (placed along walls for ambience)
   if interior.mazeMap then
     for y = 1, #interior.mazeMap - 1 do
       for x = 1, #interior.mazeMap[y] - 1 do
@@ -382,30 +394,55 @@ function M.updateMaze(dt, interior)
     local row = interior.mazeMap[py + 1]
     if row then
       local cell = row[px + 1]
-      -- Check trap types
-      if cell == 2 then -- Dart trap tile
-        -- Darts are handled by obstacle timers below
-      elseif cell == 3 then -- Spike pit
-        -- Check if spikes are currently active
-        local spikesUp = (math.floor(ms.timer / 1.5) % 2 == 0)
-        if spikesUp then
-          M.triggerMazeKnockback("Impaled by spike trap!", interior)
+      -- Check trap types (PC case themed)
+      if cell == 2 then -- Loose wires (shock hazard)
+        -- Sparks are handled by obstacle timers below
+      elseif cell == 3 then -- Bottomless pit (missing panel)
+        -- Check if pit is currently open
+        local pitOpen = (math.floor(ms.timer / 1.5) % 2 == 0)
+        if pitOpen then
+          M.triggerMazeKnockback("Fell through a missing panel!", interior)
         end
-      elseif cell == 5 then -- Crumbling floor
+      elseif cell == 5 then -- Dust pile (crumbling)
         local key = px .. "," .. py
         if not ms.crumbleStates[key] then
-          ms.crumbleStates[key] = {state = "crumbling", timer = 0.8}
+          -- If player has compressed air, blast the dust away harmlessly
+          if gameState.hasCompressedAir then
+            ms.warningMessage = "Compressed Air clears the dust!"
+            ms.warningTimer = 1.5
+            -- Spawn dispersing dust particles
+            for i = 1, 8 do
+              table.insert(ms.particles, {
+                x = px * 32 + 16, y = py * 32 + 16,
+                vx = (math.random() - 0.5) * 120,
+                vy = -math.random() * 80 - 20,
+                life = 0.6 + math.random() * 0.3,
+                maxLife = 0.9,
+                size = 2 + math.random() * 3,
+                color = {0.6, 0.6, 0.55},
+              })
+            end
+          else
+            ms.crumbleStates[key] = {state = "crumbling", timer = 0.8}
+          end
         end
-      elseif cell == 7 and not ms.boulder.triggered then -- Boulder trigger
+      elseif cell == 9 then -- Wire tangle (slows player)
+        -- Slow effect handled in movement code
+        if not ms.wireTangleWarned then
+          ms.warningMessage = "Tangled in wires! Move slowly..."
+          ms.warningTimer = 1.5
+          ms.wireTangleWarned = true
+        end
+      elseif cell == 7 and not ms.boulder.triggered then -- Dust bunny stampede trigger
         ms.boulder.triggered = true
         ms.boulder.active = true
         ms.boulder.x = interior.boulderChase.boulderStartX
         ms.boulder.y = interior.boulderChase.boulderStartY
         ms.shake.intensity = 8
         ms.shake.timer = 2.0
-        ms.warningMessage = "RUN!!!"
+        ms.warningMessage = "DUST BUNNIES INCOMING!!!"
         ms.warningTimer = 3.0
-        -- Spawn rumble particles
+        -- Spawn dust cloud particles
         for i = 1, 20 do
           table.insert(ms.particles, {
             x = ms.boulder.x * 32 + 16,
@@ -415,10 +452,10 @@ function M.updateMaze(dt, interior)
             life = 1.0 + math.random() * 0.5,
             maxLife = 1.5,
             size = 2 + math.random() * 3,
-            color = {0.6, 0.5, 0.3},
+            color = {0.5, 0.5, 0.45},
           })
         end
-      elseif cell == 8 and not ms.chest.opened then -- Treasure chest
+      elseif cell == 8 and not ms.chest.opened then -- Treasure (rare component)
         -- Player reached the treasure! (handled by interaction)
       end
     end
@@ -429,30 +466,37 @@ function M.updateMaze(dt, interior)
     for i, obs in ipairs(interior.obstacles) do
       ms.obstacleTimers[i] = (ms.obstacleTimers[i] or 0) + dt
 
-      if obs.type == "blade" then
+      if obs.type == "blade" or obs.type == "case_fan" then
         ms.bladeAngles[i] = (ms.bladeAngles[i] or 0) + dt * obs.swingSpeed
-        -- Check if blade hits player
+        -- Check if fan blade hits player
         local bladeCenterX = obs.gridX
         local bladeCenterY = obs.gridY
         local bladeAngle = math.sin(ms.bladeAngles[i])
-        -- Blade occupies center tile and swings to adjacent tiles
+        -- Fan blade occupies center tile and swings to adjacent tiles
         local bladeReach = math.floor(bladeAngle * 1.5 + 0.5)
         if py == bladeCenterY and (px == bladeCenterX or px == bladeCenterX + bladeReach) then
           if math.abs(bladeAngle) > 0.3 then
-            M.triggerMazeKnockback("Sliced by swinging blade!", interior)
+            M.triggerMazeKnockback("Chopped by case fan blade!", interior)
           end
         end
-      elseif obs.type == "fire" then
+      elseif obs.type == "fire" or obs.type == "hot_object" then
         local cycle = ms.obstacleTimers[i] % (obs.interval + obs.activeTime)
         local isActive = cycle < obs.activeTime
         if isActive and px == obs.gridX and py == obs.gridY then
-          M.triggerMazeKnockback("Scorched by fire jet!", interior)
+          M.triggerMazeKnockback("Burned by overheating component!", interior)
         end
-      elseif obs.type == "spikes" then
+      elseif obs.type == "spikes" or obs.type == "bottomless_pit" then
         local cycle = ms.obstacleTimers[i] % (obs.interval + obs.activeTime)
         local isActive = cycle < obs.activeTime
         if isActive and px == obs.gridX and py == obs.gridY then
-          M.triggerMazeKnockback("Impaled by spike trap!", interior)
+          M.triggerMazeKnockback("Fell through a missing panel!", interior)
+        end
+      elseif obs.type == "loose_wire" then
+        -- Sparking wires that zap periodically
+        local cycle = ms.obstacleTimers[i] % (obs.interval + 0.3)
+        local isSparking = cycle < 0.3
+        if isSparking and px == obs.gridX and py == obs.gridY then
+          M.triggerMazeKnockback("Zapped by a loose wire!", interior)
         end
       end
     end
@@ -504,7 +548,7 @@ function M.updateMaze(dt, interior)
       ms.boulder.y = ms.boulder.y + ms.boulder.speed * dt
     end
 
-    -- Spawn dust particles behind boulder
+    -- Spawn dust bunny trail particles behind horde
     if ms.boulder.rumbleTimer > 0.05 then
       ms.boulder.rumbleTimer = 0
       for i = 1, 3 do
@@ -516,16 +560,24 @@ function M.updateMaze(dt, interior)
           life = 0.5 + math.random() * 0.3,
           maxLife = 0.8,
           size = 2 + math.random() * 4,
-          color = {0.5, 0.4, 0.3},
+          color = {0.55, 0.55, 0.5},
         })
       end
     end
 
-    -- Check if boulder hit player
+    -- Check if dust bunnies hit player
     local boulderGridX = math.floor(ms.boulder.x + 0.5)
     local boulderGridY = math.floor(ms.boulder.y + 0.5)
     if math.abs(px - boulderGridX) <= 1 and math.abs(py - boulderGridY) <= 1 then
-      M.triggerMazeKnockback("Crushed by the boulder!", interior)
+      -- If player has compressed air, survive the stampede
+      if gameState.hasCompressedAir then
+        ms.boulder.active = false
+        ms.boulder.escaped = true
+        ms.warningMessage = "Compressed Air scatters the dust bunnies!"
+        ms.warningTimer = 2.5
+      else
+        M.triggerMazeKnockback("Overwhelmed by dust bunnies!", interior)
+      end
     end
 
     -- Check if boulder passed the escape point (player survived)
@@ -784,7 +836,8 @@ function M.draw()
       alpha = 1 - gameState.transition.timer / gameState.transition.duration
     end
     alpha = math.max(0, math.min(1, alpha))
-    love.graphics.setColor(0, 0, 0, alpha)
+    local color = gameState.transition.color or {0, 0, 0}
+    love.graphics.setColor(color[1], color[2], color[3], alpha)
     love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
   end
 end
@@ -1630,48 +1683,44 @@ function M.drawBackground(floorDef)
     end
 
   else
-    -- Lower levels / Ancient Citadel: dark with atmospheric effects
+    -- Lower levels / Inside the PC: dark with atmospheric effects
     love.graphics.setColor(bg[1] * lightLevel, bg[2] * lightLevel, bg[3] * lightLevel)
     love.graphics.rectangle("fill", 0, 0, screenW, screenH)
 
     if gameState.currentFloor == 0 then
-      -- Ancient Citadel atmospheric background
-      -- Faint stone texture suggestion
-      love.graphics.setColor(0.12, 0.1, 0.06, 0.3)
+      -- Inside the PC atmospheric background
+      -- Dark chassis interior texture
+      love.graphics.setColor(0.06, 0.08, 0.06, 0.3)
       for i = 0, screenW, 40 do
         for j = 0, screenH, 40 do
           local shade = ((i * 7 + j * 13) % 17) / 200
-          love.graphics.setColor(0.1 + shade, 0.08 + shade, 0.05 + shade, 0.2)
+          love.graphics.setColor(0.05 + shade, 0.07 + shade, 0.05 + shade, 0.2)
           love.graphics.rectangle("fill", i, j, 38, 38)
         end
       end
 
-      -- Mysterious floating dust in shafts of dim light
+      -- Floating dust particles in dim LED light
       for i = 1, 3 do
         local shaftX = screenW * (0.2 + i * 0.3) + math.sin(t * 0.1 + i) * 20
-        love.graphics.setColor(0.4, 0.3, 0.15, 0.03)
+        love.graphics.setColor(0.15, 0.3, 0.15, 0.03)
         love.graphics.polygon("fill", shaftX - 15, 0, shaftX + 15, 0, shaftX + 40, screenH, shaftX - 40, screenH)
       end
 
-      -- Faint ancient runes glowing on background walls
+      -- Faint LED status lights glowing on background chassis
       for i = 1, 6 do
         local rx = (i * 127 + 50) % screenW
         local ry = 40 + (i * 89) % (screenH - 80)
         local glow = math.sin(t * 0.4 + i * 1.7) * 0.3 + 0.4
-        love.graphics.setColor(0.6, 0.4, 0.1, glow * 0.08)
-        love.graphics.circle("fill", rx, ry, 30)
-        love.graphics.setColor(0.7, 0.5, 0.15, glow * 0.15)
-        local runeType = i % 3
-        if runeType == 0 then
-          love.graphics.polygon("line", rx, ry - 12, rx - 10, ry + 8, rx + 10, ry + 8)
-        elseif runeType == 1 then
-          love.graphics.circle("line", rx, ry, 8)
-          love.graphics.line(rx - 8, ry, rx + 8, ry)
-          love.graphics.line(rx, ry - 8, rx, ry + 8)
+        local ledType = i % 3
+        if ledType == 0 then
+          love.graphics.setColor(0.1, 0.8, 0.2, glow * 0.08)
+        elseif ledType == 1 then
+          love.graphics.setColor(0.2, 0.4, 1, glow * 0.08)
         else
-          love.graphics.ellipse("line", rx, ry, 10, 6)
-          love.graphics.circle("fill", rx, ry, 2)
+          love.graphics.setColor(1.0, 0.6, 0.1, glow * 0.08)
         end
+        love.graphics.circle("fill", rx, ry, 20)
+        love.graphics.circle("fill", rx, ry, 3)
       end
     end
   end
@@ -1690,23 +1739,23 @@ function M.drawFloor(floorDef)
 
   -- Floor ground
   if gameState.currentFloor == 0 then
-    -- Ancient Citadel: very dark impassable stone ground
-    love.graphics.setColor(0.06, 0.05, 0.04)
+    -- Inside the PC: dark chassis floor
+    love.graphics.setColor(0.04, 0.06, 0.04)
     love.graphics.rectangle("fill", 0, 0, floorDef.width * 32, floorDef.height * 32)
 
-    -- Scattered ancient rubble and sand (subtle)
+    -- Scattered cable ties and debris (subtle)
     math.randomseed(999)
     for i = 1, 25 do
       local px = math.random(0, floorDef.width * 32)
       local py = math.random(0, floorDef.height * 32)
-      love.graphics.setColor(0.09, 0.07, 0.05, 0.3)
+      love.graphics.setColor(0.06, 0.08, 0.06, 0.3)
       love.graphics.ellipse("fill", px, py, math.random(8, 25), math.random(4, 12))
     end
-    -- Rough impassable stone (cold, dark, minimal detail)
+    -- Dark chassis panels
     for cy = 0, floorDef.height * 32, 32 do
       for cx = 0, floorDef.width * 32, 32 do
-        local shade = 0.05 + ((cx * 3 + cy * 7) % 11) / 250
-        love.graphics.setColor(shade, shade - 0.005, shade - 0.01, 0.25)
+        local shade = 0.04 + ((cx * 3 + cy * 7) % 11) / 250
+        love.graphics.setColor(shade, shade + 0.01, shade + 0.005, 0.25)
         love.graphics.rectangle("fill", cx + 1, cy + 1, 30, 30)
       end
     end
@@ -1797,8 +1846,8 @@ function M.drawFloor(floorDef)
 
   -- Grid pattern
   if gameState.currentFloor == 0 then
-    -- Ancient Citadel: very faint mortar lines on dark ground
-    love.graphics.setColor(0.04, 0.03, 0.02, 0.08)
+    -- Inside the PC: faint panel seam lines
+    love.graphics.setColor(0.03, 0.05, 0.03, 0.08)
   elseif gameState.currentFloor == 1 then
     -- Surface: subtle root/path lines instead of grid
     love.graphics.setColor(0.08, 0.14, 0.06, 0.15)
@@ -1833,20 +1882,20 @@ function M.drawFloor(floorDef)
       local ph = (path.y2 - path.y1 + 1) * 32
 
       if gameState.currentFloor == 0 then
-        -- Ancient Citadel: amber/gold stone walkway (distinct from dark ground)
-        love.graphics.setColor(0.42, 0.32, 0.14, 0.9)
+        -- Inside the PC: illuminated PCB trace walkway
+        love.graphics.setColor(0.08, 0.2, 0.08, 0.9)
         love.graphics.rectangle("fill", px, py, pw, ph)
-        -- Carved golden sandstone blocks
+        -- Circuit board trace pattern
         for fy = py, py + ph - 1, 20 do
           local rowOff = (math.floor((fy - py) / 20) % 2 == 0) and 0 or 10
           for fx = px + rowOff, px + pw - 1, 20 do
-            local shade = 0.38 + ((fx + fy * 3) % 11) / 55
-            love.graphics.setColor(shade, shade * 0.78, shade * 0.4, 0.6)
+            local shade = 0.1 + ((fx + fy * 3) % 11) / 55
+            love.graphics.setColor(shade, shade + 0.15, shade + 0.05, 0.6)
             love.graphics.rectangle("fill", fx + 1, fy + 1, 17, 17, 1, 1)
           end
         end
-        -- Sand drifts along edges
-        love.graphics.setColor(0.5, 0.4, 0.2, 0.3)
+        -- Copper trace lines along edges
+        love.graphics.setColor(0.4, 0.28, 0.08, 0.3)
         love.graphics.ellipse("fill", px + pw * 0.3, py + 4, pw * 0.15, 6)
         love.graphics.ellipse("fill", px + pw * 0.7, py + ph - 4, pw * 0.12, 5)
         -- Torch glow accents at path corners (warm orange light pools)
@@ -2669,7 +2718,7 @@ function M.drawBuilding(b, colors, lightLevel)
 end
 
 -- ═══════════════════════════════════════
--- MAZE INTERIOR DRAWING (Ancient Citadel)
+-- MAZE INTERIOR DRAWING (Inside the PC Case)
 -- ═══════════════════════════════════════
 
 function M.drawMazeInterior(interior)
@@ -2682,11 +2731,11 @@ function M.drawMazeInterior(interior)
     love.graphics.translate(ms.shake.x, ms.shake.y)
   end
 
-  -- Dark stone floor base
-  love.graphics.setColor(0.12, 0.1, 0.08)
+  -- Dark PCB/chassis floor base
+  love.graphics.setColor(0.06, 0.08, 0.06)
   love.graphics.rectangle("fill", 0, 0, interior.width * GS, interior.height * GS)
 
-  -- Floor tile pattern (ancient stone)
+  -- Floor tile pattern (PCB traces and chassis panels)
   for y = 0, interior.height - 1 do
     for x = 0, interior.width - 1 do
       local row = interior.mazeMap[y + 1]
@@ -2696,189 +2745,212 @@ function M.drawMazeInterior(interior)
       local py = y * GS
 
       if cell == 1 then
-        -- Wall block: carved stone with hieroglyphic accents
-        local shade = 0.18 + ((x * 7 + y * 13) % 17) / 170
-        love.graphics.setColor(shade, shade - 0.02, shade - 0.04)
+        -- Wall block: PC chassis panels / heatsink fins
+        local shade = 0.12 + ((x * 7 + y * 13) % 17) / 170
+        love.graphics.setColor(shade, shade + 0.01, shade + 0.02)
         love.graphics.rectangle("fill", px, py, GS, GS)
 
-        -- Stone brick lines
-        love.graphics.setColor(0, 0, 0, 0.2)
+        -- Metal panel lines
+        love.graphics.setColor(0, 0, 0, 0.25)
         love.graphics.setLineWidth(1)
         love.graphics.rectangle("line", px + 1, py + 1, GS - 2, GS - 2)
 
-        -- Occasional hieroglyph carvings on walls
+        -- Occasional ventilation holes or screw heads on panels
         if (x * 11 + y * 3) % 23 == 0 then
-          love.graphics.setColor(0.3, 0.25, 0.15, 0.3)
-          local glyphType = (x + y) % 4
-          if glyphType == 0 then
-            -- Eye symbol
-            love.graphics.ellipse("line", px + 16, py + 16, 8, 5)
+          love.graphics.setColor(0.08, 0.1, 0.08, 0.4)
+          local detailType = (x + y) % 4
+          if detailType == 0 then
+            -- Screw head
+            love.graphics.circle("line", px + 16, py + 16, 4)
+            love.graphics.line(px + 13, py + 16, px + 19, py + 16)
+          elseif detailType == 1 then
+            -- Vent slots
+            for vy = py + 8, py + 24, 4 do
+              love.graphics.line(px + 8, vy, px + 24, vy)
+            end
+          elseif detailType == 2 then
+            -- Circuit trace pattern
+            love.graphics.setColor(0.15, 0.25, 0.15, 0.3)
+            love.graphics.line(px + 4, py + 16, px + 16, py + 16)
+            love.graphics.line(px + 16, py + 16, px + 16, py + 28)
             love.graphics.circle("fill", px + 16, py + 16, 2)
-          elseif glyphType == 1 then
-            -- Triangle (pyramid)
-            love.graphics.polygon("line", px + 16, py + 6, px + 8, py + 26, px + 24, py + 26)
-          elseif glyphType == 2 then
-            -- Ankh
-            love.graphics.circle("line", px + 16, py + 10, 5)
-            love.graphics.line(px + 16, py + 15, px + 16, py + 28)
-            love.graphics.line(px + 11, py + 20, px + 21, py + 20)
           else
-            -- Scarab
-            love.graphics.ellipse("line", px + 16, py + 16, 6, 8)
-            love.graphics.line(px + 10, py + 12, px + 6, py + 8)
-            love.graphics.line(px + 22, py + 12, px + 26, py + 8)
+            -- Heatsink fins
+            for fx = px + 6, px + 26, 4 do
+              love.graphics.setColor(0.14, 0.16, 0.14, 0.3)
+              love.graphics.rectangle("fill", fx, py + 4, 2, 24)
+            end
           end
         end
       else
-        -- Path tile: worn sandy stone floor (warmer, lighter than walls)
-        local pathShade = 0.38 + ((x * 3 + y * 11) % 13) / 130
-        love.graphics.setColor(pathShade, pathShade - 0.06, pathShade - 0.14)
+        -- Path tile: motherboard / PCB surface (dark green)
+        local pathShade = 0.08 + ((x * 3 + y * 11) % 13) / 200
+        love.graphics.setColor(pathShade, pathShade + 0.12, pathShade + 0.04)
         love.graphics.rectangle("fill", px, py, GS, GS)
 
-        -- Tile cracks and mortar
-        love.graphics.setColor(0, 0, 0, 0.08)
+        -- PCB trace lines
+        love.graphics.setColor(0.1, 0.22, 0.1, 0.15)
         love.graphics.rectangle("line", px + 1, py + 1, GS - 2, GS - 2)
 
-        -- Random cracks on floor
+        -- Random copper trace patterns on floor
         if (x * 17 + y * 7) % 31 == 0 then
-          love.graphics.setColor(0, 0, 0, 0.12)
+          love.graphics.setColor(0.5, 0.35, 0.1, 0.12)
           love.graphics.setLineWidth(1)
-          love.graphics.line(px + 4, py + 8, px + 18, py + 24)
-          love.graphics.line(px + 18, py + 24, px + 28, py + 20)
+          love.graphics.line(px + 4, py + 8, px + 18, py + 8)
+          love.graphics.line(px + 18, py + 8, px + 18, py + 24)
+          love.graphics.circle("fill", px + 18, py + 8, 1.5)
         end
 
         -- Draw trap indicators on special cells
         if cell == 2 then
-          -- Dart trap: small holes in wall
-          love.graphics.setColor(0.08, 0.06, 0.04)
-          love.graphics.circle("fill", px + 8, py + 16, 3)
-          love.graphics.circle("fill", px + 24, py + 16, 3)
-          -- Warning scratches on floor
-          love.graphics.setColor(0.5, 0.15, 0.1, 0.3)
-          love.graphics.line(px + 4, py + 4, px + 12, py + 12)
-          love.graphics.line(px + 20, py + 4, px + 28, py + 12)
+          -- Loose wires: dangling cables with spark effects
+          love.graphics.setColor(0.2, 0.2, 0.6, 0.7)
+          love.graphics.setLineWidth(2)
+          love.graphics.line(px + 8, py + 2, px + 12, py + 18)
+          love.graphics.line(px + 22, py + 2, px + 18, py + 20)
+          love.graphics.setLineWidth(1)
+          -- Copper wire tips
+          love.graphics.setColor(0.7, 0.45, 0.1, 0.8)
+          love.graphics.circle("fill", px + 12, py + 18, 2)
+          love.graphics.circle("fill", px + 18, py + 20, 2)
+          -- Spark effect (periodic)
+          local sparkPhase = math.sin(t * 6 + x * 3) * 0.5 + 0.5
+          if sparkPhase > 0.7 then
+            love.graphics.setColor(1, 1, 0.5, sparkPhase)
+            love.graphics.circle("fill", px + 15, py + 19, 3 + sparkPhase * 2)
+            love.graphics.setColor(0.5, 0.8, 1, sparkPhase * 0.5)
+            love.graphics.circle("fill", px + 15, py + 19, 5 + sparkPhase * 3)
+          end
         elseif cell == 3 then
-          -- Spike pit: grate pattern
-          local spikesUp = (math.floor(t / 1.5) % 2 == 0)
-          if spikesUp then
-            love.graphics.setColor(0.6, 0.15, 0.1, 0.8)
-            for sx = px + 4, px + 28, 6 do
-              love.graphics.polygon("fill", sx, py + 28, sx + 2, py + 28, sx + 1, py + 8)
-            end
-          else
-            love.graphics.setColor(0.05, 0.03, 0.02, 0.8)
+          -- Bottomless pit: missing chassis panel showing void below
+          local pitOpen = (math.floor(t / 1.5) % 2 == 0)
+          if pitOpen then
+            -- Dark void below
+            love.graphics.setColor(0.02, 0.02, 0.02, 0.95)
             love.graphics.rectangle("fill", px + 2, py + 2, 28, 28)
-            love.graphics.setColor(0.08, 0.06, 0.04)
+            -- Distant circuit board glow far below
+            love.graphics.setColor(0.1, 0.3, 0.1, 0.2)
+            for bx = px + 6, px + 26, 8 do
+              love.graphics.line(bx, py + 20, bx + 4, py + 26)
+            end
+            -- Danger border
+            love.graphics.setColor(0.8, 0.2, 0.0, 0.5)
+            love.graphics.setLineWidth(2)
+            love.graphics.rectangle("line", px + 2, py + 2, 28, 28)
+            love.graphics.setLineWidth(1)
+          else
+            -- Panel loosely in place
+            love.graphics.setColor(0.12, 0.12, 0.14, 0.6)
+            love.graphics.rectangle("fill", px + 2, py + 2, 28, 28)
+            love.graphics.setColor(0.08, 0.08, 0.1)
             for sx = px + 5, px + 28, 8 do
               love.graphics.line(sx, py + 4, sx, py + 28)
             end
           end
         elseif cell == 4 then
-          -- Swinging blade: find obstacle for angle
+          -- Case fan: spinning blades
           local bladeAngle = 0
           if interior.obstacles then
             for i, obs in ipairs(interior.obstacles) do
-              if obs.type == "blade" and obs.gridX == x and obs.gridY == y then
-                bladeAngle = math.sin(ms.bladeAngles[i] or 0)
+              if (obs.type == "blade" or obs.type == "case_fan") and obs.gridX == x and obs.gridY == y then
+                bladeAngle = ms.bladeAngles[i] or 0
                 break
               end
             end
           end
-          -- Blade pendulum
-          local bladeLen = 14
-          local bladeTipX = px + 16 + bladeAngle * bladeLen
-          local bladeTipY = py + 16
-          -- Blade arc trail
-          love.graphics.setColor(0.7, 0.7, 0.75, 0.15)
-          love.graphics.arc("fill", px + 16, py + 4, bladeLen + 2, math.pi * 0.15, math.pi * 0.85)
-          -- Blade
-          love.graphics.setColor(0.65, 0.65, 0.7, 0.9)
-          love.graphics.setLineWidth(3)
-          love.graphics.line(px + 16, py + 4, bladeTipX, bladeTipY)
-          love.graphics.setLineWidth(1)
-          -- Blade tip glow
-          love.graphics.setColor(0.8, 0.8, 0.85, 0.6)
-          love.graphics.circle("fill", bladeTipX, bladeTipY, 3)
-          -- Pivot point
-          love.graphics.setColor(0.4, 0.35, 0.3)
-          love.graphics.circle("fill", px + 16, py + 4, 4)
+          -- Fan housing (circle)
+          love.graphics.setColor(0.15, 0.15, 0.18, 0.8)
+          love.graphics.circle("fill", px + 16, py + 16, 14)
+          love.graphics.setColor(0.25, 0.25, 0.3, 0.6)
+          love.graphics.circle("line", px + 16, py + 16, 14)
+          -- Spinning fan blades (4 blades)
+          for bi = 0, 3 do
+            local angle = bladeAngle + bi * math.pi / 2
+            local bx1 = px + 16 + math.cos(angle) * 2
+            local by1 = py + 16 + math.sin(angle) * 2
+            local bx2 = px + 16 + math.cos(angle) * 12
+            local by2 = py + 16 + math.sin(angle) * 12
+            love.graphics.setColor(0.4, 0.4, 0.45, 0.8)
+            love.graphics.setLineWidth(3)
+            love.graphics.line(bx1, by1, bx2, by2)
+            love.graphics.setLineWidth(1)
+          end
+          -- Center hub
+          love.graphics.setColor(0.3, 0.3, 0.35)
+          love.graphics.circle("fill", px + 16, py + 16, 3)
         elseif cell == 5 then
-          -- Crumbling floor
+          -- Dust pile (crumbling)
           local key = x .. "," .. y
           local cs = ms.crumbleStates[key]
           if cs then
             if cs.state == "crumbling" then
-              -- Shaking/cracking animation
+              -- Dust dispersing animation
               local shake = math.sin(t * 20) * 2
-              love.graphics.setColor(0.25, 0.2, 0.12, 0.7)
+              love.graphics.setColor(0.4, 0.4, 0.35, 0.7)
               love.graphics.rectangle("fill", px + shake, py, GS, GS)
-              -- Cracks spreading
-              love.graphics.setColor(0.05, 0.03, 0.01)
-              love.graphics.setLineWidth(2)
-              love.graphics.line(px + 16, py + 2, px + 8, py + 16)
-              love.graphics.line(px + 8, py + 16, px + 20, py + 30)
-              love.graphics.line(px + 16, py + 2, px + 28, py + 18)
-              love.graphics.setLineWidth(1)
+              -- Dust clouds breaking apart
+              love.graphics.setColor(0.5, 0.5, 0.45, 0.5)
+              love.graphics.circle("fill", px + 10 + shake, py + 12, 6)
+              love.graphics.circle("fill", px + 22 - shake, py + 18, 5)
             elseif cs.state == "fallen" then
-              -- Dark pit
-              love.graphics.setColor(0.02, 0.01, 0.01)
+              -- Cleared area (dust gone, slippery surface)
+              love.graphics.setColor(0.06, 0.1, 0.06, 0.6)
               love.graphics.rectangle("fill", px + 2, py + 2, 28, 28)
-              -- Depth shading
-              love.graphics.setColor(0, 0, 0, 0.5)
-              love.graphics.rectangle("fill", px + 4, py + 4, 24, 24)
             end
           else
-            -- Intact but suspicious floor (subtle cracks)
-            love.graphics.setColor(0.35, 0.28, 0.15, 0.3)
-            love.graphics.setLineWidth(1)
-            love.graphics.line(px + 6, py + 10, px + 26, py + 22)
-            love.graphics.line(px + 14, py + 4, px + 20, py + 28)
+            -- Intact dust pile (fluffy grey mound)
+            love.graphics.setColor(0.45, 0.45, 0.4, 0.6)
+            love.graphics.ellipse("fill", px + 16, py + 20, 12, 8)
+            love.graphics.setColor(0.5, 0.5, 0.45, 0.5)
+            love.graphics.ellipse("fill", px + 14, py + 16, 9, 6)
+            love.graphics.setColor(0.55, 0.55, 0.5, 0.4)
+            love.graphics.ellipse("fill", px + 18, py + 14, 6, 4)
+            -- Tiny dust particles floating off
+            local dustFloat = math.sin(t * 2 + x) * 3
+            love.graphics.setColor(0.5, 0.5, 0.45, 0.3)
+            love.graphics.circle("fill", px + 12, py + 10 + dustFloat, 1.5)
+            love.graphics.circle("fill", px + 20, py + 8 - dustFloat, 1)
           end
         elseif cell == 6 then
-          -- Fire jet
-          local fireActive = false
+          -- Hot object (overheating CPU/GPU)
+          local hotActive = false
           if interior.obstacles then
             for i, obs in ipairs(interior.obstacles) do
-              if obs.type == "fire" and obs.gridX == x and obs.gridY == y then
+              if (obs.type == "fire" or obs.type == "hot_object") and obs.gridX == x and obs.gridY == y then
                 local cycle = ms.obstacleTimers[i] % (obs.interval + obs.activeTime)
-                fireActive = (cycle < obs.activeTime)
+                hotActive = (cycle < obs.activeTime)
                 break
               end
             end
           end
-          -- Vent grate
-          love.graphics.setColor(0.15, 0.12, 0.08)
-          love.graphics.rectangle("fill", px + 8, py + 8, 16, 16)
-          love.graphics.setColor(0.08, 0.06, 0.04)
-          for gy = py + 10, py + 22, 4 do
-            love.graphics.line(px + 10, gy, px + 22, gy)
+          -- Heatsink base
+          love.graphics.setColor(0.2, 0.2, 0.22)
+          love.graphics.rectangle("fill", px + 6, py + 6, 20, 20)
+          -- Heatsink fins
+          love.graphics.setColor(0.25, 0.25, 0.28)
+          for fx = px + 8, px + 24, 3 do
+            love.graphics.rectangle("fill", fx, py + 6, 1, 20)
           end
-          if fireActive then
-            -- Animated fire
-            for fi = 0, 4 do
-              local flameH = 12 + math.sin(t * 8 + fi * 1.5) * 6
-              local flameW = 4 + math.sin(t * 6 + fi * 2) * 2
-              local flameX = px + 12 + fi * 3 + math.sin(t * 10 + fi) * 2
-              local alpha = 0.7 - fi * 0.1
-              -- Outer flame (orange-red)
-              love.graphics.setColor(1, 0.3, 0.05, alpha * 0.6)
-              love.graphics.ellipse("fill", flameX, py + 16 - flameH/2, flameW, flameH/2)
-              -- Inner flame (yellow)
-              love.graphics.setColor(1, 0.8, 0.1, alpha * 0.8)
-              love.graphics.ellipse("fill", flameX, py + 16 - flameH/3, flameW * 0.6, flameH/3)
-              -- Core (white-yellow)
-              love.graphics.setColor(1, 1, 0.7, alpha)
-              love.graphics.ellipse("fill", flameX, py + 16 - flameH/4, flameW * 0.3, flameH/4)
+          if hotActive then
+            -- Overheating! Red/orange glow
+            love.graphics.setColor(1, 0.3, 0.0, 0.6)
+            love.graphics.rectangle("fill", px + 6, py + 6, 20, 20)
+            -- Heat shimmer
+            for hi = 0, 3 do
+              local shimmerY = py + 4 - math.sin(t * 8 + hi * 1.5) * 6 - hi * 4
+              local shimmerAlpha = 0.4 - hi * 0.08
+              love.graphics.setColor(1, 0.5, 0.1, shimmerAlpha)
+              love.graphics.ellipse("fill", px + 16 + math.sin(t * 5 + hi) * 3, shimmerY, 6, 2)
             end
-            -- Heat distortion glow
-            love.graphics.setColor(1, 0.4, 0.1, 0.15)
-            love.graphics.circle("fill", px + 16, py + 8, 20)
+            -- Warning glow
+            love.graphics.setColor(1, 0.2, 0.0, 0.15)
+            love.graphics.circle("fill", px + 16, py + 16, 22)
           else
-            -- Warning glow before activation
+            -- Warm-up warning glow
             local cycle = 0
             if interior.obstacles then
               for i, obs in ipairs(interior.obstacles) do
-                if obs.type == "fire" and obs.gridX == x and obs.gridY == y then
+                if (obs.type == "fire" or obs.type == "hot_object") and obs.gridX == x and obs.gridY == y then
                   cycle = ms.obstacleTimers[i] % (obs.interval + obs.activeTime)
                   break
                 end
@@ -2886,23 +2958,24 @@ function M.drawMazeInterior(interior)
             end
             local warning = cycle / 2.5
             if warning > 0.7 then
-              love.graphics.setColor(1, 0.3, 0.05, (warning - 0.7) * 0.5)
-              love.graphics.circle("fill", px + 16, py + 16, 8)
+              love.graphics.setColor(1, 0.4, 0.1, (warning - 0.7) * 0.4)
+              love.graphics.circle("fill", px + 16, py + 16, 10)
             end
           end
         elseif cell == 7 then
-          -- Boulder trigger plate
+          -- Dust bunny stampede trigger plate
           if not ms.boulder.triggered then
             local trigPulse = math.sin(t * 2) * 0.15 + 0.6
-            love.graphics.setColor(0.6, 0.4, 0.15, trigPulse)
+            love.graphics.setColor(0.5, 0.5, 0.45, trigPulse)
             love.graphics.rectangle("fill", px + 4, py + 4, 24, 24)
-            love.graphics.setColor(0.8, 0.6, 0.2, trigPulse)
+            -- Pressure plate border
+            love.graphics.setColor(0.6, 0.6, 0.55, trigPulse)
             love.graphics.setLineWidth(2)
             love.graphics.rectangle("line", px + 6, py + 6, 20, 20)
             love.graphics.setLineWidth(1)
-            -- Warning icon
-            love.graphics.setColor(0.9, 0.2, 0.1, trigPulse)
-            love.graphics.print("!", px + 13, py + 8)
+            -- Dust bunny warning icon
+            love.graphics.setColor(0.7, 0.7, 0.65, trigPulse)
+            love.graphics.print("~", px + 13, py + 8)
           end
         elseif cell == 8 then
           -- Treasure chest
@@ -2914,70 +2987,92 @@ function M.drawMazeInterior(interior)
     end
   end
 
-  -- Draw torches on walls (animated flickering)
+  -- Draw LED indicator lights on chassis walls (animated pulsing)
   for _, torch in ipairs(ms.torches) do
     local tx = torch.x * GS + 16
     local ty = torch.y * GS + 16
-    local flicker = math.sin(t * 5 + torch.flicker) * 0.2 + 0.8
+    local pulse = math.sin(t * 3 + torch.flicker) * 0.3 + 0.7
 
-    -- Torch bracket
-    love.graphics.setColor(0.3, 0.25, 0.15)
-    love.graphics.rectangle("fill", tx - 2, ty - 4, 4, 12)
+    -- LED housing (small rectangle)
+    love.graphics.setColor(0.1, 0.1, 0.12)
+    love.graphics.rectangle("fill", tx - 3, ty - 3, 6, 6)
 
-    -- Flame
-    local flameH = 8 + math.sin(t * 7 + torch.flicker) * 3
-    local flameSway = math.sin(t * 4 + torch.flicker * 2) * 2
-    love.graphics.setColor(1, 0.5, 0.1, flicker * 0.9)
-    love.graphics.ellipse("fill", tx + flameSway, ty - 8, 4, flameH / 2)
-    love.graphics.setColor(1, 0.8, 0.2, flicker)
-    love.graphics.ellipse("fill", tx + flameSway * 0.5, ty - 8, 2.5, flameH / 3)
-    love.graphics.setColor(1, 1, 0.7, flicker * 0.8)
-    love.graphics.ellipse("fill", tx + flameSway * 0.3, ty - 7, 1.5, flameH / 4)
+    -- LED color (alternating green/blue/amber)
+    local ledType = math.floor((torch.x + torch.y * 7) % 3)
+    local r, g, b
+    if ledType == 0 then
+      r, g, b = 0.1, 0.9, 0.2  -- Green LED
+    elseif ledType == 1 then
+      r, g, b = 0.2, 0.5, 1.0  -- Blue LED
+    else
+      r, g, b = 1.0, 0.7, 0.1  -- Amber LED
+    end
+
+    -- LED glow
+    love.graphics.setColor(r, g, b, pulse * 0.8)
+    love.graphics.circle("fill", tx, ty, 2.5)
 
     -- Light glow on surrounding area
-    love.graphics.setColor(1, 0.6, 0.15, 0.08 * flicker)
-    love.graphics.circle("fill", tx, ty - 6, 45)
-    love.graphics.setColor(1, 0.7, 0.2, 0.04 * flicker)
-    love.graphics.circle("fill", tx, ty - 6, 70)
+    love.graphics.setColor(r, g, b, 0.04 * pulse)
+    love.graphics.circle("fill", tx, ty, 30)
+    love.graphics.setColor(r, g, b, 0.02 * pulse)
+    love.graphics.circle("fill", tx, ty, 50)
   end
 
-  -- Draw boulder
+  -- Draw dust bunny horde
   if ms.boulder.active then
     local bx = ms.boulder.x * GS + 16
     local by = ms.boulder.y * GS + 16
-    local boulderRadius = 14
-    local rollAngle = t * 8
+    local hordRadius = 14
+    local wobble = t * 6
 
-    -- Boulder shadow
-    love.graphics.setColor(0, 0, 0, 0.4)
-    love.graphics.ellipse("fill", bx + 3, by + boulderRadius + 2, boulderRadius + 2, 5)
+    -- Horde shadow
+    love.graphics.setColor(0, 0, 0, 0.3)
+    love.graphics.ellipse("fill", bx + 2, by + hordRadius + 2, hordRadius + 3, 5)
 
-    -- Boulder body (rocky sphere)
-    love.graphics.setColor(0.45, 0.38, 0.28)
-    love.graphics.circle("fill", bx, by, boulderRadius)
+    -- Main dust bunny body (large fuzzy blob)
+    love.graphics.setColor(0.55, 0.55, 0.5)
+    love.graphics.circle("fill", bx, by, hordRadius)
 
-    -- Rock texture / cracks
-    love.graphics.setColor(0.35, 0.28, 0.18)
-    love.graphics.arc("fill", bx - 2, by - 3, boulderRadius - 2, rollAngle, rollAngle + 1.2)
-    love.graphics.arc("fill", bx + 4, by + 2, boulderRadius - 4, rollAngle + 2.5, rollAngle + 3.5)
+    -- Fuzzy texture (smaller overlapping circles)
+    love.graphics.setColor(0.5, 0.5, 0.45)
+    love.graphics.circle("fill", bx - 5, by - 4, 8)
+    love.graphics.circle("fill", bx + 6, by - 3, 7)
+    love.graphics.circle("fill", bx - 3, by + 5, 7)
+    love.graphics.circle("fill", bx + 4, by + 4, 8)
 
-    -- Highlight (rolling glint)
-    love.graphics.setColor(0.6, 0.5, 0.35, 0.5)
-    local hlx = bx + math.cos(rollAngle) * 5
-    local hly = by + math.sin(rollAngle) * 5 - 3
-    love.graphics.circle("fill", hlx, hly, 4)
+    -- Lighter fuzzy highlights
+    love.graphics.setColor(0.65, 0.65, 0.6, 0.5)
+    love.graphics.circle("fill", bx - 2, by - 6, 4)
+    love.graphics.circle("fill", bx + 5, by - 5, 3)
 
-    -- Crack lines
-    love.graphics.setColor(0.25, 0.2, 0.12, 0.6)
-    love.graphics.setLineWidth(1)
-    love.graphics.line(bx - 8, by - 2, bx + 3, by + 6)
-    love.graphics.line(bx + 2, by - 8, bx - 4, by + 4)
-    love.graphics.line(bx + 6, by - 4, bx + 10, by + 8)
+    -- Little beady eyes (dust bunnies have eyes!)
+    love.graphics.setColor(0.1, 0.1, 0.1)
+    local eyeOffset = math.sin(wobble) * 1.5
+    love.graphics.circle("fill", bx - 4 + eyeOffset, by - 3, 2)
+    love.graphics.circle("fill", bx + 4 + eyeOffset, by - 3, 2)
+    -- Eye gleam
+    love.graphics.setColor(1, 1, 1, 0.7)
+    love.graphics.circle("fill", bx - 3 + eyeOffset, by - 4, 0.8)
+    love.graphics.circle("fill", bx + 5 + eyeOffset, by - 4, 0.8)
 
-    -- Dust cloud around boulder
-    love.graphics.setColor(0.5, 0.4, 0.3, 0.3)
+    -- Trailing smaller dust bunnies in the horde
+    for di = 1, 4 do
+      local dx = bx + 16 + di * 6 + math.sin(wobble + di * 2) * 4
+      local dy = by + math.sin(wobble * 0.8 + di * 1.5) * 6
+      local dr = 4 + math.sin(wobble + di) * 1.5
+      love.graphics.setColor(0.5, 0.5, 0.45, 0.7)
+      love.graphics.circle("fill", dx, dy, dr)
+      -- Tiny eyes
+      love.graphics.setColor(0.1, 0.1, 0.1, 0.6)
+      love.graphics.circle("fill", dx - 1.5, dy - 1, 0.8)
+      love.graphics.circle("fill", dx + 1.5, dy - 1, 0.8)
+    end
+
+    -- Dust cloud around horde
+    love.graphics.setColor(0.5, 0.5, 0.45, 0.25)
     for di = 0, 5 do
-      local dx = bx + 20 + math.sin(t * 6 + di * 1.5) * 12
+      local dx = bx + 15 + math.sin(t * 6 + di * 1.5) * 12
       local dy = by + math.sin(t * 4 + di * 2) * 10
       love.graphics.circle("fill", dx, dy, 3 + math.sin(t * 3 + di) * 2)
     end
@@ -2990,29 +3085,37 @@ function M.drawMazeInterior(interior)
     love.graphics.circle("fill", p.x, p.y, p.size * alpha)
   end
 
-  -- Exit door (ancient stone archway)
+  -- Exit door (PC case side panel opening)
   local exitPx = interior.exitX * GS
   local exitPy = interior.exitY * GS
-  love.graphics.setColor(0.3, 0.25, 0.15, 0.6)
+  love.graphics.setColor(0.15, 0.15, 0.18, 0.6)
   love.graphics.rectangle("fill", exitPx, exitPy, GS, GS)
-  love.graphics.setColor(0.5, 0.4, 0.2, 0.8)
-  love.graphics.arc("line", exitPx + 16, exitPy + 4, 14, math.pi, 0)
+  -- Panel frame
+  love.graphics.setColor(0.3, 0.3, 0.35, 0.8)
   love.graphics.setLineWidth(2)
-  love.graphics.line(exitPx + 2, exitPy + 4, exitPx + 2, exitPy + GS)
-  love.graphics.line(exitPx + 30, exitPy + 4, exitPx + 30, exitPy + GS)
+  love.graphics.rectangle("line", exitPx + 2, exitPy + 2, GS - 4, GS - 4)
+  -- Arrow indicator
+  love.graphics.setColor(0.2, 0.8, 0.3, 0.7 + math.sin(t * 3) * 0.3)
+  love.graphics.polygon("fill", exitPx + 10, exitPy + 16, exitPx + 22, exitPy + 8, exitPx + 22, exitPy + 24)
   love.graphics.setLineWidth(1)
 
-  -- Ambient dust motes floating in the air
-  for i = 1, 20 do
-    local dx = (math.sin(t * 0.15 + i * 2.7) * 0.5 + 0.5) * interior.width * GS
-    local dy = (math.sin(t * 0.12 + i * 1.9) * 0.5 + 0.5) * interior.height * GS
-    local bright = math.sin(t * 0.5 + i * 1.3) * 0.3 + 0.4
-    love.graphics.setColor(0.8, 0.7, 0.5, bright * 0.2)
-    love.graphics.circle("fill", dx, dy, 1.5)
+  -- Ambient dust motes floating in the air (inside PC case)
+  for i = 1, 25 do
+    local dx = (math.sin(t * 0.1 + i * 2.7) * 0.5 + 0.5) * interior.width * GS
+    local dy = (math.sin(t * 0.08 + i * 1.9) * 0.5 + 0.5) * interior.height * GS
+    local bright = math.sin(t * 0.4 + i * 1.3) * 0.3 + 0.4
+    love.graphics.setColor(0.6, 0.6, 0.55, bright * 0.15)
+    love.graphics.circle("fill", dx, dy, 1 + math.sin(t * 0.3 + i) * 0.5)
+  end
+
+  -- Compressed Air indicator (if player has it)
+  if gameState.hasCompressedAir then
+    love.graphics.setColor(0.2, 0.7, 1.0, 0.8)
+    love.graphics.print("[Compressed Air] ✓", interior.width * GS - 180, 10)
   end
 
   -- Interior name
-  love.graphics.setColor(0.8, 0.6, 0.2)
+  love.graphics.setColor(0.2, 0.8, 0.3)
   love.graphics.print(interior.name, 40, 10)
 end
 
@@ -3531,8 +3634,29 @@ function M.keypressed(key)
   end
 
   if gameState.dialogueBox then
-    if key == "e" or key == "escape" or key == "return" then
+    if key == "e" or key == "return" then
+      -- Check if there's a compressed air purchase offer active
+      if gameState.compressedAirOffer and gameState.compressedAirOffer.active then
+        local price = gameState.compressedAirOffer.price
+        if gameState.credits >= price then
+          gameState.credits = gameState.credits - price
+          gameState.hasCompressedAir = true
+          gameState.compressedAirOffer = nil
+          gameState.dialogueBox = {
+            npc = gameState.dialogueBox.npc,
+            text = "Here you go! One can of Compressed Air. Use it wisely in the Temple of Peril - it'll blast through dust piles and scatter those pesky dust bunnies!"
+          }
+        else
+          gameState.compressedAirOffer = nil
+          gameState.dialogueBox = nil
+        end
+      else
+        gameState.dialogueBox = nil
+        gameState.compressedAirOffer = nil
+      end
+    elseif key == "escape" then
       gameState.dialogueBox = nil
+      gameState.compressedAirOffer = nil
     end
     return
   end
@@ -3597,10 +3721,43 @@ function M.keypressed(key)
     end
 
     if gameState.nearbyNPC then
-      gameState.dialogueBox = {
-        npc = gameState.nearbyNPC.name,
-        text = gameState.nearbyNPC.dialogue
-      }
+      -- Check if this NPC sells Compressed Air
+      if gameState.nearbyNPC.sellsCompressedAir and not gameState.hasCompressedAir then
+        local price = gameState.nearbyNPC.price or 10000
+        local winnings = gameState.casinoWinnings or 0
+        if winnings >= 10000 and gameState.credits >= price then
+          -- Player qualifies! Show purchase dialogue
+          gameState.compressedAirOffer = {
+            npc = gameState.nearbyNPC.name,
+            price = price,
+            active = true,
+          }
+          gameState.dialogueBox = {
+            npc = gameState.nearbyNPC.name,
+            text = "You've won " .. winnings .. " credits at the casino! I can see you've got the dough. Compressed Air - " .. price .. " credits. Press E to buy, ESC to decline."
+          }
+        elseif winnings < 10000 then
+          gameState.dialogueBox = {
+            npc = gameState.nearbyNPC.name,
+            text = "I've got Compressed Air for sale, but I only deal with high rollers. Win at least 10,000 credits at the Golden Vault casino first, then we'll talk."
+          }
+        else
+          gameState.dialogueBox = {
+            npc = gameState.nearbyNPC.name,
+            text = "You've got the casino rep, but not enough credits on hand. Come back with " .. price .. " credits."
+          }
+        end
+      elseif gameState.nearbyNPC.sellsCompressedAir and gameState.hasCompressedAir then
+        gameState.dialogueBox = {
+          npc = gameState.nearbyNPC.name,
+          text = "You already bought my Compressed Air! Go blast those dust bunnies in the Temple of Peril. That stuff works wonders on overheating components too."
+        }
+      else
+        gameState.dialogueBox = {
+          npc = gameState.nearbyNPC.name,
+          text = gameState.nearbyNPC.dialogue
+        }
+      end
       return
     end
   end

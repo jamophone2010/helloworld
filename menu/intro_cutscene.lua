@@ -123,7 +123,7 @@ end
 
 function M.load()
   fonts.title = love.graphics.newFont(40)
-  fonts.dialogue = love.graphics.newFont(18)
+  fonts.dialogue = love.graphics.newFont("fonts/Exo2-Regular.ttf", 18)
   fonts.name_input = love.graphics.newFont(28)
   fonts.npc_name = love.graphics.newFont(22)
   fonts.small = love.graphics.newFont(14)

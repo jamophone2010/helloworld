@@ -10,6 +10,7 @@ local time = 0
 -- Current constellation visuals
 local currentBgColor = {0.02, 0.02, 0.05}
 local currentConstellationId = "nebula"
+local currentTileX, currentTileY = 0, 0
 
 -- Gas pillar data (for Orion)
 local gasPillars = {}
@@ -45,6 +46,7 @@ function M.init(width, height, tileX, tileY)
   local cData, cId = constellation.getConstellation(tileX, tileY)
   currentConstellationId = cId
   currentBgColor = cData.bgColor
+  currentTileX, currentTileY = tileX, tileY
 
   -- Get the appropriate palette for this tile
   local palette = constellation.getCloudPalette(tileX, tileY)
@@ -323,16 +325,27 @@ end
 -- ===================== CONSTELLATION-SPECIFIC DRAWING =====================
 
 function M.drawBlackHole(width, height)
-  local cx, cy = width / 2, height / 2
+  -- The black hole graphic spans the full 7x7 constellation.
+  -- Calculate the pixel offset from this tile to the constellation center tile.
+  local lx, ly = constellation.getLocalTilePos(currentTileX, currentTileY)
+  -- Local pos 3,3 is the center tile. Offset in tiles from center:
+  local dtx = 3 - lx  -- positive = center is to the right
+  local dty = 3 - ly  -- positive = center is below
+  -- Convert tile offset to pixel offset (each tile = one screen)
+  local cx = width / 2 + dtx * width
+  local cy = height / 2 + dty * height
+
+  -- Scale everything by 3.5 to span the 7-tile-wide constellation
+  local S = 3.5
 
   -- Dark void center
   love.graphics.setColor(0, 0, 0, 0.95)
-  love.graphics.circle("fill", cx, cy, 50)
+  love.graphics.circle("fill", cx, cy, 50 * S)
 
   -- Gravitational lensing rings (accretion disk)
   for _, ring in ipairs(blackHole.lensRings) do
     local angle = blackHole.accretionAngle * ring.speed + ring.offset
-    love.graphics.setLineWidth(ring.width)
+    love.graphics.setLineWidth(ring.width * S * 0.5)
 
     -- Draw elliptical accretion disk (tilted view)
     love.graphics.push()
@@ -341,27 +354,31 @@ function M.drawBlackHole(width, height)
 
     -- Top arc (brighter, Doppler shifted)
     love.graphics.setColor(ring.color[1], ring.color[2], ring.color[3], 0.7)
-    love.graphics.arc("line", "open", 0, 0, ring.radius, -math.pi * 0.8, math.pi * 0.8)
+    love.graphics.arc("line", "open", 0, 0, ring.radius * S, -math.pi * 0.8, math.pi * 0.8)
 
     -- Bottom arc (dimmer, behind the hole)
     love.graphics.setColor(ring.color[1] * 0.4, ring.color[2] * 0.4, ring.color[3] * 0.4, 0.4)
-    love.graphics.arc("line", "open", 0, 0, ring.radius, math.pi * 0.2, math.pi * 1.8)
+    love.graphics.arc("line", "open", 0, 0, ring.radius * S, math.pi * 0.2, math.pi * 1.8)
 
     love.graphics.pop()
   end
 
   -- Photon sphere (bright ring at event horizon)
-  love.graphics.setLineWidth(2)
+  love.graphics.setLineWidth(2 * S)
   love.graphics.setColor(1, 0.85, 0.4, 0.6 + math.sin(time * 2) * 0.2)
-  love.graphics.circle("line", cx, cy, 55)
+  love.graphics.circle("line", cx, cy, 55 * S)
   love.graphics.setColor(1, 0.9, 0.6, 0.3)
-  love.graphics.circle("line", cx, cy, 58)
+  love.graphics.circle("line", cx, cy, 58 * S)
 
   -- Gravitational lensing distortion glow
   love.graphics.setColor(0.9, 0.6, 0.15, 0.15)
-  love.graphics.circle("fill", cx, cy, 100)
+  love.graphics.circle("fill", cx, cy, 100 * S)
   love.graphics.setColor(0.7, 0.4, 0.1, 0.08)
-  love.graphics.circle("fill", cx, cy, 150)
+  love.graphics.circle("fill", cx, cy, 150 * S)
+
+  -- Far-field gravitational haze (visible from distant tiles)
+  love.graphics.setColor(0.4, 0.25, 0.05, 0.04)
+  love.graphics.circle("fill", cx, cy, 250 * S)
 
   love.graphics.setLineWidth(1)
 end
@@ -473,37 +490,114 @@ function M.drawPulsarBeam(width, height)
 end
 
 function M.drawAndromedaSpiral(width, height)
-  local cx, cy = width / 2, height / 2
+  -- The galaxy graphic spans the full 7x7 constellation (top-down view,
+  -- re-using the spiral galaxy style from the title screen).
+  local lx, ly = constellation.getLocalTilePos(currentTileX, currentTileY)
+  local dtx = 3 - lx
+  local dty = 3 - ly
+  local cx = width / 2 + dtx * width
+  local cy = height / 2 + dty * height
 
-  -- Draw faint spiral arms
-  love.graphics.setLineWidth(2)
-  for arm = 1, 3 do
-    local armOffset = (arm - 1) * math.pi * 2 / 3
-    local armColor
-    if arm == 1 then armColor = {0.3, 0.4, 0.8}
-    elseif arm == 2 then armColor = {0.8, 0.6, 0.3}
-    else armColor = {0.7, 0.3, 0.5} end
+  -- Scale so the galaxy fills ~7 tiles worth of space
+  local S = 3.5
+  local numArms = 4
+  local armSpread = 0.4
+  local maxRadius = 394 * S * 0.5  -- matches title screen sizing scaled up
+  local coreRadius = 56 * S * 0.5
 
-    for i = 0, 100 do
-      local t = i / 100 * math.pi * 3
-      local r = 20 + t * 40
-      local x = cx + math.cos(t + armOffset + time * 0.02) * r
-      local y = cy + math.sin(t + armOffset + time * 0.02) * r * 0.6 -- Elliptical
-
-      if x > 0 and x < width and y > 0 and y < height then
-        local alpha = 0.1 * (1 - i / 100)
-        love.graphics.setColor(armColor[1], armColor[2], armColor[3], alpha)
-        love.graphics.circle("fill", x, y, 15 - i * 0.1)
-      end
+  -- Nebula clouds in spiral arms
+  local cloudPalette = {
+    {0.4, 0.2, 0.6, 0.04},
+    {0.2, 0.3, 0.7, 0.035},
+    {0.6, 0.2, 0.4, 0.03},
+    {0.3, 0.5, 0.7, 0.035},
+    {0.5, 0.3, 0.6, 0.03},
+  }
+  math.randomseed(9999)  -- Deterministic
+  for i = 1, 20 do
+    local armIndex = math.random(0, numArms - 1)
+    local armAngle = (armIndex / numArms) * math.pi * 2
+    local dist = math.random() * maxRadius * 0.85 + coreRadius * 0.5
+    local spiralTwist = dist * 0.008
+    local angle = armAngle + spiralTwist + (math.random() - 0.5) * 0.5
+    local color = cloudPalette[math.random(#cloudPalette)]
+    local cloudX = cx + math.cos(angle + time * 0.008) * dist
+    local cloudY = cy + math.sin(angle + time * 0.008) * dist  -- Top-down (circular, not elliptical)
+    local cloudR = (68 + math.random() * 113) * S * 0.4
+    for layer = 3, 1, -1 do
+      local lr = cloudR * (0.4 + layer * 0.25)
+      local lo = color[4] * (1.2 - layer * 0.3) * 0.6
+      love.graphics.setColor(color[1], color[2], color[3], lo)
+      love.graphics.circle("fill", cloudX, cloudY, lr)
     end
   end
 
-  -- Bright galactic core
-  love.graphics.setColor(0.9, 0.85, 0.7, 0.15)
-  love.graphics.circle("fill", cx, cy, 60)
-  love.graphics.setColor(1, 0.95, 0.8, 0.1)
-  love.graphics.circle("fill", cx, cy, 40)
-  love.graphics.setLineWidth(1)
+  -- Galactic core glow
+  for i = 8, 1, -1 do
+    local glowSize = coreRadius * i * 0.8
+    local alpha = 0.03 / (i * 0.5)
+    love.graphics.setColor(1, 0.85, 0.6, alpha)
+    love.graphics.circle("fill", cx, cy, glowSize)
+  end
+  for i = 6, 1, -1 do
+    local glowSize = coreRadius * i * 0.5
+    local alpha = 0.02 / (i * 0.5)
+    love.graphics.setColor(0.8, 0.7, 1, alpha)
+    love.graphics.circle("fill", cx, cy, glowSize)
+  end
+
+  -- Spiral arm stars (top-down, circular like galaxy.lua but rendered at constellation scale)
+  math.randomseed(7777)  -- Deterministic
+  for i = 1, 400 do
+    local armIndex = math.random(0, numArms - 1)
+    local armAngle = (armIndex / numArms) * math.pi * 2
+    local dist = math.random() ^ 0.5 * maxRadius + coreRadius * 0.3
+    local spiralTwist = dist * 0.008
+    local angle = armAngle + spiralTwist + (math.random() - 0.5) * armSpread
+
+    local sx = cx + math.cos(angle + time * 0.008) * dist
+    local sy = cy + math.sin(angle + time * 0.008) * dist  -- Top-down (circular)
+
+    local brightness = math.random() * 0.5 + 0.2
+    local size = math.random() * 1.5 + 0.5
+    local colorType = math.random()
+    local r, g, b
+    if colorType < 0.6 then
+      r, g, b = 0.8 + math.random() * 0.2, 0.85 + math.random() * 0.15, 1
+    elseif colorType < 0.85 then
+      r, g, b = 1, 0.9 + math.random() * 0.1, 0.6 + math.random() * 0.2
+    else
+      r, g, b = 1, 0.5 + math.random() * 0.3, 0.3 + math.random() * 0.2
+    end
+
+    local twinkle = math.sin(time * (1.5 + math.random()) + i) * 0.3 + 0.7
+    love.graphics.setColor(r * brightness * twinkle, g * brightness * twinkle, b * brightness * twinkle)
+    love.graphics.circle("fill", sx, sy, size)
+  end
+
+  -- Core stars (denser, warmer)
+  math.randomseed(8888)
+  for i = 1, 80 do
+    local angle = math.random() * math.pi * 2
+    local dist = math.random() ^ 2 * coreRadius
+    local sx = cx + math.cos(angle + time * 0.008) * dist
+    local sy = cy + math.sin(angle + time * 0.008) * dist
+    local brightness = math.random() * 0.3 + 0.6
+    love.graphics.setColor(1 * brightness, 0.95 * brightness, 0.8 * brightness)
+    love.graphics.circle("fill", sx, sy, math.random() * 2 + 1)
+  end
+
+  -- Bright galactic center
+  love.graphics.setColor(1, 0.9, 0.7, 0.25)
+  love.graphics.circle("fill", cx, cy, 22 * S * 0.3)
+  love.graphics.setColor(1, 0.95, 0.8, 0.4)
+  love.graphics.circle("fill", cx, cy, 13 * S * 0.3)
+  love.graphics.setColor(1, 0.98, 0.9, 0.6)
+  love.graphics.circle("fill", cx, cy, 7 * S * 0.3)
+  love.graphics.setColor(1, 1, 1, 0.8)
+  love.graphics.circle("fill", cx, cy, 3.5 * S * 0.3)
+
+  math.randomseed(os.time())  -- Restore
 end
 
 function M.drawPandoraHeat(width, height)

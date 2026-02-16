@@ -67,7 +67,8 @@ function M.load()
       phase = "in",
       timer = 0,
       duration = 0.5,
-      callback = nil
+      callback = nil,
+      color = {1, 1, 1}  -- White fade
     }
     gameState.fadeInFromStarfox = false
   end
@@ -339,7 +340,8 @@ function M.draw()
       alpha = 1 - gameState.transition.timer / gameState.transition.duration
     end
     alpha = math.max(0, math.min(1, alpha))
-    love.graphics.setColor(0, 0, 0, alpha)
+    local color = gameState.transition.color or {0, 0, 0}
+    love.graphics.setColor(color[1], color[2], color[3], alpha)
     love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
   end
 end

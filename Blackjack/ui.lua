@@ -10,9 +10,9 @@ local uiTime = 0 -- Accumulated time for animations
 M.buttons = {}
 
 function M.load()
-  fonts.small = love.graphics.newFont(12)
-  fonts.normal = love.graphics.newFont(16)
-  fonts.large = love.graphics.newFont(26)
+  fonts.small = love.graphics.newFont("fonts/Exo2-Regular.ttf", 12)
+  fonts.normal = love.graphics.newFont("fonts/Exo2-Regular.ttf", 16)
+  fonts.large = love.graphics.newFont("fonts/Exo2-Regular.ttf", 26)
   fonts.tableText = love.graphics.newFont(13)
   fonts.cardRank = love.graphics.newFont(22)
   fonts.title = love.graphics.newFont(11)

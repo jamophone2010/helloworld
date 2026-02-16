@@ -19,6 +19,14 @@ local worldMapMessage = nil             -- Status message (e.g. "Out of radio ra
 local worldMapMessageTimer = 0
 local worldMapScroll = {x = 0, y = 0}  -- Scroll offset for the view
 
+local fadeState = {
+  active = false,
+  alpha = 0,
+  fadingOut = false,
+  fadingIn = false,
+  callback = nil
+}
+
 M.onResume = nil
 M.onOptions = nil
 M.onSave = nil
@@ -147,15 +155,20 @@ end
 local warpList = {}
 
 function M.load()
-  fonts.title = love.graphics.newFont(32)
-  fonts.menu = love.graphics.newFont(24)
-  fonts.small = love.graphics.newFont(14)
-  fonts.code = love.graphics.newFont(20)
+  fonts.title = love.graphics.newFont("fonts/Exo2-Regular.ttf", 32)
+  fonts.menu = love.graphics.newFont("fonts/Exo2-Regular.ttf", 24)
+  fonts.small = love.graphics.newFont("fonts/Exo2-Regular.ttf", 14)
+  fonts.code = love.graphics.newFont("fonts/Exo2-Regular.ttf", 20)
   selectedIndex = 1
   subMenu = nil
   optionsIndex = 1
   codeInput = ""
   codeMessage = nil
+  fadeState.active = false
+  fadeState.alpha = 0
+  fadeState.fadingOut = false
+  fadeState.fadingIn = false
+  fadeState.callback = nil
 end
 
 function M.update(dt)
@@ -169,6 +182,26 @@ function M.update(dt)
     worldMapMessageTimer = worldMapMessageTimer - dt
     if worldMapMessageTimer <= 0 then
       worldMapMessage = nil
+    end
+  end
+  
+  -- Update fade animation
+  if fadeState.active then
+    if fadeState.fadingOut then
+      fadeState.alpha = math.min(1.0, fadeState.alpha + dt * 2.0)
+      if fadeState.alpha >= 1.0 and fadeState.callback then
+        local cb = fadeState.callback
+        fadeState.callback = nil
+        fadeState.fadingOut = false
+        fadeState.fadingIn = true
+        cb()
+      end
+    elseif fadeState.fadingIn then
+      fadeState.alpha = math.max(0, fadeState.alpha - dt * 2.0)
+      if fadeState.alpha <= 0 then
+        fadeState.active = false
+        fadeState.fadingIn = false
+      end
     end
   end
 end
@@ -609,6 +642,12 @@ function M.draw()
   else
     drawMainPause()
   end
+  
+  -- White fade overlay
+  if fadeState.active and fadeState.alpha > 0 then
+    love.graphics.setColor(1, 1, 1, fadeState.alpha)
+    love.graphics.rectangle("fill", 0, 0, 1366, 768)
+  end
 end
 
 -- ═══════════════════════════════════════
@@ -750,10 +789,16 @@ local function keypressedWarpList(key)
     local listIndex = selectableItems[warpIndex]
     local entry = warpList[listIndex]
     if entry and M.onWarpTo then
-      M.onWarpTo(entry)
-      -- Close pause menu after warp
-      subMenu = nil
-      if M.onResume then M.onResume() end
+      -- Start fade to white
+      fadeState.active = true
+      fadeState.alpha = 0
+      fadeState.fadingOut = true
+      fadeState.callback = function()
+        M.onWarpTo(entry)
+        -- Close pause menu after warp
+        subMenu = nil
+        if M.onResume then M.onResume() end
+      end
     end
   end
 end

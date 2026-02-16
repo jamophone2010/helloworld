@@ -7,9 +7,9 @@ local abilities = require("starfox.abilities")
 local fonts = {}
 
 function M.load()
-  fonts.small = love.graphics.newFont(14)
-  fonts.normal = love.graphics.newFont(18)
-  fonts.large = love.graphics.newFont(24)
+  fonts.small = love.graphics.newFont("fonts/Exo2-Regular.ttf", 14)
+  fonts.normal = love.graphics.newFont("fonts/Exo2-Regular.ttf", 18)
+  fonts.large = love.graphics.newFont("fonts/Exo2-Regular.ttf", 24)
 end
 
 function M.draw(p, levelTime, callout, bossHealth, bossMaxHealth, levelName, portalCount, totalEnemiesSpawned)

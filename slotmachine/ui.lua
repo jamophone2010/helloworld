@@ -28,16 +28,16 @@ local bgStars = {}
 local bgFountainDrops = {}
 
 function M.load()
-  fonts.normal = love.graphics.newFont(20)
-  fonts.large = love.graphics.newFont(36)
-  fonts.huge = love.graphics.newFont(48)
-  fonts.symbol = love.graphics.newFont(28)
-  fonts.bar = love.graphics.newFont(32)
-  fonts.seven = love.graphics.newFont(52)
-  fonts.lcd = love.graphics.newFont(26)
-  fonts.lcdSmall = love.graphics.newFont(18)
-  fonts.winSide = love.graphics.newFont(16)
-  fonts.winAmount = love.graphics.newFont(30)
+  fonts.normal = love.graphics.newFont("fonts/Baumans-Regular.ttf", 20)
+  fonts.large = love.graphics.newFont("fonts/Baumans-Regular.ttf", 36)
+  fonts.huge = love.graphics.newFont("fonts/Baumans-Regular.ttf", 48)
+  fonts.symbol = love.graphics.newFont("fonts/Baumans-Regular.ttf", 28)
+  fonts.bar = love.graphics.newFont("fonts/Baumans-Regular.ttf", 32)
+  fonts.seven = love.graphics.newFont("fonts/Baumans-Regular.ttf", 52)
+  fonts.lcd = love.graphics.newFont("fonts/Doto-Regular.ttf", 26)
+  fonts.lcdSmall = love.graphics.newFont("fonts/Doto-Regular.ttf", 18)
+  fonts.winSide = love.graphics.newFont("fonts/Baumans-Regular.ttf", 16)
+  fonts.winAmount = love.graphics.newFont("fonts/Baumans-Regular.ttf", 30)
 
   -- Generate background stars
   for i = 1, 120 do

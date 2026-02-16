@@ -2799,6 +2799,10 @@ function M.activatePuzzle(tileX, tileY, screenW, screenH)
   local state = M.getState(tileX, tileY)
   if state.completed then return false end
   
+  -- If already active (player left and returned), don't re-initialize.
+  -- This preserves boss HP, puzzle progress, drops, etc.
+  if state.active then return true end
+  
   local pType = puzzleInfo.puzzleType
   local cId = puzzleInfo.constellation
   

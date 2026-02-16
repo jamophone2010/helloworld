@@ -601,7 +601,7 @@ function M.drawDialogueBox(screenW, screenH, time)
   love.graphics.print(M.dialogueSpeaker, boxX + 20, boxY + 12)
 
   -- Dialogue text
-  local textFont = love.graphics.newFont(16)
+  local textFont = love.graphics.newFont("fonts/Exo2-Regular.ttf", 18)
   love.graphics.setFont(textFont)
   love.graphics.setColor(0.9, 0.9, 0.95)
   love.graphics.printf(M.dialogueText, boxX + 20, boxY + 45, boxW - 40, "left")

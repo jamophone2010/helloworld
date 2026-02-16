@@ -1,28 +1,47 @@
 local M = {}
 
+local galaxy = require("menu.galaxy")
 local saves = require("menu.saves")
 local selectedSlot = 1
 local fonts = {}
 local state = "selecting" -- "selecting", "confirm_delete"
 
+local fadeState = {
+  active = false,
+  alpha = 1.0
+}
+
 M.onSelectSave = nil
 M.onBack = nil
 
 function M.load()
-  fonts.title = love.graphics.newFont(40)
-  fonts.menu = love.graphics.newFont(28)
-  fonts.info = love.graphics.newFont(16)
+  fonts.title = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 40)
+  fonts.menu = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 28)
+  fonts.info = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 16)
   selectedSlot = 1
   state = "selecting"
+  fadeState.active = true
+  fadeState.alpha = 1.0
 end
 
 function M.update(dt)
-  -- Nothing to update
+  galaxy.update(dt)
+  
+  -- Fade in from white
+  if fadeState.active then
+    fadeState.alpha = math.max(0, fadeState.alpha - dt * 2.0)
+    if fadeState.alpha <= 0 then
+      fadeState.active = false
+    end
+  end
 end
 
 function M.draw()
-  -- Background
-  love.graphics.setColor(0.1, 0.1, 0.15)
+  -- Galaxy background
+  galaxy.draw()
+
+  -- Semi-transparent purple overlay
+  love.graphics.setColor(0.08, 0.05, 0.15, 0.75)
   love.graphics.rectangle("fill", 0, 0, 1366, 768)
 
   -- Title
@@ -76,6 +95,12 @@ function M.draw()
   love.graphics.setColor(0.5, 0.5, 0.5)
   if state == "selecting" then
     love.graphics.printf("UP/DOWN: Select | ENTER: Load | X: Delete | ESC: Back", 0, 700, 1366, "center")
+  end
+  
+  -- White fade overlay (fade in from white)
+  if fadeState.active and fadeState.alpha > 0 then
+    love.graphics.setColor(1, 1, 1, fadeState.alpha)
+    love.graphics.rectangle("fill", 0, 0, 1366, 768)
   end
 end
 

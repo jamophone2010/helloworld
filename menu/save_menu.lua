@@ -1,5 +1,6 @@
 local M = {}
 
+local galaxy = require("menu.galaxy")
 local saves = require("menu.saves")
 local selectedSlot = 1
 local fonts = {}
@@ -11,15 +12,17 @@ M.onBack = nil
 M.getSaveData = nil -- Function to get current game data
 
 function M.load()
-  fonts.title = love.graphics.newFont(40)
-  fonts.menu = love.graphics.newFont(28)
-  fonts.info = love.graphics.newFont(16)
+  fonts.title = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 40)
+  fonts.menu = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 28)
+  fonts.info = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 16)
   selectedSlot = 1
   state = "selecting"
   savedTimer = 0
 end
 
 function M.update(dt)
+  galaxy.update(dt)
+
   if state == "saved" then
     savedTimer = savedTimer + dt
     if savedTimer >= 1.5 then
@@ -31,8 +34,11 @@ function M.update(dt)
 end
 
 function M.draw()
-  -- Background
-  love.graphics.setColor(0.1, 0.1, 0.15)
+  -- Galaxy background
+  galaxy.draw()
+
+  -- Semi-transparent purple overlay
+  love.graphics.setColor(0.08, 0.05, 0.15, 0.75)
   love.graphics.rectangle("fill", 0, 0, 1366, 768)
 
   -- Title

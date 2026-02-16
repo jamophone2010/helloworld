@@ -1,84 +1,140 @@
 local M = {}
 
+local galaxy = require("menu.galaxy")
+
 local menuItems = {"New Game", "Continue", "Options", "Exit to Desktop"}
 local selectedIndex = 1
 local fonts = {}
+
+local screen = "pressstart"  -- "pressstart" | "menu"
+local dimAlpha = 0
+local blinkTimer = 0
+
+local fadeState = {
+  active = false,
+  alpha = 0,
+  fadingOut = false,
+  callback = nil
+}
 
 M.onNewGame = nil
 M.onContinue = nil
 M.onOptions = nil
 
 function M.load()
-  fonts.title = love.graphics.newFont(48)
-  fonts.menu = love.graphics.newFont(32)
+  fonts.title = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 68)
+  fonts.titleBold = love.graphics.newFont("fonts/EBGaramond-Bold.ttf", 68)
+  fonts.menu = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 32)
+  fonts.pressStart = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 26)
+  fonts.hint = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 16)
   selectedIndex = 1
+  screen = "pressstart"
+  dimAlpha = 0
+  blinkTimer = 0
+  fadeState.active = false
+  fadeState.alpha = 0
+  fadeState.fadingOut = false
+  fadeState.callback = nil
+  galaxy.load()
 end
 
 function M.update(dt)
-  -- Nothing to update
+  galaxy.update(dt)
+  blinkTimer = blinkTimer + dt
+  if screen == "menu" and dimAlpha < 0.58 then
+    dimAlpha = math.min(0.58, dimAlpha + dt * 2.5)
+  end
+  
+  -- Update fade animation
+  if fadeState.active then
+    if fadeState.fadingOut then
+      fadeState.alpha = math.min(1.0, fadeState.alpha + dt * 2.0)
+      if fadeState.alpha >= 1.0 and fadeState.callback then
+        local cb = fadeState.callback
+        fadeState.callback = nil
+        cb()
+      end
+    end
+  end
 end
 
 function M.draw()
-  -- Background
-  love.graphics.setColor(0.1, 0.1, 0.15)
-  love.graphics.rectangle("fill", 0, 0, 1366, 768)
+  galaxy.draw()
 
-  -- Title
-  love.graphics.setFont(fonts.title)
-  love.graphics.setColor(1, 1, 0)
-  love.graphics.printf("STARLIGHT SYMPHONY", 0, 100, 1366, "center")
-
-  -- Menu items
-  love.graphics.setFont(fonts.menu)
-  local startY = 250
-  local itemHeight = 80
-
-  for i, item in ipairs(menuItems) do
-    if i == selectedIndex then
-      love.graphics.setColor(1, 1, 0)
-      -- Draw selection highlight
-      love.graphics.rectangle("line", 400, startY + (i - 1) * itemHeight - 10, 566, 60)
-    else
-      love.graphics.setColor(0.7, 0.7, 0.7)
-    end
-    love.graphics.printf(item, 0, startY + (i - 1) * itemHeight, 1366, "center")
+  -- Dim overlay fades in when entering menu
+  if dimAlpha > 0 then
+    love.graphics.setColor(0, 0, 0, dimAlpha)
+    love.graphics.rectangle("fill", 0, 0, 1366, 768)
   end
 
-  -- Instructions
-  love.graphics.setFont(love.graphics.newFont(16))
-  love.graphics.setColor(0.5, 0.5, 0.5)
-  love.graphics.printf("Use UP/DOWN arrows to select, ENTER to confirm", 0, 700, 1366, "center")
+  -- Title: always shown
+  love.graphics.setFont(fonts.title)
+  love.graphics.setColor(1, 1, 1)
+  love.graphics.printf("STARLIGHT", 0, 80, 1366, "center")
+  love.graphics.printf("SYMPHONY",  0, 135, 1366, "center")
+
+  if screen == "pressstart" then
+    -- Fade in/out "PRESS START"
+    local alpha = (math.sin(blinkTimer * 1.4) * 0.5 + 0.5) * 0.85
+    love.graphics.setFont(fonts.pressStart)
+    love.graphics.setColor(1, 1, 1, alpha)
+    love.graphics.printf("PRESS START", 0, 610, 1366, "center")
+  else
+    -- Menu items
+    love.graphics.setFont(fonts.menu)
+    local startY = 250
+    local itemHeight = 80
+
+    for i, item in ipairs(menuItems) do
+      if i == selectedIndex then
+        love.graphics.setColor(1, 1, 0)
+        love.graphics.rectangle("line", 400, startY + (i - 1) * itemHeight - 10, 566, 60)
+      else
+        love.graphics.setColor(0.7, 0.7, 0.7)
+      end
+      love.graphics.printf(item, 0, startY + (i - 1) * itemHeight, 1366, "center")
+    end
+
+    love.graphics.setFont(fonts.hint)
+    love.graphics.setColor(0.5, 0.5, 0.5)
+    love.graphics.printf("UP/DOWN: select  |  ENTER: confirm", 0, 710, 1366, "center")
+  end
+  
+  -- White fade overlay
+  if fadeState.active and fadeState.alpha > 0 then
+    love.graphics.setColor(1, 1, 1, fadeState.alpha)
+    love.graphics.rectangle("fill", 0, 0, 1366, 768)
+  end
 end
 
 function M.keypressed(key)
+  if screen == "pressstart" then
+    if key == "space" or key == "e" or key == "return" then
+      screen = "menu"
+    end
+    return
+  end
+
   if key == "up" then
     selectedIndex = selectedIndex - 1
-    if selectedIndex < 1 then
-      selectedIndex = #menuItems
-    end
+    if selectedIndex < 1 then selectedIndex = #menuItems end
   elseif key == "down" then
     selectedIndex = selectedIndex + 1
-    if selectedIndex > #menuItems then
-      selectedIndex = 1
-    end
+    if selectedIndex > #menuItems then selectedIndex = 1 end
   elseif key == "return" then
     if selectedIndex == 1 then
-      -- New Game
-      if M.onNewGame then
-        M.onNewGame()
-      end
+      if M.onNewGame then M.onNewGame() end
     elseif selectedIndex == 2 then
-      -- Continue
       if M.onContinue then
-        M.onContinue()
+        -- Start fade to white
+        fadeState.active = true
+        fadeState.alpha = 0
+        fadeState.fadingOut = true
+        fadeState.callback = M.onContinue
       end
     elseif selectedIndex == 3 then
-      -- Options
-      if M.onOptions then
-        M.onOptions()
-      end
+      if M.onOptions then M.onOptions() end
     elseif selectedIndex == 4 then
-      -- Exit to Desktop
       love.event.quit()
     end
   end
