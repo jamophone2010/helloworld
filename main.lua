@@ -1,3 +1,5 @@
+local resolution = require("resolution")
+local controller = require("controller")
 local currentGame = nil
 local currentMenu = nil
 local hub = require("hub")
@@ -679,7 +681,24 @@ end
 
 function love.load()
   love.window.setTitle("Starlight Symphony")
-  love.window.setMode(1366, 768)
+
+  -- Initialise resolution scaling (reads saved preference, applies window mode)
+  resolution.init()
+
+  -- Initialise controller settings (reads saved preference)
+  controller.init()
+
+  -- Override love.graphics dimension queries so all modules see virtual resolution
+  love.graphics.getWidth  = function() return resolution.VIRTUAL_W end
+  love.graphics.getHeight = function() return resolution.VIRTUAL_H end
+  love.graphics.getDimensions = function() return resolution.VIRTUAL_W, resolution.VIRTUAL_H end
+
+  -- Override love.mouse.getPosition so modules that poll mouse get virtual coords
+  local _realGetPosition = love.mouse.getPosition
+  love.mouse.getPosition = function()
+    local rx, ry = _realGetPosition()
+    return resolution.toVirtual(rx, ry)
+  end
 
   -- Set up menu callbacks
   mainMenu.onNewGame = startNewGame
@@ -888,6 +907,22 @@ function love.load()
 end
 
 function love.update(dt)
+  -- Poll analog sticks for edge-triggered key simulation
+  if controller.isGamepad() then
+    local joysticks = love.joystick.getJoysticks()
+    local js = joysticks[1]
+    if js and js:isGamepad() then
+      local changes = controller.updateAxes(js)
+      for _, c in ipairs(changes) do
+        if c.pressed then
+          love.keypressed(c.key)
+        else
+          love.keyreleased(c.key)
+        end
+      end
+    end
+  end
+
   if currentMenu then
     currentMenu.update(dt)
   elseif currentGame then
@@ -896,11 +931,13 @@ function love.update(dt)
 end
 
 function love.draw()
+  resolution.beginDraw()
   if currentMenu then
     currentMenu.draw()
   elseif currentGame then
     currentGame.draw()
   end
+  resolution.endDraw()
 end
 
 function love.keypressed(key)
@@ -948,6 +985,8 @@ function love.textinput(text)
 end
 
 function love.mousepressed(x, y, button)
+  -- Remap real window coords to virtual resolution coords
+  x, y = resolution.toVirtual(x, y)
   if currentMenu then
     if currentMenu.mousepressed then
       currentMenu.mousepressed(x, y, button)
@@ -970,3 +1009,23 @@ function love.quit()
     currency.save(hub.getNotes())
   end
 end
+
+-- ═══════════════════════════════════════
+-- GAMEPAD SUPPORT
+-- ═══════════════════════════════════════
+
+function love.gamepadpressed(joystick, button)
+  local key = controller.mapButton(button)
+  if key then
+    love.keypressed(key)
+  end
+end
+
+function love.gamepadreleased(joystick, button)
+  local key = controller.mapButton(button)
+  if key then
+    love.keyreleased(key)
+  end
+end
+
+-- Analog stick → simulated keypresses (polled each frame via love.update above)

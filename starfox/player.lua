@@ -164,23 +164,38 @@ function M.tryDodge(player, direction)
   end
 
   if player.lastTapDirection == direction and (currentTime - player.lastTapTime) < DODGE_WINDOW then
-    local dodgeDist = DODGE_DISTANCE * (player.dodgeMultiplier or 1.0)
-    local dodgeX = direction == "left" and -dodgeDist or dodgeDist
-    player.dodgeStartX = player.x
-    player.x = player.x + dodgeX
-    player.x = math.max(30, math.min(screen.WIDTH - 30, player.x))
-    player.dodging = true
-    player.dodgeTimer = 0.15
-    player.dodgeCooldown = DODGE_COOLDOWN
-    player.dodgeDirection = direction
-    player.lastTapDirection = nil
-    player.lastTapTime = 0
-    return true
+    return M.forceDodge(player, direction)
   end
 
   player.lastTapDirection = direction
   player.lastTapTime = currentTime
   return false
+end
+
+--- Execute a dodge immediately (used by gamepad double-tap detection which
+--- has already validated the double-tap timing externally).
+function M.forceDodge(player, direction)
+  if player.stunned then return false end
+
+  local abilities = require("starfox.abilities")
+  local hasInfiniteDodge = abilities.hasInfiniteDodge and abilities.hasInfiniteDodge()
+
+  if player.dodgeCooldown > 0 and not hasInfiniteDodge then
+    return false
+  end
+
+  local dodgeDist = DODGE_DISTANCE * (player.dodgeMultiplier or 1.0)
+  local dodgeX = direction == "left" and -dodgeDist or dodgeDist
+  player.dodgeStartX = player.x
+  player.x = player.x + dodgeX
+  player.x = math.max(30, math.min(screen.WIDTH - 30, player.x))
+  player.dodging = true
+  player.dodgeTimer = 0.15
+  player.dodgeCooldown = DODGE_COOLDOWN
+  player.dodgeDirection = direction
+  player.lastTapDirection = nil
+  player.lastTapTime = 0
+  return true
 end
 
 function M.takeDamage(player, amount)

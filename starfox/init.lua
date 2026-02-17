@@ -4381,10 +4381,30 @@ function M.keypressed(key)
       if raid.isActive() then
         raid.tryViaTransition()
       end
-    elseif key == "left" then
-      player.tryDodge(gameState.player, "left")
-    elseif key == "right" then
-      player.tryDodge(gameState.player, "right")
+    elseif key == "left" or key == "q" then
+      local ctrl = require("controller")
+      if ctrl.isGamepad() then
+        -- Gamepad: use controller's double-tap detection (more generous window)
+        -- "left" = d-pad/stick, "q" = left shoulder button — both dodge left
+        if ctrl.registerTap("left") then
+          player.forceDodge(gameState.player, "left")
+        end
+      else
+        if key == "left" then
+          player.tryDodge(gameState.player, "left")
+        end
+      end
+    elseif key == "right" or key == "w" then
+      local ctrl = require("controller")
+      if ctrl.isGamepad() then
+        if ctrl.registerTap("right") then
+          player.forceDodge(gameState.player, "right")
+        end
+      else
+        if key == "right" then
+          player.tryDodge(gameState.player, "right")
+        end
+      end
     elseif key == "b" then
       -- Muse power activation (hold B)
       if muses.activePower and muses.canActivate() then

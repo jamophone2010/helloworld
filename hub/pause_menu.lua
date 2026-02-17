@@ -1,5 +1,7 @@
 local M = {}
 
+local resolution = require("resolution")
+local controller = require("controller")
 local selectedIndex = 1
 local fonts = {}
 
@@ -53,7 +55,12 @@ end
 
 -- Options sub-menu items
 local function buildOptionsItems()
-  return {"Enter Code", "Back"}
+  return {
+    { label = "Resolution: " .. resolution.getCurrentLabel(), type = "resolution" },
+    { label = "Controller: " .. controller.getCurrentLabel(), type = "controller" },
+    { label = "Enter Code", type = "enter_code" },
+    { label = "Back", type = "back" },
+  }
 end
 
 -- Build the warp tabs for omnia cheat (3 tabs: Starfox, Planets, Constellations)
@@ -242,17 +249,25 @@ local function drawOptionsMenu()
   love.graphics.printf("OPTIONS", 0, 200, 1366, "center")
 
   love.graphics.setFont(fonts.menu)
-  local startY = 340
+  local startY = 310
   local itemHeight = 50
 
   for i, item in ipairs(items) do
     if i == optionsIndex then
       love.graphics.setColor(1, 1, 0)
-      love.graphics.printf("> " .. item .. " <", 0, startY + (i - 1) * itemHeight, 1366, "center")
+      love.graphics.printf("> " .. item.label .. " <", 0, startY + (i - 1) * itemHeight, 1366, "center")
     else
       love.graphics.setColor(0.7, 0.7, 0.7)
-      love.graphics.printf(item, 0, startY + (i - 1) * itemHeight, 1366, "center")
+      love.graphics.printf(item.label, 0, startY + (i - 1) * itemHeight, 1366, "center")
     end
+  end
+
+  -- Show hint for cycling rows
+  local selItem = items[optionsIndex]
+  if selItem and (selItem.type == "resolution" or selItem.type == "controller") then
+    love.graphics.setFont(fonts.small)
+    love.graphics.setColor(0.6, 0.6, 0.6)
+    love.graphics.printf("< LEFT / RIGHT > to change  |  ENTER to apply", 0, startY + #items * itemHeight + 10, 1366, "center")
   end
 
   love.graphics.setFont(fonts.small)
@@ -872,15 +887,34 @@ local function keypressedOptions(key)
   elseif key == "down" then
     optionsIndex = optionsIndex + 1
     if optionsIndex > #items then optionsIndex = 1 end
+  elseif key == "left" then
+    local item = items[optionsIndex]
+    if item and item.type == "resolution" then
+      resolution.prevPreset()
+    elseif item and item.type == "controller" then
+      controller.prevPreset()
+    end
+  elseif key == "right" then
+    local item = items[optionsIndex]
+    if item and item.type == "resolution" then
+      resolution.nextPreset()
+    elseif item and item.type == "controller" then
+      controller.nextPreset()
+    end
   elseif key == "escape" then
     subMenu = nil
   elseif key == "return" or key == "space" then
     local item = items[optionsIndex]
-    if item == "Enter Code" then
+    if item.type == "resolution" then
+      resolution.apply()
+      resolution.save()
+    elseif item.type == "controller" then
+      controller.save()
+    elseif item.type == "enter_code" then
       subMenu = "enter_code"
       codeInput = ""
       codeMessage = nil
-    elseif item == "Back" then
+    elseif item.type == "back" then
       subMenu = nil
     end
   end
