@@ -37,7 +37,7 @@ function M.new(name, x, y, dialogue, gender, extras)
   return obj
 end
 
-function M.update(npc, dt, collisionMap, allNPCs, player)
+function M.update(npc, dt, collisionMap, allNPCs, player, doorPositions)
   -- Handle movement animation
   if npc.moving then
     npc.moveProgress = npc.moveProgress + SPEED * dt
@@ -60,13 +60,13 @@ function M.update(npc, dt, collisionMap, allNPCs, player)
     -- Wander logic
     npc.wanderTimer = npc.wanderTimer - dt
     if npc.wanderTimer <= 0 then
-      M.tryRandomMove(npc, collisionMap, allNPCs, player)
+      M.tryRandomMove(npc, collisionMap, allNPCs, player, doorPositions)
       npc.wanderTimer = WANDER_MIN_DELAY + math.random() * (WANDER_MAX_DELAY - WANDER_MIN_DELAY)
     end
   end
 end
 
-function M.tryRandomMove(npc, collisionMap, allNPCs, player)
+function M.tryRandomMove(npc, collisionMap, allNPCs, player, doorPositions)
   local directions = {"up", "down", "left", "right"}
   local dir = directions[math.random(1, 4)]
 
@@ -88,6 +88,16 @@ function M.tryRandomMove(npc, collisionMap, allNPCs, player)
     if collisionMap[newGridY][newGridX] then
       npc.direction = dir  -- Still face that direction
       return false
+    end
+  end
+
+  -- Check doorway collision (NPCs should not block doorways)
+  if doorPositions then
+    for _, door in ipairs(doorPositions) do
+      if door.x == newGridX and door.y == newGridY then
+        npc.direction = dir
+        return false
+      end
     end
   end
 

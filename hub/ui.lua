@@ -24,8 +24,8 @@ end
 function M.draw(gameState, time)
   time = time or 0
   love.graphics.push()
-  love.graphics.translate(-gameState.camera.x + love.graphics.getWidth() / 2,
-                          -gameState.camera.y + love.graphics.getHeight() / 2)
+  love.graphics.translate(math.floor(-gameState.camera.x + love.graphics.getWidth() / 2),
+                          math.floor(-gameState.camera.y + love.graphics.getHeight() / 2))
 
   if gameState.location == "floor" then
     M.drawFloor(gameState, time)

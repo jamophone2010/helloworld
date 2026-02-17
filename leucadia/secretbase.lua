@@ -220,14 +220,17 @@ function M.update(dt)
     npc.update(npcObj, dt, gameState.collisionMap, gameState.currentNPCs, gameState.player)
   end
 
-  if love.keyboard.isDown("up") then
-    player.tryMove(gameState.player, "up", gameState.collisionMap, gameState.currentNPCs)
-  elseif love.keyboard.isDown("down") then
-    player.tryMove(gameState.player, "down", gameState.collisionMap, gameState.currentNPCs)
-  elseif love.keyboard.isDown("left") then
-    player.tryMove(gameState.player, "left", gameState.collisionMap, gameState.currentNPCs)
-  elseif love.keyboard.isDown("right") then
-    player.tryMove(gameState.player, "right", gameState.collisionMap, gameState.currentNPCs)
+  -- Continuous movement (disabled during dialogue)
+  if not gameState.dialogueBox then
+    if love.keyboard.isDown("up") then
+      player.tryMove(gameState.player, "up", gameState.collisionMap, gameState.currentNPCs)
+    elseif love.keyboard.isDown("down") then
+      player.tryMove(gameState.player, "down", gameState.collisionMap, gameState.currentNPCs)
+    elseif love.keyboard.isDown("left") then
+      player.tryMove(gameState.player, "left", gameState.collisionMap, gameState.currentNPCs)
+    elseif love.keyboard.isDown("right") then
+      player.tryMove(gameState.player, "right", gameState.collisionMap, gameState.currentNPCs)
+    end
   end
 
   camera.update(gameState.camera, gameState.player.x, gameState.player.y)
@@ -347,8 +350,8 @@ function M.draw()
   love.graphics.rectangle("fill", 0, 0, screenW, screenH)
 
   love.graphics.push()
-  love.graphics.translate(-gameState.camera.x + screenW / 2,
-                          -gameState.camera.y + screenH / 2)
+  love.graphics.translate(math.floor(-gameState.camera.x + screenW / 2),
+                          math.floor(-gameState.camera.y + screenH / 2))
 
   if gameState.location == "base_outdoors" then
     M.drawBaseFloor()
@@ -722,6 +725,17 @@ function M.keypressed(key)
 
     -- NPC dialogue
     if gameState.nearbyNPC then
+      -- Make NPC turn to face the player
+      local npcGridX = gameState.nearbyNPC.gridX or gameState.nearbyNPC.x
+      local npcGridY = gameState.nearbyNPC.gridY or gameState.nearbyNPC.y
+      local dx = gameState.player.gridX - npcGridX
+      local dy = gameState.player.gridY - npcGridY
+      if math.abs(dx) > math.abs(dy) then
+        gameState.nearbyNPC.direction = dx > 0 and "right" or "left"
+      else
+        gameState.nearbyNPC.direction = dy > 0 and "down" or "up"
+      end
+
       gameState.dialogueBox = {
         npc = gameState.nearbyNPC.name,
         text = gameState.nearbyNPC.dialogue

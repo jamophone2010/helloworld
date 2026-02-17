@@ -16,6 +16,11 @@ M.shootCooldown = 0
 M.spartanLaserBeam = nil
 M.paladinCharging = false
 M.paladinChargeLevel = 0
+M.hasSpreadBeam = false   -- Permanent upgrade from Orion dungeon
+M.hasHyperBeam  = false   -- Permanent upgrade from Messier dungeon
+M.hasSeeker     = false   -- Permanent upgrade from Outer Space dungeon
+M.hasSuperBombs = false   -- Permanent upgrade from Bomb Broker dungeon
+M.seekers       = {}      -- Active seeker missiles
 
 function M.reset()
   M.lasers = {}
@@ -27,6 +32,24 @@ function M.reset()
   M.spartanLaserBeam = nil
   M.paladinCharging = false
   M.paladinChargeLevel = 0
+  M.seekers = {}
+  -- Note: hasSpreadBeam, hasHyperBeam, hasSeeker, hasSuperBombs are NOT reset here — they're permanent upgrades
+end
+
+function M.setHasSpreadBeam(val)
+  M.hasSpreadBeam = val == true
+end
+
+function M.setHasHyperBeam(val)
+  M.hasHyperBeam = val == true
+end
+
+function M.setHasSeeker(val)
+  M.hasSeeker = val == true
+end
+
+function M.setHasSuperBombs(val)
+  M.hasSuperBombs = val == true
 end
 
 function M.fireHomingMissiles(player, targets)
@@ -50,11 +73,64 @@ function M.fireHomingMissiles(player, targets)
   M.shootCooldown = 0.3
 end
 
-function M.update(dt, player)
+function M.update(dt, player, enemyList)
   M.shootCooldown = math.max(0, M.shootCooldown - dt)
 
   if player.charging then
     player.chargeLevel = math.min(1, player.chargeLevel + dt / CHARGE_TIME)
+  end
+
+  -- Update seeker missiles
+  for i = #M.seekers, 1, -1 do
+    local s = M.seekers[i]
+    s.distanceTraveled = s.distanceTraveled + math.sqrt(s.vx*s.vx + s.vy*s.vy) * dt
+    -- Lock-on after 400px
+    if s.seekerState == "traveling" and s.distanceTraveled >= 400 and enemyList then
+      local bestEnt, bestDist = nil, math.huge
+      for _, e in ipairs(enemyList) do
+        if e.x and e.y and not e.seekerLocked and (e.health == nil or e.health > 0) then
+          local dx = s.x - e.x; local dy = s.y - e.y
+          local d = math.sqrt(dx*dx + dy*dy)
+          if d < bestDist then bestEnt = e; bestDist = d end
+        end
+      end
+      if bestEnt then
+        s.seekerTarget = bestEnt
+        bestEnt.seekerLocked = true
+        s.seekerState = "tracking"
+      end
+    end
+    -- Steer toward target
+    if s.seekerState == "tracking" and s.seekerTarget then
+      local tgt = s.seekerTarget
+      if (tgt.health and tgt.health <= 0) or tgt.dead then
+        tgt.seekerLocked = false
+        s.seekerTarget = nil
+        s.seekerState = "traveling"
+      else
+        local dx = tgt.x - s.x; local dy = tgt.y - s.y
+        local dist = math.sqrt(dx*dx + dy*dy)
+        if dist > 0 then
+          local spd = math.sqrt(s.vx*s.vx + s.vy*s.vy)
+          s.vx = s.vx + (dx/dist) * 900 * dt
+          s.vy = s.vy + (dy/dist) * 900 * dt
+          local newSpd = math.sqrt(s.vx*s.vx + s.vy*s.vy)
+          if newSpd > 0 then
+            local cap = math.max(spd, LASER_SPEED * 2)
+            s.vx = s.vx / newSpd * cap
+            s.vy = s.vy / newSpd * cap
+          end
+        end
+      end
+    end
+    -- Move
+    s.x = s.x + s.vx * dt
+    s.y = s.y + s.vy * dt
+    -- Remove if off-screen
+    if s.y < -30 or s.y > screen.HEIGHT + 30 or s.x < -30 or s.x > screen.WIDTH + 30 then
+      if s.seekerTarget then s.seekerTarget.seekerLocked = false end
+      table.remove(M.seekers, i)
+    end
   end
 
   for i = #M.lasers, 1, -1 do
@@ -149,16 +225,65 @@ end
 
 function M.shoot(player)
   if M.shootCooldown <= 0 then
+    -- Center laser (Hyper Beam upgrades it to a wider, higher-damage shot)
     table.insert(M.lasers, {
       x = player.x,
       y = player.y - 20,
       vy = -LASER_SPEED,
-      damage = 1,
-      width = 4,
-      height = 15,
-      owner = "player",
-      charged = false
+      damage  = M.hasHyperBeam and 2 or 1,
+      width   = M.hasHyperBeam and 8 or 4,
+      height  = M.hasHyperBeam and 24 or 15,
+      owner   = "player",
+      charged = false,
+      isHyper = M.hasHyperBeam or false,
     })
+    -- Spread Beam: two angled lasers at ±15° (in StarFox screen space = horizontal offset)
+    if M.hasSpreadBeam then
+      local spread = math.pi / 12  -- 15 degrees
+      local vx_off = LASER_SPEED * math.sin(spread)  -- horizontal component
+      local vy_val = -LASER_SPEED * math.cos(spread)
+      table.insert(M.lasers, {
+        x = player.x,
+        y = player.y - 20,
+        vx = -vx_off,
+        vy = vy_val,
+        damage = 1,
+        width = 3,
+        height = 13,
+        owner = "player",
+        charged = false,
+        spreadBeam = true,
+      })
+      table.insert(M.lasers, {
+        x = player.x,
+        y = player.y - 20,
+        vx = vx_off,
+        vy = vy_val,
+        damage = 1,
+        width = 3,
+        height = 13,
+        owner = "player",
+        charged = false,
+        spreadBeam = true,
+      })
+    end
+    -- Seeker Missile: fires alongside normal/hyper laser, homes in after 400px
+    if M.hasSeeker then
+      table.insert(M.seekers, {
+        x = player.x,
+        y = player.y - 20,
+        vx = 0,
+        vy = -LASER_SPEED * 2,
+        distanceTraveled = 0,
+        seekerState = "traveling",
+        seekerTarget = nil,
+        damage = 2,
+        width = 6,
+        height = 10,
+        owner = "player",
+        isSeeker = true,
+      })
+    end
     M.shootCooldown = LASER_COOLDOWN
     return true
   end

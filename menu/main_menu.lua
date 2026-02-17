@@ -10,13 +10,6 @@ local screen = "pressstart"  -- "pressstart" | "menu"
 local dimAlpha = 0
 local blinkTimer = 0
 
-local fadeState = {
-  active = false,
-  alpha = 0,
-  fadingOut = false,
-  callback = nil
-}
-
 M.onNewGame = nil
 M.onContinue = nil
 M.onOptions = nil
@@ -31,10 +24,6 @@ function M.load()
   screen = "pressstart"
   dimAlpha = 0
   blinkTimer = 0
-  fadeState.active = false
-  fadeState.alpha = 0
-  fadeState.fadingOut = false
-  fadeState.callback = nil
   galaxy.load()
 end
 
@@ -43,18 +32,6 @@ function M.update(dt)
   blinkTimer = blinkTimer + dt
   if screen == "menu" and dimAlpha < 0.58 then
     dimAlpha = math.min(0.58, dimAlpha + dt * 2.5)
-  end
-  
-  -- Update fade animation
-  if fadeState.active then
-    if fadeState.fadingOut then
-      fadeState.alpha = math.min(1.0, fadeState.alpha + dt * 2.0)
-      if fadeState.alpha >= 1.0 and fadeState.callback then
-        local cb = fadeState.callback
-        fadeState.callback = nil
-        cb()
-      end
-    end
   end
 end
 
@@ -99,12 +76,6 @@ function M.draw()
     love.graphics.setColor(0.5, 0.5, 0.5)
     love.graphics.printf("UP/DOWN: select  |  ENTER: confirm", 0, 710, 1366, "center")
   end
-  
-  -- White fade overlay
-  if fadeState.active and fadeState.alpha > 0 then
-    love.graphics.setColor(1, 1, 1, fadeState.alpha)
-    love.graphics.rectangle("fill", 0, 0, 1366, 768)
-  end
 end
 
 function M.keypressed(key)
@@ -125,13 +96,7 @@ function M.keypressed(key)
     if selectedIndex == 1 then
       if M.onNewGame then M.onNewGame() end
     elseif selectedIndex == 2 then
-      if M.onContinue then
-        -- Start fade to white
-        fadeState.active = true
-        fadeState.alpha = 0
-        fadeState.fadingOut = true
-        fadeState.callback = M.onContinue
-      end
+      if M.onContinue then M.onContinue() end
     elseif selectedIndex == 3 then
       if M.onOptions then M.onOptions() end
     elseif selectedIndex == 4 then

@@ -10,6 +10,14 @@ M.TYPES = {
   timeslow = {duration = 8, color = {0.6, 0.3, 1}, label = "T", desc = "Time Warp"},
   bomb = {amount = 1, color = {1, 0.3, 0.1}, label = "B", desc = "Bomb"},
   score = {amount = 500, color = {1, 0.85, 0}, label = "$", desc = "Bonus"},
+  -- Permanent upgrade from the Orion dungeon boss fight
+  spreadbeam = {permanent = true, color = {0.2, 1.0, 0.5}, label = "≋", desc = "Spread Beam"},
+  -- Permanent upgrade from the Messier dungeon boss fight
+  hyperbeam  = {permanent = true, color = {0.3, 0.9, 1.0}, label = "◈", desc = "Hyper Beam"},
+  -- Permanent upgrade from the Outer Space dungeon boss fight
+  seeker     = {permanent = true, color = {0.8, 0.2, 0.2}, label = "⟳", desc = "Seeker Missiles"},
+  -- Permanent upgrade from the Bomb Broker dungeon boss fight
+  superbombs = {permanent = true, color = {1.0, 0.5, 0.1}, label = "B+", desc = "Super Bombs"},
 }
 
 -- Labels for display
@@ -79,6 +87,10 @@ function M.update(powerup, dt)
 end
 
 function M.isAlive(powerup)
+  local t = M.TYPES[powerup.type]
+  if t and t.permanent then
+    return not powerup.collected
+  end
   return powerup.lifetime > 0 and not powerup.collected
 end
 
@@ -102,6 +114,18 @@ function M.apply(powerup, ship)
     return {message = "+1 BOMB"}
   elseif powerup.type == "score" then
     return {score = M.TYPES.score.amount, message = "+" .. M.TYPES.score.amount}
+  elseif powerup.type == "spreadbeam" then
+    ship.hasSpreadBeam = true
+    return {spreadbeam = true, message = "SPREAD BEAM"}
+  elseif powerup.type == "hyperbeam" then
+    ship.hasHyperBeam = true
+    return {hyperbeam = true, message = "HYPER BEAM"}
+  elseif powerup.type == "seeker" then
+    ship.hasSeeker = true
+    return {seeker = true, message = "SEEKER MISSILES"}
+  elseif powerup.type == "superbombs" then
+    ship.hasSuperBombs = true
+    return {superbombs = true, message = "SUPER BOMBS"}
   end
   return {}
 end

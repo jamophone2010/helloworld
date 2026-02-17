@@ -22,6 +22,21 @@ local PLANETS = {
   {id = 4, name = "Mixia", type = "station", ring = "middle", angle = 90,
    description = "A vertical city planet of endless towers stretching into the clouds. Elevators connect worlds within worlds.",
    hubType = "mixia"},
+  {id = 5, name = "Elendil", type = "station", ring = "middle", angle = 270,
+   description = "A medieval fantasy village nestled among rolling hills and ancient oaks. Half-timbered houses line cobblestone paths beside a gentle river.",
+   hubType = "elendil"},
+  {id = 6, name = "Chillon", type = "station", ring = "middle", angle = 180,
+   description = "An ice planet of towering snow-capped peaks and Nordic longhouses. Troll-infested mountain trails wind through frozen valleys beneath the aurora borealis.",
+   hubType = "chillon"},
+
+  -- Outer ring - Deep Space
+  {id = 7, name = "Kala Patthar", type = "station", ring = "outer", angle = 45,
+   description = "A remote mountaineering outpost in Deep Space, inspired by Everest Base Camp. Prayer flags snap in the cosmic wind as sherpas share legends of the four Muses.",
+   hubType = "kalapatthar"},
+
+  {id = 8, name = "Cereus", type = "station", ring = "middle", angle = 0,
+   description = "A desert arboretum inspired by Arizona's Boyce Thompson, where ancient saguaros stand sentinel over winding trails through cactus gardens and eucalyptus groves.",
+   hubType = "cereus"},
 }
 
 local selectedIndex = 1
@@ -156,6 +171,10 @@ function M.draw()
       leucadia = {0.4, 0.7, 0.5},
       singularity = {0.6, 0.4, 0.7},
       mixia = {0.7, 0.6, 0.4},
+      kalapatthar = {0.7, 0.5, 0.3},
+      cereus = {0.85, 0.65, 0.3},
+      elendil = {0.3, 0.7, 0.4},
+      chillon = {0.5, 0.6, 0.8},
     }
     local sc = stationColor[planet.hubType] or {0.5, 0.6, 0.7}
     love.graphics.setColor(sc[1], sc[2], sc[3])

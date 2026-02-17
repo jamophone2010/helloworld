@@ -16,6 +16,14 @@ local patrol = require("asteroids.patrol")
 local wanted = require("asteroids.wanted")
 local constellation = require("asteroids.constellation")
 local puzzle = require("asteroids.puzzle")
+local dungeon = require("asteroids.dungeon")
+local encounter = require("asteroids.encounter")
+local kraken = require("asteroids.kraken")
+local orionDungeon = require("asteroids.orion_dungeon")
+local messierDungeon = require("asteroids.messier_dungeon")
+local outerDungeon = require("asteroids.outer_dungeon")
+local velaDungeon = require("asteroids.vela_dungeon")
+local muses = require("kalapatthar.muses")
 
 local gameState = {}
 
@@ -137,6 +145,29 @@ local spaceEventState = {
 -- Powerup pickup message popups
 local pickupMessages = {}
 
+-- Orion dungeon: Spread Beam acquisition banner timer
+local spreadBeamBannerTimer = 0
+local hyperBeamBannerTimer = 0
+local seekerMissileBannerTimer = 0
+
+-- ===== ENCOUNTER SYSTEM STATE =====
+local encounterState = {
+  enemies = {},             -- active encounter enemies
+  spawnTimer = 0,
+  spawnInterval = 12,       -- seconds between spawn checks
+  encounterActive = false,
+  encounterMessage = "",
+  encounterMessageTimer = 0,
+  encounterMessageColor = {1, 0.6, 0.2},
+  damageImmune = 0,         -- brief immunity after enemy hit
+}
+
+-- ===== KRAKEN BOSS STATE =====
+local krakenState = nil        -- kraken instance (lazy init)
+local krakenDefeated = false   -- persists across tiles
+local hasTrident = false       -- permanent item flag
+local tridentBannerTimer = 0   -- acquisition banner display
+
 -- Combo score tracking
 local comboState = {
   count = 0,
@@ -145,6 +176,8 @@ local comboState = {
   multiplier = 1,
   displayTimer = 0,
 }
+-- Shield deflection flash timer
+local shieldDeflectTimer = 0
 
 -- Smart bomb state (two-press: launch then detonate)
 local bombState = {
@@ -167,6 +200,14 @@ local bombState = {
   flash = 0,
 }
 
+-- Muse power B-hold tracking (hold B = Muse power, tap B = smart bomb)
+local museBHoldTimer = 0
+local MUSE_B_HOLD_THRESHOLD = 0.3  -- seconds before B counts as "held"
+local museBHeld = false
+
+-- Chain lightning visual effects (Djolt power)
+local chainLightningArcs = {}
+
 -- Missile AOE explosion state (visual effects queue)
 local missileExplosions = {}
 local MISSILE_AOE_RADIUS = 120
@@ -175,6 +216,68 @@ local MISSILE_DAMAGE_MULT = 2.0  -- Missiles deal 2x damage to asteroids (instan
 -- ===================== PER-TILE STATE CACHE =====================
 -- Preserves drops, asteroids, ufos, etc. when moving between sectors
 local tileStateCache = {}
+
+-- ===================== CHAIN LIGHTNING (Djolt Muse Power) =====================
+-- When a bullet hits something, arc lightning to nearby enemies/asteroids
+local function triggerChainLightning(hitX, hitY, skipIndex, targetType)
+  if not muses.hasChainLightning() then return end
+
+  local arcRange = 200
+  local maxArcs = 3
+  local arcDamage = 25
+  local arcsUsed = 0
+
+  -- Arc to nearby asteroids
+  for i = #gameState.asteroids, 1, -1 do
+    if arcsUsed >= maxArcs then break end
+    local a = gameState.asteroids[i]
+    if not (targetType == "asteroid" and i == skipIndex) then
+      local dist = math.sqrt((hitX - a.x)^2 + (hitY - a.y)^2)
+      if dist < arcRange then
+        -- Visual arc
+        table.insert(chainLightningArcs, {
+          x1 = hitX, y1 = hitY, x2 = a.x, y2 = a.y,
+          timer = 0.3,
+          color = muses.MUSES.djolt.color,
+        })
+        -- Damage the asteroid (split it)
+        local splits, score = asteroid.split(a)
+        gameState.score = gameState.score + score
+        for _, split in ipairs(splits) do
+          table.insert(gameState.asteroids, split)
+        end
+        for _, p in ipairs(particle.new(a.x, a.y)) do
+          table.insert(gameState.particles, p)
+        end
+        table.remove(gameState.asteroids, i)
+        arcsUsed = arcsUsed + 1
+      end
+    end
+  end
+
+  -- Arc to nearby UFOs
+  for i = #gameState.ufos, 1, -1 do
+    if arcsUsed >= maxArcs then break end
+    local u = gameState.ufos[i]
+    if not (targetType == "ufo" and i == skipIndex) then
+      local dist = math.sqrt((hitX - u.x)^2 + (hitY - u.y)^2)
+      if dist < arcRange then
+        table.insert(chainLightningArcs, {
+          x1 = hitX, y1 = hitY, x2 = u.x, y2 = u.y,
+          timer = 0.3,
+          color = muses.MUSES.djolt.color,
+        })
+        gameState.score = gameState.score + u.score
+        for _, p in ipairs(particle.new(u.x, u.y)) do
+          table.insert(gameState.particles, p)
+        end
+        table.insert(gameState.powerups, powerup.new(u.x, u.y))
+        table.remove(gameState.ufos, i)
+        arcsUsed = arcsUsed + 1
+      end
+    end
+  end
+end
 
 local function getTileCacheKey(x, y)
   return x .. "," .. y
@@ -247,8 +350,13 @@ function M.load()
 end
 
 -- Set map progression from hub state
-function M.setProgression(antennaInstalled, sentinelDefeated)
-  worldmap.setProgression(antennaInstalled, sentinelDefeated)
+function M.setProgression(antennaInstalled, sentinelDefeated, hasTrident)
+  worldmap.setProgression(antennaInstalled, sentinelDefeated, hasTrident)
+end
+
+-- Get current ship state for cross-game sync (e.g. Spread Beam → StarFox)
+function M.getShipData()
+  return gameState.ship
 end
 
 -- Refresh missiles to max (called when returning from Hometown Station)
@@ -313,6 +421,12 @@ function M.startGame()
   sectorBoundary.active = false
   sectorBoundary.wallAlpha = 0
 
+  -- Reset Muse combat state for new session
+  muses.resetCombatState()
+  museBHeld = false
+  museBHoldTimer = 0
+  chainLightningArcs = {}
+
   -- Preserve missile state across restarts
   local prevMaxMissiles = gameState.ship and gameState.ship.maxMissiles or 0
   local prevMissiles = gameState.ship and gameState.ship.missiles or 0
@@ -341,6 +455,13 @@ function M.startGame()
 
   -- Reset wanted system
   wanted.reset()
+
+  -- Reset encounter system
+  encounterState.enemies = {}
+  encounterState.spawnTimer = 0
+  encounterState.encounterMessageTimer = 0
+  encounterState.damageImmune = 0
+  krakenState = nil
 
   -- Reset worldmap to center
   worldmap.init()
@@ -417,11 +538,47 @@ function M.spawnTileContent()
     sectorBoundary.active = false
     sectorBoundary.wallAlpha = 0
   end
+
+  -- Initialize dungeon (maze walls, enemies, decorations) for dungeon tiles
+  dungeon.init(worldmap.tileX, worldmap.tileY, gameState.width, gameState.height)
+
+  -- Initialize Orion boss dungeon (places Spread Beam powerup on boss tile)
+  local orionPowerup = orionDungeon.initTile(worldmap.tileX, worldmap.tileY, gameState.width, gameState.height)
+  if orionPowerup then
+    table.insert(gameState.powerups, orionPowerup)
+  end
+  local messierPowerup = messierDungeon.initTile(worldmap.tileX, worldmap.tileY, gameState.width, gameState.height)
+  if messierPowerup then
+    table.insert(gameState.powerups, messierPowerup)
+  end
+  local outerPowerup = outerDungeon.initTile(worldmap.tileX, worldmap.tileY, gameState.width, gameState.height)
+  if outerPowerup then
+    table.insert(gameState.powerups, outerPowerup)
+  end
+
+  -- Check if this is the Vela dungeon entrance tile
+  if velaDungeon.isVelaDungeonTile(worldmap.tileX, worldmap.tileY) and not velaDungeon.isActive() then
+    velaDungeon.enter(gameState.width, gameState.height)
+  end
+
+  -- ===== ENCOUNTER SYSTEM: roll for enemy spawns on tile entry =====
+  if tile.type ~= worldmap.TILE_STATION and not restored then
+    M.rollEncounterOnTileEntry()
+  end
 end
 
 function M.transitionToTile(newX, newY, shipWrapX, shipWrapY)
   -- Save current tile state before leaving (preserves drops, boss HP, etc.)
   saveTileState(worldmap.tileX, worldmap.tileY)
+
+  -- Clear encounter enemies (don't follow between tiles)
+  encounterState.enemies = {}
+  encounterState.spawnTimer = 0
+
+  -- Deactivate Kraken if leaving tile (boss despawns)
+  if krakenState and krakenState.active and not krakenState.dying then
+    krakenState.active = false
+  end
 
   worldmap.setPosition(newX, newY)
   -- Mark the new tile as discovered
@@ -944,9 +1101,53 @@ function M.update(dt)
 end
 
 function M.updatePlaying(dt)
+  -- Track ship state to detect respawn after boss fight death
+  local shipWasDead = gameState.ship.dead
+
   ship.update(gameState.ship, dt)
 
+  -- If ship just respawned while in the Orion boss fight, redirect to dungeon entrance
+  if shipWasDead and not gameState.ship.dead and not gameState.ship.exploding then
+    if orionDungeon.getState() == "boss_fight" then
+      -- Lose the Spread Beam
+      gameState.ship.hasSpreadBeam = false
+      -- Reset dungeon state (back to powerup_present)
+      orionDungeon.onPlayerDied()
+      -- Teleport to dungeon entrance tile
+      local ex, ey = orionDungeon.getEntranceTile()
+      gameState.ship.spawnX = gameState.width / 2
+      gameState.ship.spawnY = gameState.height / 2
+      gameState.ship.x     = gameState.width  / 2
+      gameState.ship.y     = gameState.height / 2
+      M.transitionToTile(ex, ey, gameState.width / 2, gameState.height / 2)
+    end
+    if messierDungeon.getState() == "boss_fight" then
+      gameState.ship.hasHyperBeam = false
+      messierDungeon.onPlayerDied()
+      local ex, ey = messierDungeon.getEntranceTile()
+      gameState.ship.spawnX = gameState.width / 2
+      gameState.ship.spawnY = gameState.height / 2
+      gameState.ship.x = gameState.width / 2
+      gameState.ship.y = gameState.height / 2
+      M.transitionToTile(ex, ey, gameState.width / 2, gameState.height / 2)
+    end
+    if outerDungeon.getBossState() == "boss_fight" then
+      gameState.ship.hasSeeker = false
+      outerDungeon.onPlayerDied()
+      local ex, ey = outerDungeon.getEntranceTile()
+      gameState.ship.spawnX = gameState.width / 2
+      gameState.ship.spawnY = gameState.height / 2
+      gameState.ship.x = gameState.width / 2
+      gameState.ship.y = gameState.height / 2
+      M.transitionToTile(ex, ey, gameState.width / 2, gameState.height / 2)
+    end
+  end
+
   -- Check for tile transitions instead of simple wrap
+  -- Tierra Muse power: screen wrap within tile instead of transitioning
+  if muses.hasScreenWrap() then
+    ship.wrap(gameState.ship, gameState.width, gameState.height)
+  else
   local transitioned, newTileX, newTileY, wrapX, wrapY =
     worldmap.checkEdgeTransition(gameState.ship.x, gameState.ship.y, gameState.width, gameState.height)
 
@@ -956,6 +1157,30 @@ function M.updatePlaying(dt)
     -- Clamp ship to screen instead of transitioning
     wrapX = math.max(8, math.min(gameState.width - 8, gameState.ship.x))
     wrapY = math.max(8, math.min(gameState.height - 8, gameState.ship.y))
+  end
+
+  -- Block transitions when Orion dungeon boss room is sealed
+  if transitioned and orionDungeon.isLocked() then
+    transitioned = false
+    wrapX = math.max(8, math.min(gameState.width - 8, gameState.ship.x))
+    wrapY = math.max(8, math.min(gameState.height - 8, gameState.ship.y))
+  end
+  if transitioned and messierDungeon.isLocked() then
+    transitioned = false
+    wrapX = math.max(8, math.min(gameState.width - 8, gameState.ship.x))
+    wrapY = math.max(8, math.min(gameState.height - 8, gameState.ship.y))
+  end
+  if transitioned and outerDungeon.isCombatLocked() then
+    transitioned = false
+    wrapX = math.max(8, math.min(gameState.width - 8, gameState.ship.x))
+    wrapY = math.max(8, math.min(gameState.height - 8, gameState.ship.y))
+  end
+  if transitioned then
+    if not outerDungeon.checkTransition(worldmap.tileX, worldmap.tileY, newTileX, newTileY) then
+      transitioned = false
+      wrapX = math.max(8, math.min(gameState.width - 8, gameState.ship.x))
+      wrapY = math.max(8, math.min(gameState.height - 8, gameState.ship.y))
+    end
   end
 
   if transitioned then
@@ -1014,6 +1239,7 @@ function M.updatePlaying(dt)
       end
     end
   end
+  end -- end of Tierra screen wrap else block
 
   -- Update landing state at station
   if worldmap.isAtStation() then
@@ -1030,11 +1256,56 @@ function M.updatePlaying(dt)
     gameState.health = math.min(gameState.maxHealth, gameState.health + dt * 5)
   end
 
+  -- Shield deflection flash decay
+  if shieldDeflectTimer > 0 then
+    shieldDeflectTimer = shieldDeflectTimer - dt
+  end
+
   -- ===== CONSTELLATION HAZARD UPDATES =====
   M.updateConstellationHazards(dt)
 
   -- ===== SECTOR BOUNDARY UPDATE (puzzle/miniboss walls + lever) =====
   M.updateSectorBoundary(dt)
+
+  -- ===== ORION DUNGEON UPDATE (Spread Beam boss fight) =====
+  if spreadBeamBannerTimer > 0 then
+    spreadBeamBannerTimer = spreadBeamBannerTimer - dt
+  end
+  local orionResult = orionDungeon.update(dt, gameState.ship, gameState.bullets, gameState.width, gameState.height)
+  if orionResult then
+    -- Add boss bullets to game bullet list
+    if orionResult.bossBullets then
+      for _, bb in ipairs(orionResult.bossBullets) do
+        table.insert(gameState.bullets, bb)
+      end
+    end
+  end
+
+  -- ===== MESSIER DUNGEON UPDATE (Hyper Beam boss fight) =====
+  if hyperBeamBannerTimer > 0 then
+    hyperBeamBannerTimer = hyperBeamBannerTimer - dt
+  end
+  local messierResult = messierDungeon.update(dt, gameState.ship, gameState.bullets, gameState.width, gameState.height)
+  if messierResult then
+    if messierResult.bossBullets then
+      for _, bb in ipairs(messierResult.bossBullets) do
+        table.insert(gameState.bullets, bb)
+      end
+    end
+  end
+
+  -- ===== OUTER SPACE DUNGEON UPDATE (Seeker Missiles boss fight) =====
+  if seekerMissileBannerTimer > 0 then
+    seekerMissileBannerTimer = seekerMissileBannerTimer - dt
+  end
+  local outerResult = outerDungeon.update(dt, gameState.ship, gameState.bullets, gameState.width, gameState.height)
+  if outerResult then
+    if outerResult.bossBullets then
+      for _, bb in ipairs(outerResult.bossBullets) do
+        table.insert(gameState.bullets, bb)
+      end
+    end
+  end
 
   -- Deactivate boundary when puzzle is completed
   if sectorBoundary.active and not sectorBoundary.deactivating then
@@ -1137,6 +1408,38 @@ function M.updatePlaying(dt)
     end
   end
 
+  -- ===== MUSE POWERS =====
+  muses.updateCombat(dt)
+
+  -- B-hold detection: if B is held, track duration
+  if museBHeld then
+    museBHoldTimer = museBHoldTimer + dt
+    if museBHoldTimer >= MUSE_B_HOLD_THRESHOLD and not muses.powerActive then
+      -- Held long enough — activate Muse power (cancel the bomb if not yet launched)
+      if muses.canActivate() then
+        muses.activate()
+      end
+    end
+  end
+
+  -- Melo: override time scale when Muse time slow is active
+  if muses.isTimeSlowed() then
+    dtEff = dt * muses.getTimeScale()
+  end
+
+  -- Tierra: screen wrap instead of tile transition
+  if muses.hasScreenWrap() and not gameState.ship.dead and not gameState.ship.exploding then
+    ship.wrap(gameState.ship, gameState.width, gameState.height)
+  end
+
+  -- Djolt: update chain lightning visual arcs
+  for i = #chainLightningArcs, 1, -1 do
+    chainLightningArcs[i].timer = chainLightningArcs[i].timer - dt
+    if chainLightningArcs[i].timer <= 0 then
+      table.remove(chainLightningArcs, i)
+    end
+  end
+
   -- ===== COMBO TIMER =====
   if comboState.timer > 0 then
     comboState.timer = comboState.timer - dt
@@ -1176,9 +1479,75 @@ function M.updatePlaying(dt)
   -- ===== SPACE EVENTS =====
   M.updateSpaceEvents(dtEff)
 
+  -- ===== ENCOUNTER SYSTEM =====
+  M.updateEncounters(dtEff)
+
+  -- ===== KRAKEN BOSS =====
+  M.updateKraken(dtEff)
+
   for i = #gameState.bullets, 1, -1 do
     bullet.update(gameState.bullets[i], dt)
     bullet.wrap(gameState.bullets[i], gameState.width, gameState.height)
+
+    -- Seeker missile homing logic
+    local b = gameState.bullets[i]
+    if b.isSeeker then
+      local dx2 = b.vx; local dy2 = b.vy
+      b.distanceTraveled = (b.distanceTraveled or 0) + math.sqrt(dx2*dx2 + dy2*dy2) * dt
+      if (b.seekerState or "traveling") == "traveling" and b.distanceTraveled >= 400 then
+        -- Find nearest unlocked target
+        local bestTarget, bestDist = nil, math.huge
+        for _, a in ipairs(gameState.asteroids) do
+          if not a.seekerLocked then
+            local adx = b.x - a.x; local ady = b.y - a.y
+            local d = math.sqrt(adx*adx + ady*ady)
+            if d < bestDist then bestTarget = a; bestDist = d end
+          end
+        end
+        for _, u in ipairs(gameState.ufos) do
+          if not u.seekerLocked then
+            local udx = b.x - u.x; local udy = b.y - u.y
+            local d = math.sqrt(udx*udx + udy*udy)
+            if d < bestDist then bestTarget = u; bestDist = d end
+          end
+        end
+        for _, t in ipairs(outerDungeon.getTargetList()) do
+          if not t.entity.seekerLocked then
+            local tdx = b.x - t.x; local tdy = b.y - t.y
+            local d = math.sqrt(tdx*tdx + tdy*tdy)
+            if d < bestDist then bestTarget = t.entity; bestDist = d end
+          end
+        end
+        if bestTarget then
+          b.seekerTarget = bestTarget
+          bestTarget.seekerLocked = true
+          b.seekerState = "tracking"
+        end
+      end
+      if (b.seekerState or "traveling") == "tracking" then
+        local tgt = b.seekerTarget
+        if not tgt or tgt.dead or (tgt.hp and tgt.hp <= 0) then
+          if tgt then tgt.seekerLocked = false end
+          b.seekerTarget = nil
+          b.seekerState = "traveling"
+        else
+          local tdx = tgt.x - b.x; local tdy = tgt.y - b.y
+          local tdist = math.sqrt(tdx*tdx + tdy*tdy)
+          if tdist > 0 then
+            local spd = math.sqrt(b.vx*b.vx + b.vy*b.vy)
+            local steer = 600
+            b.vx = b.vx + (tdx/tdist) * steer * dt
+            b.vy = b.vy + (tdy/tdist) * steer * dt
+            local newSpd = math.sqrt(b.vx*b.vx + b.vy*b.vy)
+            if newSpd > 0 then
+              local cap = math.max(spd, 1000)
+              b.vx = b.vx / newSpd * cap
+              b.vy = b.vy / newSpd * cap
+            end
+          end
+        end
+      end
+    end
 
     if not bullet.isAlive(gameState.bullets[i]) then
       table.remove(gameState.bullets, i)
@@ -1233,6 +1602,159 @@ function M.updatePlaying(dt)
   end
 
   M.checkCollisions()
+
+  -- ===== DUNGEON SYSTEM UPDATE =====
+  if dungeon.isActive() then
+    dungeon.update(dt, gameState.width, gameState.height, gameState.ship.x, gameState.ship.y)
+
+    -- Wall collision for ship
+    if not gameState.ship.dead and not gameState.ship.exploding then
+      local newX, newY, wallHit = dungeon.resolveWallCollision(
+        gameState.ship.x, gameState.ship.y, gameState.ship.size or 12)
+      if wallHit then
+        gameState.ship.x = newX
+        gameState.ship.y = newY
+        -- Kill velocity into wall
+        gameState.ship.vx = gameState.ship.vx * 0.3
+        gameState.ship.vy = gameState.ship.vy * 0.3
+      end
+
+      -- Hazard zone damage
+      local hazardDmg = dungeon.getHazardDamage(gameState.ship.x, gameState.ship.y)
+      if hazardDmg > 0 then
+        if gameState.ship.shieldActive then
+          gameState.ship.shieldEnergy = gameState.ship.shieldEnergy - hazardDmg * dt
+          if gameState.ship.shieldEnergy <= 0 then
+            gameState.ship.shieldEnergy = 0
+            gameState.ship.shieldActive = false
+          end
+        else
+          gameState.health = gameState.health - hazardDmg * dt
+          if gameState.health <= 0 then ship.die(gameState.ship) end
+        end
+      end
+
+      -- Sentry contact damage
+      local sentryDmg = dungeon.checkShipCollision(gameState.ship.x, gameState.ship.y, gameState.ship.size or 12)
+      if sentryDmg > 0 then
+        if gameState.ship.shieldActive then
+          gameState.ship.shieldEnergy = gameState.ship.shieldEnergy - sentryDmg
+          if gameState.ship.shieldEnergy <= 0 then
+            gameState.ship.shieldEnergy = 0
+            gameState.ship.shieldActive = false
+          end
+        else
+          gameState.health = gameState.health - sentryDmg
+          gameState.damageTimer = 3
+          if gameState.health <= 0 then ship.die(gameState.ship) end
+        end
+      end
+    end
+
+    -- Turret shots → add as enemy bullets
+    local turretShots = dungeon.getTurretShots(gameState.ship.x, gameState.ship.y, dt)
+    for _, shot in ipairs(turretShots) do
+      table.insert(gameState.bullets, {
+        x = shot.x, y = shot.y,
+        vx = shot.vx, vy = shot.vy,
+        lifetime = 3,
+        owner = "dungeon",
+        dungeonBullet = true,
+        damage = shot.damage,
+        size = 4,
+      })
+    end
+
+    -- Player bullets vs dungeon enemies
+    local destroyed = dungeon.checkBulletCollisions(gameState.bullets)
+    for _, d in ipairs(destroyed) do
+      -- Spawn particles at destroyed enemy
+      for _, p in ipairs(particle.new(d.x, d.y)) do
+        table.insert(gameState.particles, p)
+      end
+      gameState.score = gameState.score + 150
+    end
+
+    -- Dungeon bullets hitting the player
+    if not gameState.ship.dead and not gameState.ship.exploding then
+      for i = #gameState.bullets, 1, -1 do
+        local b = gameState.bullets[i]
+        if b.dungeonBullet then
+          local dist = math.sqrt((b.x - gameState.ship.x)^2 + (b.y - gameState.ship.y)^2)
+          if dist < (gameState.ship.size or 12) + 4 then
+            if gameState.ship.shieldActive then
+              deflectBullet(b, 3)
+            else
+              local dmg = b.damage or 10
+              gameState.health = gameState.health - dmg
+              gameState.damageTimer = 3
+              if gameState.health <= 0 then ship.die(gameState.ship) end
+              table.remove(gameState.bullets, i)
+            end
+          end
+        end
+      end
+    end
+  end
+
+  -- ===== VELA DUNGEON SYSTEM UPDATE =====
+  if velaDungeon.isActive() then
+    velaDungeon.update(dt, gameState.ship.x, gameState.ship.y, gameState.ship.size or 12)
+
+    -- Wall collision for ship
+    if not gameState.ship.dead and not gameState.ship.exploding then
+      local newX, newY, wallHit = velaDungeon.resolveShipWallCollision(
+        gameState.ship.x, gameState.ship.y, gameState.ship.size or 12)
+      if wallHit then
+        gameState.ship.x = newX
+        gameState.ship.y = newY
+        gameState.ship.vx = gameState.ship.vx * 0.3
+        gameState.ship.vy = gameState.ship.vy * 0.3
+      end
+
+      -- Player bullets vs dungeon enemies
+      local destroyed = velaDungeon.checkBulletCollisions(gameState.bullets)
+      for _, d in ipairs(destroyed) do
+        for _, p in ipairs(particle.new(d.x, d.y)) do
+          table.insert(gameState.particles, p)
+        end
+        gameState.score = gameState.score + (d.isBoss and 500 or 200)
+      end
+
+      -- Dungeon bullets / boss hitting the player
+      local hits = velaDungeon.getPlayerHits(gameState.ship.x, gameState.ship.y, gameState.ship.size or 12)
+      for _, hit in ipairs(hits) do
+        if not gameState.ship.invulnerable then
+          if gameState.ship.shieldActive then
+            gameState.ship.shieldEnergy = gameState.ship.shieldEnergy - hit.damage
+            if gameState.ship.shieldEnergy <= 0 then
+              gameState.ship.shieldEnergy = 0
+              gameState.ship.shieldActive = false
+            end
+          else
+            gameState.health = gameState.health - hit.damage
+            gameState.damageTimer = 3
+            if gameState.health <= 0 then ship.die(gameState.ship) end
+          end
+        end
+      end
+
+      -- Treasure room pickup = heal
+      if velaDungeon.hasTreasure() then
+        -- Handled by velaDungeon update (player proximity)
+      end
+
+      -- Firebird reward collected
+      if velaDungeon.isRewardCollected() then
+        -- Award the Firebird ship
+        velaDungeon.exit()
+        -- Mark Firebird as purchased/acquired in shipyard
+        if M.onFirebirdAcquired then
+          M.onFirebirdAcquired()
+        end
+      end
+    end
+  end
 
   -- Update patrol robots
   M.updatePatrols(dt)
@@ -1577,6 +2099,48 @@ function M.drawMissileExplosions()
   love.graphics.setLineWidth(1)
 end
 
+-- ===================== SHIELD DEFLECTION =====================
+-- Reflects an enemy bullet off the shield back outward.
+-- Drains shield energy proportional to damage and reverses bullet ownership.
+local function deflectBullet(b, shieldDrain)
+  -- Reflect: reverse velocity away from ship + slight random spread
+  local dx = b.x - gameState.ship.x
+  local dy = b.y - gameState.ship.y
+  local dist = math.sqrt(dx * dx + dy * dy)
+  if dist < 1 then dist = 1 end
+  local nx, ny = dx / dist, dy / dist
+
+  local speed = math.sqrt((b.vx or 0)^2 + (b.vy or 0)^2)
+  if speed < 100 then speed = 300 end  -- ensure a minimum bounce speed
+  local spread = (math.random() - 0.5) * 0.4  -- ±0.2 rad spread
+  local angle = math.atan2(ny, nx) + spread
+  b.vx = math.cos(angle) * speed * 1.2
+  b.vy = math.sin(angle) * speed * 1.2
+
+  -- Push bullet outside shield radius so it doesn't re-collide
+  local shieldR = (gameState.ship.size or 12) * 1.8 + 4
+  b.x = gameState.ship.x + nx * shieldR
+  b.y = gameState.ship.y + ny * shieldR
+
+  -- Change ownership so it can hit enemies
+  b.owner = "player"
+  b.enemyBullet = false
+  b.dungeonBullet = false
+  b.deflected = true
+  b.lifetime = 2.0  -- give it fresh lifetime
+
+  -- Drain shield energy (reduced cost since deflecting, not absorbing)
+  local drain = shieldDrain or 3
+  gameState.ship.shieldEnergy = gameState.ship.shieldEnergy - drain
+  if gameState.ship.shieldEnergy <= 0 then
+    gameState.ship.shieldEnergy = 0
+    gameState.ship.shieldActive = false
+  end
+
+  -- Trigger deflection flash
+  shieldDeflectTimer = 0.15
+end
+
 function M.drawShield()
   if not gameState.ship.shieldActive or gameState.ship.dead or gameState.ship.exploding then return end
 
@@ -1606,6 +2170,16 @@ function M.drawShield()
     local hx = sx + math.cos(angle) * radius * 0.6
     local hy = sy + math.sin(angle) * radius * 0.6
     love.graphics.circle("line", hx, hy, 6)
+  end
+
+  -- Deflection flash (bright white/cyan burst when bullet is reflected)
+  if shieldDeflectTimer > 0 then
+    local flashAlpha = shieldDeflectTimer / 0.15
+    love.graphics.setColor(0.7, 0.9, 1, flashAlpha * 0.6)
+    love.graphics.circle("fill", sx, sy, radius * 1.3)
+    love.graphics.setLineWidth(3)
+    love.graphics.setColor(1, 1, 1, flashAlpha * 0.8)
+    love.graphics.circle("line", sx, sy, radius)
   end
 
   love.graphics.setLineWidth(1)
@@ -1659,6 +2233,27 @@ function M.updatePatrols(dt)
     -- Clean up finished explosions
     if p.dead and patrol.isExplosionDone(p) then
       table.remove(wanted.patrols, i)
+    end
+  end
+
+  -- Firebird burn DoT: tick burn damage on burning patrol ships
+  for _, p in ipairs(wanted.patrols) do
+    if p.burnTimer and p.burnTimer > 0 and not p.dead then
+      p.burnTimer = p.burnTimer - dt
+      p.burnTickTimer = (p.burnTickTimer or 0) + dt
+      if p.burnTickTimer >= 1.0 then
+        p.burnTickTimer = p.burnTickTimer - 1.0
+        local destroyed = patrol.damage(p, p.burnDamage or 1)
+        if destroyed then
+          gameState.score = gameState.score + p.score
+          wanted.onPatrolDestroyed(p, gameState.width, gameState.height)
+        end
+      end
+      if p.burnTimer <= 0 then
+        p.burnTimer = nil
+        p.burnDamage = nil
+        p.burnTickTimer = nil
+      end
     end
   end
 end
@@ -1819,6 +2414,300 @@ function M.updateSpaceEvents(dt)
   end
 end
 
+-- ===================== ENCOUNTER SYSTEM =====================
+-- Zone-based enemy spawning with Starfox-style formations
+
+function M.rollEncounterOnTileEntry()
+  local chances = encounter.getSpawnChances(worldmap.tileX, worldmap.tileY)
+
+  -- Roll for each difficulty tier independently
+  local spawnedAny = false
+
+  -- Easy enemies
+  if math.random() < chances.easy then
+    local enemies = encounter.spawnFormation(encounter.DIFFICULTY_EASY,
+      gameState.width, gameState.height, gameState.ship.x, gameState.ship.y)
+    for _, e in ipairs(enemies) do
+      table.insert(encounterState.enemies, e)
+    end
+    if #enemies > 0 then spawnedAny = true end
+  end
+
+  -- Medium enemies (additional, on top of easy)
+  if chances.medium > 0 and math.random() < chances.medium then
+    local enemies = encounter.spawnFormation(encounter.DIFFICULTY_MEDIUM,
+      gameState.width, gameState.height, gameState.ship.x, gameState.ship.y)
+    for _, e in ipairs(enemies) do
+      table.insert(encounterState.enemies, e)
+    end
+    if #enemies > 0 then spawnedAny = true end
+  end
+
+  -- Hard enemies (additional)
+  if chances.hard > 0 and math.random() < chances.hard then
+    local enemies = encounter.spawnFormation(encounter.DIFFICULTY_HARD,
+      gameState.width, gameState.height, gameState.ship.x, gameState.ship.y)
+    for _, e in ipairs(enemies) do
+      table.insert(encounterState.enemies, e)
+    end
+    if #enemies > 0 then spawnedAny = true end
+  end
+
+  -- Kraken (1/50 chance in Outer Space rings 4-5, only if not defeated)
+  if chances.kraken > 0 and not krakenDefeated and math.random() < chances.kraken then
+    krakenState = kraken.new(gameState.width, gameState.height)
+    kraken.spawn(krakenState)
+    encounterState.encounterMessage = "⚠ THE KRAKEN AWAKENS! ⚠"
+    encounterState.encounterMessageTimer = 4.0
+    encounterState.encounterMessageColor = {1, 0.2, 0.3}
+    return  -- Kraken overrides normal encounters
+  end
+
+  if spawnedAny then
+    encounterState.encounterMessage = "⚠ HOSTILE CONTACTS DETECTED!"
+    encounterState.encounterMessageTimer = 3.0
+    encounterState.encounterMessageColor = {1, 0.6, 0.2}
+  end
+end
+
+function M.updateEncounters(dt)
+  -- Don't run at stations/portals
+  if worldmap.isAtStation() or worldmap.isAtPortal() then return end
+
+  -- Encounter message timer
+  if encounterState.encounterMessageTimer > 0 then
+    encounterState.encounterMessageTimer = encounterState.encounterMessageTimer - dt
+  end
+
+  -- Damage immunity timer
+  if encounterState.damageImmune > 0 then
+    encounterState.damageImmune = encounterState.damageImmune - dt
+  end
+
+  -- Periodic spawn timer (additional waves while exploring)
+  encounterState.spawnTimer = encounterState.spawnTimer + dt
+  if encounterState.spawnTimer >= encounterState.spawnInterval then
+    encounterState.spawnTimer = 0
+    encounterState.spawnInterval = 10 + math.random() * 15  -- 10-25s between checks
+    -- Only roll if fewer than 6 enemies on screen
+    if #encounterState.enemies < 6 then
+      M.rollEncounterOnTileEntry()
+    end
+  end
+
+  -- Update enemies
+  for i = #encounterState.enemies, 1, -1 do
+    local e = encounterState.enemies[i]
+    encounter.updateEnemy(e, dt, gameState.ship.x, gameState.ship.y, gameState.width, gameState.height)
+
+    -- Update mines for bombers
+    if e.mines and #e.mines > 0 then
+      encounter.updateMines(e, dt)
+    end
+
+    -- Shoot at player
+    local shots = encounter.getShots(e, gameState.ship.x, gameState.ship.y)
+    for _, shot in ipairs(shots) do
+      table.insert(gameState.bullets, shot)
+    end
+
+    -- Remove expired enemies (off-screen or explosion done)
+    if encounter.isExplosionDone(e) then
+      table.remove(encounterState.enemies, i)
+    elseif not e.dead and encounter.isOffScreen(e, gameState.width, gameState.height, 300) then
+      table.remove(encounterState.enemies, i)
+    end
+  end
+
+  -- Bullet vs encounter enemies
+  if not gameState.ship.dead and not gameState.ship.exploding then
+    for bi = #gameState.bullets, 1, -1 do
+      local b = gameState.bullets[bi]
+      if b.owner == "player" then
+        for ei = #encounterState.enemies, 1, -1 do
+          local e = encounterState.enemies[ei]
+          if not e.dead and not e.warpingIn then
+            local dx = b.x - e.x
+            local dy = b.y - e.y
+            local dist = math.sqrt(dx * dx + dy * dy)
+            if dist < e.size + (b.size or 4) then
+              local killed = encounter.takeDamage(e, b.damage or 1)
+              if killed then
+                gameState.score = gameState.score + e.score
+                -- Chance to drop powerup
+                if math.random() < 0.2 then
+                  table.insert(gameState.powerups, powerup.new(e.x, e.y))
+                end
+              end
+              table.remove(gameState.bullets, bi)
+              break
+            end
+          end
+        end
+      end
+    end
+  end
+
+  -- Enemy bullets hitting the player
+  if not gameState.ship.dead and not gameState.ship.exploding and encounterState.damageImmune <= 0 then
+    for bi = #gameState.bullets, 1, -1 do
+      local b = gameState.bullets[bi]
+      if b.enemyBullet then
+        local dx = b.x - gameState.ship.x
+        local dy = b.y - gameState.ship.y
+        local dist = math.sqrt(dx * dx + dy * dy)
+        if dist < (gameState.ship.size or 12) + (b.size or 4) then
+          if gameState.ship.shieldActive then
+            deflectBullet(b, 3)
+          else
+            local dmg = b.damage or 8
+            gameState.health = gameState.health - dmg
+            gameState.damageTimer = 3
+            if gameState.health <= 0 then ship.die(gameState.ship) end
+            table.remove(gameState.bullets, bi)
+          end
+          encounterState.damageImmune = 0.3  -- brief immunity
+        end
+      end
+    end
+  end
+
+  -- Contact damage from enemies
+  if not gameState.ship.dead and not gameState.ship.exploding and encounterState.damageImmune <= 0 then
+    for _, e in ipairs(encounterState.enemies) do
+      if not e.dead and not e.warpingIn then
+        local dx = gameState.ship.x - e.x
+        local dy = gameState.ship.y - e.y
+        local dist = math.sqrt(dx * dx + dy * dy)
+        if dist < (gameState.ship.size or 12) + e.size then
+          local dmg = 10
+          if gameState.ship.shieldActive then
+            gameState.ship.shieldEnergy = gameState.ship.shieldEnergy - dmg
+            if gameState.ship.shieldEnergy <= 0 then
+              gameState.ship.shieldEnergy = 0
+              gameState.ship.shieldActive = false
+            end
+          else
+            gameState.health = gameState.health - dmg
+            gameState.damageTimer = 3
+            if gameState.health <= 0 then ship.die(gameState.ship) end
+          end
+          encounterState.damageImmune = 0.5
+        end
+
+        -- Mine collision
+        if e.mines then
+          local mineDmg = encounter.checkMineCollision(e, gameState.ship.x, gameState.ship.y, gameState.ship.size or 12)
+          if mineDmg > 0 then
+            if gameState.ship.shieldActive then
+              gameState.ship.shieldEnergy = gameState.ship.shieldEnergy - mineDmg
+              if gameState.ship.shieldEnergy <= 0 then
+                gameState.ship.shieldEnergy = 0
+                gameState.ship.shieldActive = false
+              end
+            else
+              gameState.health = gameState.health - mineDmg
+              gameState.damageTimer = 3
+              if gameState.health <= 0 then ship.die(gameState.ship) end
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
+-- ===================== KRAKEN BOSS UPDATE =====================
+
+function M.updateKraken(dt)
+  if not krakenState or not krakenState.active then
+    -- Check for Trident drop pickup
+    if krakenState and kraken.hasTridentDrop(krakenState) then
+      local collected = kraken.updateTridentDrop(krakenState, dt,
+        gameState.ship.x, gameState.ship.y, gameState.ship.size or 12)
+      if collected then
+        hasTrident = true
+        krakenDefeated = true
+        constellation.hasTrident = true
+        tridentBannerTimer = 5.0
+        encounterState.encounterMessage = "🔱 THE TRIDENT ACQUIRED!"
+        encounterState.encounterMessageTimer = 4.0
+        encounterState.encounterMessageColor = {0.4, 0.8, 1.0}
+      end
+    end
+    return
+  end
+
+  kraken.update(krakenState, dt, gameState.ship.x, gameState.ship.y)
+
+  -- Vortex pull on player
+  if krakenState.vortexActive and not gameState.ship.dead and not gameState.ship.exploding then
+    local pullX, pullY = kraken.getVortexPull(krakenState, gameState.ship.x, gameState.ship.y)
+    gameState.ship.vx = gameState.ship.vx + pullX * dt
+    gameState.ship.vy = gameState.ship.vy + pullY * dt
+  end
+
+  -- Player bullets vs Kraken
+  if not gameState.ship.dead and not gameState.ship.exploding then
+    for bi = #gameState.bullets, 1, -1 do
+      local b = gameState.bullets[bi]
+      if b.owner == "player" then
+        if kraken.checkBulletHit(krakenState, b.x, b.y, b.size or 4) then
+          local defeated = kraken.takeDamage(krakenState, b.damage or 1)
+          if defeated then
+            gameState.score = gameState.score + 5000
+          end
+          table.remove(gameState.bullets, bi)
+        end
+      end
+    end
+  end
+
+  -- Kraken damage to player
+  if not gameState.ship.dead and not gameState.ship.exploding and encounterState.damageImmune <= 0 then
+    -- Tentacle / body contact damage
+    local contactDmg = kraken.checkTentacleDamage(krakenState,
+      gameState.ship.x, gameState.ship.y, gameState.ship.size or 12)
+    if contactDmg > 0 then
+      if gameState.ship.shieldActive then
+        gameState.ship.shieldEnergy = gameState.ship.shieldEnergy - contactDmg
+        if gameState.ship.shieldEnergy <= 0 then
+          gameState.ship.shieldEnergy = 0
+          gameState.ship.shieldActive = false
+        end
+      else
+        gameState.health = gameState.health - contactDmg
+        gameState.damageTimer = 3
+        if gameState.health <= 0 then ship.die(gameState.ship) end
+      end
+      encounterState.damageImmune = 0.5
+    end
+
+    -- Ink damage
+    local inkDmg = kraken.checkInkDamage(krakenState,
+      gameState.ship.x, gameState.ship.y, gameState.ship.size or 12)
+    if inkDmg > 0 and encounterState.damageImmune <= 0 then
+      if gameState.ship.shieldActive then
+        gameState.ship.shieldEnergy = gameState.ship.shieldEnergy - inkDmg
+        if gameState.ship.shieldEnergy <= 0 then
+          gameState.ship.shieldEnergy = 0
+          gameState.ship.shieldActive = false
+        end
+      else
+        gameState.health = gameState.health - inkDmg
+        gameState.damageTimer = 3
+        if gameState.health <= 0 then ship.die(gameState.ship) end
+      end
+      encounterState.damageImmune = 0.3
+    end
+  end
+
+  -- Trident banner timer
+  if tridentBannerTimer > 0 then
+    tridentBannerTimer = tridentBannerTimer - dt
+  end
+end
+
 function M.updateStationLanding(dt)
   local helipads = worldmap.getHelipads()
   local closestPad = nil
@@ -1893,7 +2782,18 @@ function M.checkCollisions()
       local dist = math.sqrt((b.x - a.x)^2 + (b.y - a.y)^2)
 
       if dist < asteroid.getRadius(a) and b.owner == "player" then
-        local splits, score = asteroid.split(a)
+        -- Firebird meltsIce: icy asteroids shatter completely (no splits)
+        local inIcy = constellation.getAsteroidVisuals(worldmap.tileX, worldmap.tileY).icy
+        local melt = inIcy and b.meltsIce
+        local splits, score
+        if melt then
+          splits = {}  -- No child asteroids when melting ice
+          score = asteroid.SIZES[a.size] and asteroid.SIZES[a.size].score or 100
+          -- Bonus score for melting
+          score = math.floor(score * 1.5)
+        else
+          splits, score = asteroid.split(a)
+        end
 
         -- Combo system
         comboState.count = comboState.count + 1
@@ -1915,6 +2815,24 @@ function M.checkCollisions()
           table.insert(gameState.particles, p)
         end
 
+        -- Extra steam particles when melting icy asteroids
+        if melt then
+          for k = 1, 8 do
+            local angle = (k / 8) * math.pi * 2
+            local speed = 30 + math.random() * 50
+            table.insert(gameState.particles, {
+              x = a.x, y = a.y,
+              vx = math.cos(angle) * speed,
+              vy = math.sin(angle) * speed,
+              lifetime = 0.8 + math.random() * 0.5,
+              maxLife = 1.3,
+              size = 3 + math.random() * 3,
+              color = {0.5, 0.8, 1.0},
+              alpha = 0.7,
+            })
+          end
+        end
+
         -- Powerup drop from asteroids (small chance, higher for small asteroids)
         local dropChance = a.size == "small" and 0.15 or (a.size == "medium" and 0.08 or 0.04)
         if math.random() < dropChance then
@@ -1927,6 +2845,9 @@ function M.checkCollisions()
         if b.isMissile then
           M.triggerMissileExplosion(b.x, b.y)
         end
+
+        -- Chain lightning: arc to nearby targets (Djolt Muse power)
+        triggerChainLightning(a.x, a.y, j, "asteroid")
 
         table.remove(gameState.bullets, i)
         break
@@ -1956,6 +2877,9 @@ function M.checkCollisions()
         if b.isMissile then
           M.triggerMissileExplosion(b.x, b.y)
         end
+
+        -- Chain lightning: arc to nearby targets (Djolt Muse power)
+        triggerChainLightning(u.x, u.y, j, "ufo")
 
         table.remove(gameState.bullets, i)
         break
@@ -2022,21 +2946,65 @@ function M.checkCollisions()
 
         if dist < gameState.ship.size then
           if gameState.ship.shieldActive then
-            gameState.ship.shieldEnergy = gameState.ship.shieldEnergy - 15
-            if gameState.ship.shieldEnergy <= 0 then
-              gameState.ship.shieldEnergy = 0
-              gameState.ship.shieldActive = false
-            end
+            deflectBullet(b, 4)
           else
             gameState.health = gameState.health - 15
             gameState.damageTimer = 3
-          end
-          table.remove(gameState.bullets, i)
+            table.remove(gameState.bullets, i)
 
-          -- Check if health depleted
-          if not gameState.ship.shieldActive and gameState.health <= 0 then
-            ship.die(gameState.ship)
+            -- Check if health depleted
+            if gameState.health <= 0 then
+              ship.die(gameState.ship)
+            end
           end
+        end
+      elseif b.owner == "boss" then
+        -- Orion dungeon boss bullets damage the player
+        local dist = math.sqrt((gameState.ship.x - b.x)^2 + (gameState.ship.y - b.y)^2)
+        if dist < gameState.ship.size + (b.size or 5) then
+          if gameState.ship.shieldActive then
+            deflectBullet(b, 5)
+          else
+            local dmg = b.damage or 15
+            gameState.health = gameState.health - dmg
+            gameState.damageTimer = 3
+            if gameState.health <= 0 then
+              ship.die(gameState.ship)
+            end
+            table.remove(gameState.bullets, i)
+          end
+          gameState.ship.shieldTimer = 0.3
+          gameState.ship.invulnerable = true
+        end
+      elseif b.owner == "boss_messier" then
+        local dist = math.sqrt((gameState.ship.x - b.x)^2 + (gameState.ship.y - b.y)^2)
+        if dist < gameState.ship.size + (b.size or 6) then
+          if gameState.ship.shieldActive then
+            deflectBullet(b, 5)
+          else
+            local dmg = b.damage or 15
+            gameState.health = gameState.health - dmg
+            gameState.damageTimer = 3
+            if gameState.health <= 0 then ship.die(gameState.ship) end
+            table.remove(gameState.bullets, i)
+          end
+          gameState.ship.shieldTimer = 0.3
+          gameState.ship.invulnerable = true
+        end
+      elseif b.owner == "boss_outer" then
+        local dist = math.sqrt((gameState.ship.x - b.x)^2 + (gameState.ship.y - b.y)^2)
+        if dist < gameState.ship.size + (b.size or 5) then
+          if gameState.ship.shieldActive then
+            deflectBullet(b, 5)
+          else
+            local dmg = b.damage or 12
+            gameState.health = gameState.health - dmg
+            gameState.damageTimer = 3
+            if gameState.health <= 0 then ship.die(gameState.ship) end
+            table.remove(gameState.bullets, i)
+          end
+          gameState.ship.shieldTimer = 0.3
+          gameState.ship.invulnerable = true
         end
       end
     end
@@ -2059,6 +3027,19 @@ function M.checkCollisions()
           timeSlowState.active = true
           timeSlowState.timer = result.timeslow
           timeSlowState.duration = result.timeslow
+        end
+        if result.spreadbeam then
+          -- Trigger boss fight: seal the tile and spawn the boss
+          orionDungeon.onSpreadBeamCollected()
+          spreadBeamBannerTimer = 3.0
+        end
+        if result.hyperbeam then
+          messierDungeon.onHyperBeamCollected()
+          hyperBeamBannerTimer = 3.0
+        end
+        if result.seeker then
+          outerDungeon.onSeekerMissilesCollected()
+          seekerMissileBannerTimer = 3.0
         end
       end
       -- Show pickup message
@@ -2087,6 +3068,11 @@ function M.checkCollisions()
           if dist < p.size then
             wanted.onPatrolHit(p, gameState.width, gameState.height)
             local destroyed = patrol.damage(p, 1)
+            -- Apply Firebird burn DoT on hit
+            if not destroyed and b.burnDamage and b.burnDuration then
+              p.burnDamage = b.burnDamage
+              p.burnTimer = b.burnDuration
+            end
             if destroyed then
               gameState.score = gameState.score + p.score
               wanted.onPatrolDestroyed(p, gameState.width, gameState.height)
@@ -2107,17 +3093,8 @@ function M.checkCollisions()
         local dist = math.sqrt((gameState.ship.x - b.x)^2 + (gameState.ship.y - b.y)^2)
         if dist < gameState.ship.size then
           if gameState.ship.shieldActive then
-            -- Shield absorbs patrol bullets
-            local dmg = (b.patrolDamage and b.patrolDamage > 0) and b.patrolDamage or 10
-            gameState.ship.shieldEnergy = gameState.ship.shieldEnergy - dmg
-            if gameState.ship.shieldEnergy <= 0 then
-              gameState.ship.shieldEnergy = 0
-              gameState.ship.shieldActive = false
-            end
-            -- Slow still applies through shield
-            if b.slowEffect and b.slowEffect > 0 then
-              ship.applySlow(gameState.ship, b.slowEffect * 0.5, (b.slowDuration or 2.0) * 0.5)
-            end
+            -- Shield deflects patrol bullets
+            deflectBullet(b, 4)
           else
             -- Apply slow effect
             if b.slowEffect and b.slowEffect > 0 then
@@ -2135,8 +3112,8 @@ function M.checkCollisions()
                 end
               end
             end
+            table.remove(gameState.bullets, i)
           end
-          table.remove(gameState.bullets, i)
         end
       end
     end
@@ -2393,6 +3370,116 @@ function M.drawStarfoxShip(s)
       sz * 0.35, -sz * 0.25
     )
 
+  elseif shipType == "Muscle" then
+    -- 1969 Pontiac GTO-inspired: wide, aggressive, muscular lines
+    -- Hood scoop and split grille silhouette — viewed top-down as a spaceship
+
+    -- Main body — wide, flat, aggressive GTO-style proportions
+    love.graphics.setColor(color[1], color[2], color[3])
+    love.graphics.polygon("fill",
+      0, -sz * 1.1,                    -- nose tip
+      -sz * 0.25, -sz * 0.7,          -- fender line start
+      -sz * 0.55, -sz * 0.15,         -- wide shoulder (GTO fender bulge)
+      -sz * 0.55, sz * 0.5,           -- rear quarter panel
+      -sz * 0.35, sz * 0.65,          -- rear taper
+      0, sz * 0.55,                    -- rear center
+      sz * 0.35, sz * 0.65,
+      sz * 0.55, sz * 0.5,
+      sz * 0.55, -sz * 0.15,
+      sz * 0.25, -sz * 0.7
+    )
+
+    -- Hood scoop (raised center ridge — the GTO's signature)
+    love.graphics.setColor(color[1] * 0.6, color[2] * 0.6, color[3] * 0.6)
+    love.graphics.polygon("fill",
+      0, -sz * 0.9,
+      -sz * 0.08, -sz * 0.5,
+      -sz * 0.10, -sz * 0.1,
+      sz * 0.10, -sz * 0.1,
+      sz * 0.08, -sz * 0.5
+    )
+
+    -- Fender flares — wide muscular wings
+    love.graphics.setColor(accent[1] * 0.8, accent[2] * 0.8, accent[3] * 0.8, 0.85)
+    love.graphics.polygon("fill",
+      -sz * 0.5, -sz * 0.1,
+      -sz * 1.0, sz * 0.2,
+      -sz * 0.95, sz * 0.45,
+      -sz * 0.52, sz * 0.45
+    )
+    love.graphics.polygon("fill",
+      sz * 0.5, -sz * 0.1,
+      sz * 1.0, sz * 0.2,
+      sz * 0.95, sz * 0.45,
+      sz * 0.52, sz * 0.45
+    )
+
+    -- Rear spoiler ridge
+    love.graphics.setColor(color[1] * 0.5, color[2] * 0.5, color[3] * 0.5)
+    love.graphics.rectangle("fill", -sz * 0.45, sz * 0.52, sz * 0.9, sz * 0.08)
+
+    -- Split grille detail (twin nostril look)
+    love.graphics.setColor(0.15, 0.05, 0.05, 0.8)
+    love.graphics.rectangle("fill", -sz * 0.18, -sz * 0.75, sz * 0.12, sz * 0.12)
+    love.graphics.rectangle("fill",  sz * 0.06, -sz * 0.75, sz * 0.12, sz * 0.12)
+
+    -- Headlight accents (hidden headlights popped up)
+    love.graphics.setColor(1, 0.85, 0.5, 0.6 + math.sin(t * 4) * 0.2)
+    love.graphics.circle("fill", -sz * 0.3, -sz * 0.55, 3)
+    love.graphics.circle("fill",  sz * 0.3, -sz * 0.55, 3)
+
+    -- Cockpit (tinted T-top style)
+    love.graphics.setColor(0.3, 0.15, 0.1, 0.8)
+    love.graphics.polygon("fill",
+      0, -sz * 0.4,
+      -sz * 0.15, -sz * 0.1,
+      -sz * 0.15, sz * 0.15,
+      sz * 0.15, sz * 0.15,
+      sz * 0.15, -sz * 0.1
+    )
+
+    -- Gentle red fire effect — subtle heat shimmer emanating from the ship
+    local fireGlow = math.sin(t * 3) * 0.15 + 0.35
+    -- Soft outer aura
+    love.graphics.setColor(0.9, 0.15, 0.05, fireGlow * 0.08)
+    love.graphics.circle("fill", 0, 0, sz * 1.4)
+    -- Warm inner glow
+    love.graphics.setColor(1, 0.3, 0.08, fireGlow * 0.12)
+    love.graphics.circle("fill", 0, 0, sz * 0.8)
+    -- Flickering ember wisps around the hull
+    for fi = 1, 6 do
+      local fAngle = t * 1.5 + fi * 1.047  -- evenly spaced
+      local fDist = sz * (0.6 + math.sin(t * 4 + fi * 2) * 0.15)
+      local fx = math.cos(fAngle) * fDist
+      local fy = math.sin(fAngle) * fDist
+      local fAlpha = 0.15 + math.sin(t * 6 + fi * 3) * 0.1
+      love.graphics.setColor(1, 0.35 + math.sin(t * 5 + fi) * 0.15, 0.05, fAlpha)
+      love.graphics.circle("fill", fx, fy, 2 + math.sin(t * 7 + fi) * 0.8)
+    end
+
+    -- Racing stripe down center (GTO aesthetic)
+    love.graphics.setColor(accent[1], accent[2], accent[3], 0.5)
+    love.graphics.setLineWidth(2)
+    love.graphics.line(0, -sz * 1.0, 0, sz * 0.5)
+    love.graphics.setLineWidth(1)
+
+    -- Hull outline highlight
+    love.graphics.setColor(1, 0.4, 0.15, 0.3)
+    love.graphics.setLineWidth(1.5)
+    love.graphics.polygon("line",
+      0, -sz * 1.1,
+      -sz * 0.25, -sz * 0.7,
+      -sz * 0.55, -sz * 0.15,
+      -sz * 0.55, sz * 0.5,
+      -sz * 0.35, sz * 0.65,
+      0, sz * 0.55,
+      sz * 0.35, sz * 0.65,
+      sz * 0.55, sz * 0.5,
+      sz * 0.55, -sz * 0.15,
+      sz * 0.25, -sz * 0.7
+    )
+    love.graphics.setLineWidth(1)
+
   else  -- "Balanced" / default (Starwing)
     -- Classic arrowhead with moderate wings
     -- Fuselage
@@ -2603,13 +3690,36 @@ function M.drawPortal()
 end
 
 function M.drawHUD()
-  -- Set base HUD font (cached, not setNewFont)
-  love.graphics.setFont(ui.getFont("hud"))
+  local hx = 10  -- HUD left margin
+  local hy = 8   -- HUD top margin
+  local panelW = 320
+  local barW = 300
+  local barH = 44
 
-  -- Health bar
+  -- ─── Background panel ───
+  love.graphics.setColor(0.05, 0.05, 0.1, 0.55)
+  -- Calculate panel height dynamically
+  local panelH = 220
+  -- Count active powerups to extend panel
+  local powerupCount = 0
+  if ship.hasMultishot(gameState.ship) then powerupCount = powerupCount + 1 end
+  if ship.hasSpeedBoost(gameState.ship) then powerupCount = powerupCount + 1 end
+  if ship.hasMagnet(gameState.ship) then powerupCount = powerupCount + 1 end
+  if gameState.ship.rapidFireTimer > 0 then powerupCount = powerupCount + 1 end
+  if timeSlowState.active then powerupCount = powerupCount + 1 end
+  if ship.hasSpreadBeam(gameState.ship) then powerupCount = powerupCount + 1 end
+  if ship.hasHyperBeam(gameState.ship) then powerupCount = powerupCount + 1 end
+  if ship.hasSeeker(gameState.ship) then powerupCount = powerupCount + 1 end
+  if powerupCount > 0 then panelH = panelH + 6 + powerupCount * 18 end
+  love.graphics.rectangle("fill", hx - 4, hy - 4, panelW, panelH, 6, 6)
+  love.graphics.setColor(0.3, 0.4, 0.6, 0.25)
+  love.graphics.setLineWidth(1)
+  love.graphics.rectangle("line", hx - 4, hy - 4, panelW, panelH, 6, 6)
+
+  -- ─── Health bar ───
   local healthPercent = math.max(0, gameState.health / gameState.maxHealth)
-  love.graphics.setColor(0.2, 0.2, 0.2)
-  love.graphics.rectangle("fill", 10, 10, 200, 20)
+  love.graphics.setColor(0.15, 0.15, 0.2)
+  love.graphics.rectangle("fill", hx, hy, barW, barH, 4, 4)
   if healthPercent > 0.5 then
     love.graphics.setColor(0.2, 0.8, 0.3)
   elseif healthPercent > 0.25 then
@@ -2617,119 +3727,120 @@ function M.drawHUD()
   else
     love.graphics.setColor(0.9, 0.2, 0.2)
   end
-  love.graphics.rectangle("fill", 10, 10, 200 * healthPercent, 20)
-  love.graphics.setColor(1, 1, 1)
-  love.graphics.rectangle("line", 10, 10, 200, 20)
+  love.graphics.rectangle("fill", hx, hy, barW * healthPercent, barH, 4, 4)
+  love.graphics.setColor(0.5, 0.5, 0.6, 0.6)
+  love.graphics.rectangle("line", hx, hy, barW, barH, 4, 4)
+  love.graphics.setFont(ui.getFont("hud"))
+  love.graphics.setColor(1, 1, 1, 0.9)
+  love.graphics.printf(math.floor(gameState.health) .. " / " .. gameState.maxHealth, hx, hy + 12, barW, "center")
 
-  -- Lives display (small ship icons)
-  love.graphics.setColor(1, 1, 1)
-  love.graphics.print("Lives:", 10, 35)
+  -- ─── Lives ───
+  local livesY = hy + barH + 8
+  love.graphics.setFont(ui.getFont("hud"))
+  love.graphics.setColor(0.7, 0.7, 0.8, 0.7)
+  love.graphics.print("LIVES", hx, livesY)
   for i = 1, (gameState.ship.lives or 0) do
-    local lx = 60 + (i - 1) * 20
-    local ly = 42
-    love.graphics.setColor(0.3, 0.5, 1.0)
+    local lx = hx + 68 + (i - 1) * 32
+    local ly = livesY + 10
+    love.graphics.setColor(0.3, 0.5, 1.0, 0.9)
     love.graphics.polygon("fill",
-      lx, ly - 6,
-      lx - 5, ly + 4,
-      lx, ly + 2,
-      lx + 5, ly + 4
+      lx, ly - 12,
+      lx - 10, ly + 8,
+      lx, ly + 3,
+      lx + 10, ly + 8
     )
   end
 
-  -- Score
-  love.graphics.setColor(1, 1, 1)
-  love.graphics.print("Score: " .. gameState.score, 10, 55)
+  -- ─── Divider ───
+  local divY = livesY + 32
+  love.graphics.setColor(0.3, 0.4, 0.5, 0.3)
+  love.graphics.line(hx, divY, hx + barW, divY)
 
-  -- Tile coordinates
-  love.graphics.setColor(0.7, 0.7, 0.8)
-  local tile = worldmap.getCurrentTile()
-  local coords = "(" .. worldmap.tileX .. ", " .. worldmap.tileY .. ")"
-  local constellationName = worldmap.getConstellationName()
-  love.graphics.print(constellationName .. " " .. coords, 10, 75)
-
-  -- Shield energy bar
+  -- ─── Shield bar ───
+  local shieldY = divY + 5
+  local shieldW = 260
+  local shieldH = 32
   local shieldPct = gameState.ship.shieldEnergy / gameState.ship.shieldMaxEnergy
-  love.graphics.setColor(0.15, 0.15, 0.2)
-  love.graphics.rectangle("fill", 10, 95, 150, 14)
+  love.graphics.setColor(0.1, 0.1, 0.15)
+  love.graphics.rectangle("fill", hx, shieldY, shieldW, shieldH, 3, 3)
   if gameState.ship.shieldActive then
     love.graphics.setColor(0.3, 0.6, 1, 0.9)
   else
-    love.graphics.setColor(0.2, 0.4, 0.7, 0.7)
+    love.graphics.setColor(0.2, 0.4, 0.7, 0.6)
   end
-  love.graphics.rectangle("fill", 10, 95, 150 * shieldPct, 14)
-  love.graphics.setColor(0.4, 0.6, 0.9)
-  love.graphics.rectangle("line", 10, 95, 150, 14)
-  love.graphics.setFont(ui.getFont("hudSmall"))
-  love.graphics.setColor(1, 1, 1, 0.8)
-  love.graphics.print("SHIELD [S]", 12, 96)
-
-  -- Missile count
+  love.graphics.rectangle("fill", hx, shieldY, shieldW * shieldPct, shieldH, 3, 3)
+  love.graphics.setColor(0.4, 0.6, 0.9, 0.5)
+  love.graphics.rectangle("line", hx, shieldY, shieldW, shieldH, 3, 3)
   love.graphics.setFont(ui.getFont("hudLabel"))
-  love.graphics.setColor(1, 0.35, 0.1)
-  love.graphics.print("MISSILES: ", 10, 114)
+  love.graphics.setColor(0.8, 0.9, 1, 0.8)
+  love.graphics.printf("SHIELD [S]", hx, shieldY + 8, shieldW, "center")
+
+  -- ─── Missiles + Bombs ───
+  local ammoY = shieldY + shieldH + 10
+  love.graphics.setFont(ui.getFont("hud"))
+
   if gameState.ship.maxMissiles > 0 then
-    for i = 1, gameState.ship.maxMissiles do
-      local mx = 85 + (i - 1) * 14
-      if i <= gameState.ship.missiles then
-        -- Filled missile icon
-        love.graphics.setColor(1, 0.3, 0.1)
-        love.graphics.polygon("fill", mx, 117, mx - 3, 126, mx + 3, 126)
-        love.graphics.setColor(1, 0.6, 0.3)
-        love.graphics.polygon("line", mx, 117, mx - 3, 126, mx + 3, 126)
-      else
-        -- Empty missile slot
-        love.graphics.setColor(0.4, 0.2, 0.1, 0.5)
-        love.graphics.polygon("line", mx, 117, mx - 3, 126, mx + 3, 126)
-      end
-    end
+    love.graphics.setColor(1, 0.35, 0.1, 0.9)
+    love.graphics.print("MISSILES x " .. gameState.ship.missiles, hx, ammoY)
+    ammoY = ammoY + 22
+  end
+
+  local bombCount = gameState.ship.bombs or 0
+  if bombCount > 0 then
+    love.graphics.setColor(0.75, 0.75, 0.8, 0.9)
   else
-    love.graphics.setColor(0.5, 0.5, 0.5)
-    love.graphics.print("--", 85, 114)
+    love.graphics.setColor(0.4, 0.4, 0.45, 0.5)
   end
+  love.graphics.print("BOMB x " .. bombCount, hx, ammoY)
 
-  -- Bomb count
-  love.graphics.setFont(ui.getFont("hudLabel"))
-  love.graphics.setColor(1, 0.7, 0.2)
-  love.graphics.print("BOMBS [B]: ", 10, 132)
-  for i = 1, gameState.ship.bombs do
-    local bx = 100 + (i - 1) * 16
-    love.graphics.setColor(1, 0.5, 0.1)
-    love.graphics.circle("fill", bx, 139, 5)
-    love.graphics.setColor(1, 0.8, 0.3)
-    love.graphics.circle("line", bx, 139, 5)
-  end
-  if gameState.ship.bombs == 0 then
-    love.graphics.setColor(0.5, 0.5, 0.5)
-    love.graphics.print("NONE", 100, 132)
-  end
+  -- ─── Active powerups ───
+  local activeY = ammoY + 28
+  if powerupCount > 0 then
+    love.graphics.setColor(0.3, 0.4, 0.5, 0.3)
+    love.graphics.line(hx, activeY - 2, hx + barW, activeY - 2)
+    activeY = activeY + 3
 
-  -- Active powerup indicators
-  local activeY = 154
-  love.graphics.setFont(ui.getFont("hudSmall"))
-  if ship.hasMultishot(gameState.ship) then
-    love.graphics.setColor(1, 0.2, 0.8, 0.9)
-    love.graphics.print("● MULTI-SHOT " .. math.ceil(gameState.ship.multishotTimer) .. "s", 10, activeY)
-    activeY = activeY + 16
-  end
-  if ship.hasSpeedBoost(gameState.ship) then
-    love.graphics.setColor(0.2, 1, 1, 0.9)
-    love.graphics.print("● SPEED BOOST " .. math.ceil(gameState.ship.speedBoostTimer) .. "s", 10, activeY)
-    activeY = activeY + 16
-  end
-  if ship.hasMagnet(gameState.ship) then
-    love.graphics.setColor(1, 1, 0.2, 0.9)
-    love.graphics.print("● MAGNET " .. math.ceil(gameState.ship.magnetTimer) .. "s", 10, activeY)
-    activeY = activeY + 16
-  end
-  if gameState.ship.rapidFireTimer > 0 then
-    love.graphics.setColor(1, 0.5, 0, 0.9)
-    love.graphics.print("● RAPID FIRE " .. math.ceil(gameState.ship.rapidFireTimer) .. "s", 10, activeY)
-    activeY = activeY + 16
-  end
-  if timeSlowState.active then
-    love.graphics.setColor(0.6, 0.3, 1, 0.9)
-    love.graphics.print("● TIME WARP " .. math.ceil(timeSlowState.timer) .. "s", 10, activeY)
-    activeY = activeY + 16
+    love.graphics.setFont(ui.getFont("hudLabel"))
+    if ship.hasMultishot(gameState.ship) then
+      love.graphics.setColor(1, 0.2, 0.8, 0.9)
+      love.graphics.print("● MULTI-SHOT " .. math.ceil(gameState.ship.multishotTimer) .. "s", hx, activeY)
+      activeY = activeY + 18
+    end
+    if ship.hasSpeedBoost(gameState.ship) then
+      love.graphics.setColor(0.2, 1, 1, 0.9)
+      love.graphics.print("● SPEED BOOST " .. math.ceil(gameState.ship.speedBoostTimer) .. "s", hx, activeY)
+      activeY = activeY + 18
+    end
+    if ship.hasMagnet(gameState.ship) then
+      love.graphics.setColor(1, 1, 0.2, 0.9)
+      love.graphics.print("● MAGNET " .. math.ceil(gameState.ship.magnetTimer) .. "s", hx, activeY)
+      activeY = activeY + 18
+    end
+    if gameState.ship.rapidFireTimer > 0 then
+      love.graphics.setColor(1, 0.5, 0, 0.9)
+      love.graphics.print("● RAPID FIRE " .. math.ceil(gameState.ship.rapidFireTimer) .. "s", hx, activeY)
+      activeY = activeY + 18
+    end
+    if timeSlowState.active then
+      love.graphics.setColor(0.6, 0.3, 1, 0.9)
+      love.graphics.print("● TIME WARP " .. math.ceil(timeSlowState.timer) .. "s", hx, activeY)
+      activeY = activeY + 18
+    end
+    if ship.hasSpreadBeam(gameState.ship) then
+      love.graphics.setColor(0.2, 1.0, 0.5, 0.9)
+      love.graphics.print("≋ SPREAD BEAM", hx, activeY)
+      activeY = activeY + 18
+    end
+    if ship.hasHyperBeam(gameState.ship) then
+      love.graphics.setColor(0.3, 0.9, 1.0, 0.9)
+      love.graphics.print("◈ HYPER BEAM", hx, activeY)
+      activeY = activeY + 18
+    end
+    if ship.hasSeeker(gameState.ship) then
+      love.graphics.setColor(0.8, 0.2, 0.2, 0.9)
+      love.graphics.print("⟳ SEEKER MISSILES", hx, activeY)
+      activeY = activeY + 18
+    end
   end
 
   -- Combo display
@@ -2757,6 +3868,41 @@ function M.drawHUD()
     love.graphics.printf(spaceEventState.message, 0, gameState.height / 2 - 100, gameState.width, "center")
   end
 
+  -- Encounter warning message
+  if encounterState.encounterMessageTimer > 0 then
+    love.graphics.setFont(ui.getFont("medium"))
+    local alpha = math.min(1, encounterState.encounterMessageTimer / 0.5)
+    love.graphics.setColor(encounterState.encounterMessageColor[1], encounterState.encounterMessageColor[2], encounterState.encounterMessageColor[3], alpha)
+    love.graphics.printf(encounterState.encounterMessage, 0, gameState.height / 2 - 140, gameState.width, "center")
+  end
+
+  -- Trident acquisition banner
+  if tridentBannerTimer > 0 then
+    local alpha = math.min(1, tridentBannerTimer / 1.0)
+    local glow = math.sin(love.timer.getTime() * 4) * 0.2 + 0.8
+
+    -- Background
+    love.graphics.setColor(0, 0, 0, alpha * 0.6)
+    love.graphics.rectangle("fill", 0, gameState.height / 2 - 50, gameState.width, 100)
+
+    -- Glow border
+    love.graphics.setColor(0.3, 0.7, 1.0, alpha * glow * 0.5)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", 20, gameState.height / 2 - 48, gameState.width - 40, 96)
+    love.graphics.setLineWidth(1)
+
+    -- Title
+    love.graphics.setFont(ui.getFont("medium"))
+    love.graphics.setColor(0.7, 0.9, 1.0, alpha * glow)
+    love.graphics.printf("🔱 THE TRIDENT 🔱", 0, gameState.height / 2 - 40, gameState.width, "center")
+
+    -- Description
+    love.graphics.setFont(ui.getFont("hudLabel"))
+    love.graphics.setColor(0.5, 0.8, 1.0, alpha * 0.9)
+    love.graphics.printf("You can now teleport anywhere in Outer Space!", 0, gameState.height / 2 + 5, gameState.width, "center")
+    love.graphics.printf("Open the World Map to fast travel.", 0, gameState.height / 2 + 25, gameState.width, "center")
+  end
+
   -- Minimap
   M.drawMinimap()
 
@@ -2775,13 +3921,13 @@ function M.drawMinimap()
 
   if tier == constellation.TIER_NEBULA then
     viewRadius = 3
-    cellSize = 14
+    cellSize = 28
   elseif tier == constellation.TIER_INNER_SPACE then
     viewRadius = 5 -- Show a 11x11 window centered on player (named constellations ±10)
-    cellSize = 8
+    cellSize = 16
   else
     viewRadius = 7 -- 15x15 window for full 63x63 world
-    cellSize = 6
+    cellSize = 12
   end
 
   local viewSize = (viewRadius * 2 + 1)
@@ -2855,11 +4001,15 @@ function M.drawMinimap()
   love.graphics.setColor(0.5, 0.5, 0.6)
   love.graphics.rectangle("line", mapX, mapY, mapSize, mapSize)
 
-  -- Constellation label below minimap
-  love.graphics.setFont(ui.getFont("hudSmall"))
+  -- Constellation label and coordinates below minimap
+  love.graphics.setFont(ui.getFont("mapSector"))
   love.graphics.setColor(0.6, 0.7, 0.8)
   local cName = worldmap.getConstellationName()
-  love.graphics.printf(cName, mapX, mapY + mapSize + 2, mapSize, "center")
+  love.graphics.printf(cName, mapX - 30, mapY + mapSize + 4, mapSize + 60, "center")
+  local coords = "(" .. worldmap.tileX .. ", " .. worldmap.tileY .. ")"
+  love.graphics.setFont(ui.getFont("mapCoords"))
+  love.graphics.setColor(0.5, 0.6, 0.7)
+  love.graphics.printf(coords, mapX - 30, mapY + mapSize + 24, mapSize + 60, "center")
 end
 
 function M.drawLandingUI()
@@ -2909,6 +4059,23 @@ function M.drawPlaying()
   -- Draw nebula background
   nebula.draw(gameState.width, gameState.height)
 
+  -- Draw dungeon background decorations (behind everything)
+  if dungeon.isActive() then
+    dungeon.drawBackground(gameState.width, gameState.height)
+    dungeon.drawHazardZones(gameState.width, gameState.height)
+    dungeon.drawWalls(gameState.width, gameState.height)
+  end
+
+  -- Draw Orion boss dungeon background (nebula pillar, node connection lines)
+  orionDungeon.drawBackground(gameState.width, gameState.height)
+  messierDungeon.drawBackground(gameState.width, gameState.height)
+  outerDungeon.drawBackground(gameState.width, gameState.height)
+
+  -- Draw Vela dungeon (full room rendering with enemies, boss, minimap)
+  if velaDungeon.isActive() then
+    velaDungeon.draw()
+  end
+
   -- Draw tile-specific content
   if worldmap.isAtStation() then
     M.drawStation()
@@ -2952,6 +4119,24 @@ function M.drawPlaying()
     end
   end
 
+  -- Seeker missile lock-on indicators (red dots on targeted enemies)
+  for _, a in ipairs(gameState.asteroids) do
+    if a.seekerLocked then
+      love.graphics.setColor(1, 0.1, 0.1, 0.9)
+      love.graphics.circle("line", a.x, a.y, (a.size or 20) + 6)
+      love.graphics.setColor(1, 0.2, 0.2, 0.7)
+      love.graphics.circle("fill", a.x, a.y, 5)
+    end
+  end
+  for _, u in ipairs(gameState.ufos) do
+    if u.seekerLocked then
+      love.graphics.setColor(1, 0.1, 0.1, 0.9)
+      love.graphics.circle("line", u.x, u.y, (u.size or 20) + 6)
+      love.graphics.setColor(1, 0.2, 0.2, 0.7)
+      love.graphics.circle("fill", u.x, u.y, 5)
+    end
+  end
+
   for _, b in ipairs(gameState.bullets) do
     -- Color patrol bullets differently
     if b.owner == "patrol" then
@@ -2959,13 +4144,82 @@ function M.drawPlaying()
       love.graphics.circle("fill", b.x, b.y, 3)
       love.graphics.setColor(1, 0.5, 0.5, 0.4)
       love.graphics.circle("fill", b.x, b.y, 6)
+    elseif b.owner == "boss" then
+      -- Orion boss bullets: rose/magenta
+      love.graphics.setColor(1, 0.3, 0.7, 0.95)
+      love.graphics.circle("fill", b.x, b.y, b.size or 5)
+      love.graphics.setColor(1, 0.6, 0.9, 0.3)
+      love.graphics.circle("fill", b.x, b.y, (b.size or 5) + 4)
+    elseif b.owner == "boss_messier" then
+      local lifeRatio = math.max(0, b.lifetime / 3.5)
+      love.graphics.setColor(0.9, 0.7, 0.1, lifeRatio * 0.4)
+      love.graphics.circle("fill", b.x, b.y, (b.size or 6) * 2.2)
+      love.graphics.setColor(1.0, 0.9, 0.3, lifeRatio * 0.95)
+      love.graphics.circle("fill", b.x, b.y, (b.size or 6))
+    elseif b.owner == "boss_outer" then
+      local lifeRatio = math.max(0, b.lifetime / 4.0)
+      love.graphics.setColor(0.5, 0.1, 0.7, lifeRatio * 0.4)
+      love.graphics.circle("fill", b.x, b.y, (b.size or 5) * 2.2)
+      love.graphics.setColor(0.7, 0.3, 1.0, lifeRatio * 0.9)
+      love.graphics.circle("fill", b.x, b.y, b.size or 5)
+    elseif b.dungeonBullet then
+      -- Dungeon turret bullets: themed color
+      local dId = dungeon.getDungeonId()
+      if dId == "megalith" then
+        love.graphics.setColor(0.3, 0.5, 1)
+      elseif dId == "dynamo" then
+        love.graphics.setColor(1, 0.6, 0.1)
+      elseif dId == "logician" then
+        love.graphics.setColor(0.7, 0.3, 1)
+      elseif dId == "synesthesia" then
+        love.graphics.setColor(0, 1, 0.5)
+      else
+        love.graphics.setColor(1, 0.5, 0.5)
+      end
+      love.graphics.circle("fill", b.x, b.y, 4)
+      love.graphics.setColor(1, 1, 1, 0.3)
+      love.graphics.circle("fill", b.x, b.y, 7)
     else
-      ui.drawBullet(b)
+      -- Firebird burn bullets: fire-colored with ember glow
+      if b.burnDamage and b.owner == "player" then
+        local flicker = 0.8 + 0.2 * math.sin((love.timer.getTime() + b.x * 0.01) * 12)
+        -- Outer ember glow
+        love.graphics.setColor(1, 0.3, 0.05, 0.25 * flicker)
+        love.graphics.circle("fill", b.x, b.y, 8)
+        -- Mid fire ring
+        love.graphics.setColor(1, 0.5, 0.1, 0.5 * flicker)
+        love.graphics.circle("fill", b.x, b.y, 5)
+        -- Core bullet (bright orange-yellow)
+        love.graphics.setColor(1, 0.7, 0.15, 0.95)
+        love.graphics.circle("fill", b.x, b.y, 3)
+        -- Hot white center
+        love.graphics.setColor(1, 1, 0.8, 0.7)
+        love.graphics.circle("fill", b.x, b.y, 1.5)
+      else
+        if b.isHyper then
+          love.graphics.setColor(0.3, 0.9, 1.0, 0.3)
+          love.graphics.circle("fill", b.x, b.y, (b.size or 6) * 2.5)
+          love.graphics.setColor(0.6, 1.0, 1.0, 1.0)
+          love.graphics.circle("fill", b.x, b.y, (b.size or 6))
+        else
+          ui.drawBullet(b)
+        end
+      end
     end
   end
 
   for _, u in ipairs(gameState.ufos) do
     ui.drawUFO(u)
+  end
+
+  -- Draw encounter enemies
+  for _, e in ipairs(encounterState.enemies) do
+    encounter.drawEnemy(e)
+  end
+
+  -- Draw Kraken boss
+  if krakenState then
+    kraken.draw(krakenState)
   end
 
   for _, p in ipairs(gameState.powerups) do
@@ -2979,6 +4233,19 @@ function M.drawPlaying()
   -- Draw patrol robots
   for _, p in ipairs(wanted.patrols) do
     patrol.draw(p)
+    -- Firebird burn aura on burning patrols
+    if p.burnTimer and p.burnTimer > 0 and not p.dead then
+      local bFlicker = 0.5 + 0.5 * math.sin(love.timer.getTime() * 10 + p.x)
+      love.graphics.setColor(1, 0.4, 0.05, 0.2 * bFlicker)
+      love.graphics.circle("fill", p.x, p.y, p.size + 10)
+      love.graphics.setColor(1, 0.6, 0.1, 0.12 * bFlicker)
+      love.graphics.circle("fill", p.x, p.y, p.size + 18)
+    end
+  end
+
+  -- Draw dungeon enemies
+  if dungeon.isActive() then
+    dungeon.drawEnemies(gameState.width, gameState.height)
   end
 
   -- Draw smart bomb effect
@@ -3003,6 +4270,32 @@ function M.drawPlaying()
     gameState.ship.x, gameState.ship.y
   )
 
+  -- Draw dungeon foreground decorations (psychedelic overlays)
+  if dungeon.isActive() then
+    dungeon.drawForeground(gameState.width, gameState.height)
+  end
+
+  -- Draw Orion boss dungeon foreground (boss body, nodes, barriers)
+  orionDungeon.drawForeground(gameState.width, gameState.height)
+  messierDungeon.drawForeground(gameState.width, gameState.height)
+  outerDungeon.drawForeground(gameState.width, gameState.height)
+
+  -- Draw Orion boss dungeon HUD (node HP bars, phase indicator)
+  orionDungeon.drawHUD(gameState.width, gameState.height)
+  messierDungeon.drawHUD(gameState.width, gameState.height)
+  outerDungeon.drawHUD(gameState.width, gameState.height)
+
+  -- Draw Spread Beam acquisition banner
+  if spreadBeamBannerTimer > 0 then
+    orionDungeon.drawAcquisitionBanner(spreadBeamBannerTimer)
+  end
+  if hyperBeamBannerTimer > 0 then
+    messierDungeon.drawAcquisitionBanner(hyperBeamBannerTimer)
+  end
+  if seekerMissileBannerTimer > 0 then
+    outerDungeon.drawAcquisitionBanner(seekerMissileBannerTimer)
+  end
+
   -- Draw comets (Oort Cloud)
   constellation.drawComets()
 
@@ -3022,6 +4315,50 @@ function M.drawPlaying()
     love.graphics.setColor(0.4, 0.2, 0.8, 0.08 + math.sin(love.timer.getTime() * 3) * 0.04)
     love.graphics.rectangle("fill", 0, 0, gameState.width, gameState.height)
   end
+
+  -- Draw Muse power visual effects
+  -- Melo: purple time-slow tint
+  if muses.isTimeSlowed() then
+    love.graphics.setColor(0.8, 0.3, 0.3, 0.06 + math.sin(love.timer.getTime() * 2) * 0.03)
+    love.graphics.rectangle("fill", 0, 0, gameState.width, gameState.height)
+  end
+
+  -- Djolt: chain lightning arcs
+  for _, arc in ipairs(chainLightningArcs) do
+    local segments = 6
+    local prevX, prevY = arc.x1, arc.y1
+    for s = 1, segments do
+      local t = s / segments
+      local nx = arc.x1 + (arc.x2 - arc.x1) * t + (math.random() - 0.5) * 20
+      local ny = arc.y1 + (arc.y2 - arc.y1) * t + (math.random() - 0.5) * 20
+      if s == segments then nx, ny = arc.x2, arc.y2 end
+      -- Glow
+      love.graphics.setColor(arc.color[1], arc.color[2], arc.color[3], arc.timer * 1.5)
+      love.graphics.setLineWidth(3)
+      love.graphics.line(prevX, prevY, nx, ny)
+      -- Core
+      love.graphics.setColor(1, 1, 1, arc.timer * 2)
+      love.graphics.setLineWidth(1)
+      love.graphics.line(prevX, prevY, nx, ny)
+      prevX, prevY = nx, ny
+    end
+  end
+
+  -- Tierra: screen wrap indicator (subtle border glow)
+  if muses.hasScreenWrap() then
+    love.graphics.setColor(0.3, 0.7, 0.25, 0.15 + math.sin(love.timer.getTime() * 3) * 0.08)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", 2, 2, gameState.width - 4, gameState.height - 4)
+  end
+
+  -- Clarity: golden shimmer overlay
+  if muses.hasClarity() then
+    love.graphics.setColor(0.9, 0.85, 0.4, 0.04 + math.sin(love.timer.getTime() * 1.5) * 0.02)
+    love.graphics.rectangle("fill", 0, 0, gameState.width, gameState.height)
+  end
+
+  -- Muse power HUD
+  muses.drawMuseHUD()
 
   -- Draw speed boost visual (thruster trail)
   if ship.hasSpeedBoost(gameState.ship) and not gameState.ship.dead and not gameState.ship.exploding then
@@ -3109,7 +4446,7 @@ function M.drawPauseMenu()
 
   -- Menu options
   love.graphics.setFont(ui.getFont("pauseMenu"))
-  local options = {"Resume", "World Map", "Restart Level", "Options", "Exit to Station"}
+  local options = {"Resume", "World Map", "Options", "Exit to Station"}
   local startY = 340
 
   for i, option in ipairs(options) do
@@ -3141,9 +4478,9 @@ function M.drawWorldMapOverlay()
   love.graphics.setColor(0, 0, 0, 0.92)
   love.graphics.rectangle("fill", 0, 0, gameState.width, gameState.height)
 
-  local WORLD_MIN = -31
-  local WORLD_MAX = 31
-  local WORLD_SIZE = 63
+  local WORLD_MIN = -38
+  local WORLD_MAX = 38
+  local WORLD_SIZE = 77
 
   local screenW = gameState.width
   local screenH = gameState.height
@@ -3198,7 +4535,15 @@ function M.drawWorldMapOverlay()
               love.graphics.setColor(0.2, 0.2, 0.3, 0.5)
             end
           elseif zone == constellation.ZONE_DEEP_SPACE then
-            love.graphics.setColor(0.12, 0.12, 0.18, 0.5)
+            -- Check if this is a dungeon constellation (show themed color)
+            local dsId = constellation.getConstellationId(tx, ty)
+            local dsData = constellation.CONSTELLATIONS[dsId]
+            if dsData and dsData.isDungeon then
+              local bg = dsData.bgColor
+              love.graphics.setColor(bg[1] * 6 + 0.15, bg[2] * 6 + 0.15, bg[3] * 6 + 0.15, 0.6)
+            else
+              love.graphics.setColor(0.12, 0.12, 0.18, 0.5)
+            end
           else
             love.graphics.setColor(0.08, 0.08, 0.1, 0.4)
           end
@@ -3219,7 +4564,7 @@ function M.drawWorldMapOverlay()
 
   -- Constellation boundary lines (7x7 blocks)
   love.graphics.setColor(0.25, 0.25, 0.35, 0.35)
-  for i = 0, 9 do
+  for i = 0, 11 do
     local lineX = mapX + i * 7 * cellSize
     love.graphics.line(lineX, mapY, lineX, mapY + mapSize)
     local lineY = mapY + i * 7 * cellSize
@@ -3233,11 +4578,11 @@ function M.drawWorldMapOverlay()
   local namedSz = 21 * cellSize
   love.graphics.rectangle("line", mapX + namedOff, mapY + (WORLD_MAX - 10) * cellSize, namedSz, namedSz)
 
-  -- Deep space outline (tiles -17..17)
+  -- Deep space outline (tiles -24..24)
   love.graphics.setColor(0.5, 0.4, 0.3, 0.4)
-  local deepOff = ((-17) - WORLD_MIN) * cellSize
-  local deepSz = 35 * cellSize
-  love.graphics.rectangle("line", mapX + deepOff, mapY + (WORLD_MAX - 17) * cellSize, deepSz, deepSz)
+  local deepOff = ((-24) - WORLD_MIN) * cellSize
+  local deepSz = 49 * cellSize
+  love.graphics.rectangle("line", mapX + deepOff, mapY + (WORLD_MAX - 24) * cellSize, deepSz, deepSz)
 
   -- Constellation labels
   love.graphics.setFont(ui.getFont("hudLabel"))
@@ -3251,6 +4596,11 @@ function M.drawWorldMapOverlay()
     {name = "Pandora",     cx = -1, cy = 1},
     {name = "Orion",       cx = -1, cy = -1},
     {name = "Andromeda",   cx = 1,  cy = -1},
+    -- Deep Space dungeon constellations
+    {name = "Synesthesia", cx = -3, cy = 3},
+    {name = "Megalith",    cx = 3,  cy = 3},
+    {name = "Dynamo",      cx = -3, cy = -3},
+    {name = "Logician",    cx = 3,  cy = -3},
   }
   for _, c in ipairs(labels) do
     local centerTileX = c.cx * 7
@@ -3263,9 +4613,9 @@ function M.drawWorldMapOverlay()
 
   -- Zone labels
   love.graphics.setColor(0.35, 0.35, 0.45, 0.45)
-  local deepLabelY = mapY + (WORLD_MAX - 14) * cellSize
+  local deepLabelY = mapY + (WORLD_MAX - 18) * cellSize
   love.graphics.printf("DEEP SPACE", mapX, deepLabelY, mapSize, "center")
-  local outerLabelY = mapY + (WORLD_MAX - 25) * cellSize
+  local outerLabelY = mapY + (WORLD_MAX - 32) * cellSize
   love.graphics.printf("OUTER SPACE", mapX, outerLabelY, mapSize, "center")
 
   -- Special tile icons (discovered only)
@@ -3395,6 +4745,16 @@ end
 function M.updateConstellationHazards(dt)
   if gameState.ship.dead or gameState.ship.exploding then return end
 
+  -- Clarity Muse power: neutralize all environmental hazards
+  if muses.hasClarity() then
+    hazardState.coldActive = false
+    hazardState.hotActive = false
+    hazardState.gravityActive = false
+    hazardState.pulsarWarning = false
+    hazardState.pulsarBurst = false
+    return
+  end
+
   local tx, ty = worldmap.tileX, worldmap.tileY
   local cId = constellation.getConstellationId(tx, ty)
   local cData = constellation.CONSTELLATIONS[cId]
@@ -3417,7 +4777,10 @@ function M.updateConstellationHazards(dt)
   -- COLD (Oort Cloud) - continuous cold damage
   if cData.hazard == "cold" then
     hazardState.coldActive = true
-    if not gameState.ship.shieldActive then
+    -- Firebird is immune to cold damage
+    local shipDef = starfoxShips and starfoxShips.getSelectedDef and starfoxShips.getSelectedDef()
+    local coldImmune = shipDef and shipDef.coldImmune
+    if not coldImmune and not gameState.ship.shieldActive then
       gameState.health = gameState.health - cData.coldDamage * dt
       if gameState.health <= 0 then
         ship.die(gameState.ship)
@@ -3637,18 +5000,30 @@ function M.drawHazardWarnings()
 
   -- Cold warning (blue snowflake icon)
   if hazardState.coldActive then
+    local shipDef = starfoxShips and starfoxShips.getSelectedDef and starfoxShips.getSelectedDef()
+    local immune = shipDef and shipDef.coldImmune
     local pulse = math.sin(love.timer.getTime() * 4) * 0.2 + 0.8
     -- Blue warning background
     love.graphics.setColor(0, 0, 0, 0.7)
     love.graphics.rectangle("fill", barX, barY, 28, 22, 3, 3)
-    -- Snowflake/cold icon
-    love.graphics.setColor(0.3, 0.7, 1.0, pulse)
-    love.graphics.setFont(ui.getFont("hudLabel"))
-    love.graphics.print("❄", barX + 5, barY + 3)
-    -- "COLD" label
-    love.graphics.setFont(ui.getFont("hudSmall"))
-    love.graphics.setColor(0.5, 0.8, 1.0, pulse)
-    love.graphics.print("COLD", barX + 2, barY + 23)
+    if immune then
+      -- Orange/fire color for immunity
+      love.graphics.setColor(1.0, 0.5, 0.15, pulse)
+      love.graphics.setFont(ui.getFont("hudLabel"))
+      love.graphics.print("❄", barX + 5, barY + 3)
+      love.graphics.setFont(ui.getFont("hudSmall"))
+      love.graphics.setColor(1.0, 0.6, 0.2, pulse)
+      love.graphics.print("SAFE", barX + 2, barY + 23)
+    else
+      -- Snowflake/cold icon
+      love.graphics.setColor(0.3, 0.7, 1.0, pulse)
+      love.graphics.setFont(ui.getFont("hudLabel"))
+      love.graphics.print("❄", barX + 5, barY + 3)
+      -- "COLD" label
+      love.graphics.setFont(ui.getFont("hudSmall"))
+      love.graphics.setColor(0.5, 0.8, 1.0, pulse)
+      love.graphics.print("COLD", barX + 2, barY + 23)
+    end
     barX = barX + 32
   end
 
@@ -4310,13 +5685,13 @@ function M.keypressed(key)
         gameState.pauseSubMenu = nil
         worldMapState.message = nil
       elseif key == "up" then
-        worldMapState.cursorY = math.min(31, worldMapState.cursorY + 1)
+        worldMapState.cursorY = math.min(38, worldMapState.cursorY + 1)
       elseif key == "down" then
-        worldMapState.cursorY = math.max(-31, worldMapState.cursorY - 1)
+        worldMapState.cursorY = math.max(-38, worldMapState.cursorY - 1)
       elseif key == "left" then
-        worldMapState.cursorX = math.max(-31, worldMapState.cursorX - 1)
+        worldMapState.cursorX = math.max(-38, worldMapState.cursorX - 1)
       elseif key == "right" then
-        worldMapState.cursorX = math.min(31, worldMapState.cursorX + 1)
+        worldMapState.cursorX = math.min(38, worldMapState.cursorX + 1)
       elseif key == "p" then
         worldMapState.cursorX = worldmap.tileX
         worldMapState.cursorY = worldmap.tileY
@@ -4328,7 +5703,7 @@ function M.keypressed(key)
         elseif not worldmap.canFastTravel(worldMapState.cursorX, worldMapState.cursorY) then
           local zone = constellation.getZone(worldMapState.cursorX, worldMapState.cursorY)
           if zone == constellation.ZONE_OUTER_SPACE then
-            worldMapState.message = "Cannot fast travel: Outer Space is beyond radio range"
+            worldMapState.message = "Cannot fast travel: need The Trident for Outer Space"
           elseif zone == constellation.ZONE_DEEP_SPACE then
             worldMapState.message = "Cannot fast travel: need Power Amplifier for Deep Space"
           else
@@ -4384,13 +5759,9 @@ function M.keypressed(key)
         worldMapState.cursorY = worldmap.tileY
         worldMapState.message = nil
       elseif gameState.pauseMenuIndex == 3 then
-        -- Restart Level: restore missiles to entry count and restart
-        gameState.ship.missiles = gameState.ship.missileEntryCount
-        M.startGame()
-      elseif gameState.pauseMenuIndex == 4 then
         -- Options (placeholder)
         gameState.state = "playing"  -- For now, just resume
-      elseif gameState.pauseMenuIndex == 5 then
+      elseif gameState.pauseMenuIndex == 4 then
         -- Exit to Station with fade
         M.startFade(function()
           if M.returnToHub then
@@ -4459,11 +5830,73 @@ function M.keypressed(key)
 
         table.insert(gameState.bullets, bullet.new(bx, by, gameState.ship.angle, "player", useMissile))
 
+        -- Firebird burn effect: tag all player bullets with burn properties
+        local shipDef = starfoxShips.getSelectedDef()
+        if shipDef and shipDef.burnDamage then
+          local lastBullet = gameState.bullets[#gameState.bullets]
+          lastBullet.burnDamage = shipDef.burnDamage
+          lastBullet.burnDuration = shipDef.burnDuration or 3
+          lastBullet.meltsIce = shipDef.meltsIce or false
+        end
+
         -- Multishot: fire two extra angled bullets (same type)
         if ship.hasMultishot(gameState.ship) then
           local spread = 0.2  -- radians (~11 degrees)
           table.insert(gameState.bullets, bullet.new(bx, by, gameState.ship.angle - spread, "player", useMissile))
           table.insert(gameState.bullets, bullet.new(bx, by, gameState.ship.angle + spread, "player", useMissile))
+          -- Apply burn to multishot bullets too
+          if shipDef and shipDef.burnDamage then
+            gameState.bullets[#gameState.bullets].burnDamage = shipDef.burnDamage
+            gameState.bullets[#gameState.bullets].burnDuration = shipDef.burnDuration or 3
+            gameState.bullets[#gameState.bullets].meltsIce = shipDef.meltsIce or false
+            gameState.bullets[#gameState.bullets - 1].burnDamage = shipDef.burnDamage
+            gameState.bullets[#gameState.bullets - 1].burnDuration = shipDef.burnDuration or 3
+            gameState.bullets[#gameState.bullets - 1].meltsIce = shipDef.meltsIce or false
+          end
+        end
+
+        -- Spread Beam: fire two extra ±15° bullets (permanent upgrade, stacks with multishot)
+        if ship.hasSpreadBeam(gameState.ship) then
+          local spread = math.pi / 12  -- 15 degrees
+          table.insert(gameState.bullets, bullet.new(bx, by, gameState.ship.angle - spread, "player"))
+          table.insert(gameState.bullets, bullet.new(bx, by, gameState.ship.angle + spread, "player"))
+          -- Apply burn to spread beam bullets too
+          if shipDef and shipDef.burnDamage then
+            gameState.bullets[#gameState.bullets].burnDamage = shipDef.burnDamage
+            gameState.bullets[#gameState.bullets].burnDuration = shipDef.burnDuration or 3
+            gameState.bullets[#gameState.bullets].meltsIce = shipDef.meltsIce or false
+            gameState.bullets[#gameState.bullets - 1].burnDamage = shipDef.burnDamage
+            gameState.bullets[#gameState.bullets - 1].burnDuration = shipDef.burnDuration or 3
+            gameState.bullets[#gameState.bullets - 1].meltsIce = shipDef.meltsIce or false
+          end
+        end
+        -- Hyper Beam: replace normal bullet with larger hyper bullet (already fired above as normal)
+        -- Mark the most recently inserted player bullet as hyper if ship has hyper beam
+        if ship.hasHyperBeam(gameState.ship) then
+          local lastIdx = #gameState.bullets
+          if lastIdx > 0 and gameState.bullets[lastIdx].owner == "player" then
+            gameState.bullets[lastIdx].isHyper = true
+            gameState.bullets[lastIdx].size = 6
+            gameState.bullets[lastIdx].damage = 2
+          end
+        end
+        -- Seeker Missiles: when hasSeeker, mark the most recently fired player bullet as a seeker
+        if ship.hasSeeker(gameState.ship) then
+          local lastIdx = #gameState.bullets
+          if lastIdx > 0 and gameState.bullets[lastIdx].owner == "player" then
+            local sb = gameState.bullets[lastIdx]
+            sb.isSeeker = true
+            sb.seekerState = "traveling"
+            sb.distanceTraveled = 0
+            sb.seekerTarget = nil
+            -- Double the speed
+            local curSpd = math.sqrt(sb.vx*sb.vx + sb.vy*sb.vy)
+            if curSpd > 0 then
+              sb.vx = sb.vx / curSpd * 1000
+              sb.vy = sb.vy / curSpd * 1000
+            end
+            sb.size = sb.size + 2  -- slightly larger
+          end
         end
       end
     elseif key == "x" and not gameState.ship.dead then
@@ -4472,12 +5905,16 @@ function M.keypressed(key)
         gameState.health = gameState.health - 50
       end
     elseif key == "b" and not gameState.ship.dead and not gameState.ship.exploding then
-      -- Smart bomb: two-press system
+      -- Smart bomb OR Muse power (hold B = Muse, tap B = bomb)
       if bombState.launched then
-        -- Press #2: Detonate the bomb in flight
+        -- Press #2: Detonate the bomb in flight (always immediate)
         M.triggerSmartBomb()
+      elseif muses.activePower and muses.canActivate() then
+        -- Start B-hold tracking for Muse power
+        museBHeld = true
+        museBHoldTimer = 0
       elseif not bombState.active then
-        -- Press #1: Launch a bomb projectile
+        -- No Muse power available, use bomb immediately
         if ship.useBomb(gameState.ship) then
           M.launchBomb()
         end
@@ -4486,6 +5923,30 @@ function M.keypressed(key)
       -- S key press always toggles shield
       -- When Scan is unlocked, holding S also activates scanner (in updatePlaying)
       ship.toggleShield(gameState.ship)
+    end
+  end
+end
+
+function M.keyreleased(key)
+  if gameState.state == "playing" then
+    if key == "b" then
+      if museBHeld then
+        if museBHoldTimer < MUSE_B_HOLD_THRESHOLD then
+          -- Quick tap — use smart bomb instead
+          if not bombState.active and not bombState.launched then
+            if ship.useBomb(gameState.ship) then
+              M.launchBomb()
+            end
+          end
+        elseif muses.powerActive then
+          -- Release hold — deactivate toggle powers (Melo, Tierra)
+          if muses.activePower == "melo" or muses.activePower == "tierra" then
+            muses.deactivate()
+          end
+        end
+        museBHeld = false
+        museBHoldTimer = 0
+      end
     end
   end
 end

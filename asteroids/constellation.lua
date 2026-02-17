@@ -6,19 +6,19 @@
 local M = {}
 
 -- ===================== MAP EXPANSION TIERS =====================
--- The world is 63x63 tiles = 9x9 grid of 7x7 constellation blocks.
---   Tile range: -31 to +31
+-- The world is 77x77 tiles = 11x11 grid of 7x7 constellation blocks.
+--   Tile range: -38 to +38
 --   Center 3x3 constellations (cx,cy -1..1): Named sectors (tiles -10..10)
---   Next ring (cx or cy = ±2): Deep Space (tiles -17..17 minus named)
---   Outer two rings (cx or cy = ±3 or ±4): Outer Space (tiles -31..31 minus above)
+--   Next two rings (cx or cy = ±2 or ±3): Deep Space (tiles -24..24 minus named)
+--   Outer two rings (cx or cy = ±4 or ±5): Outer Space (tiles -38..38 minus above)
 --
 -- Tier 1: 7x7 (default, "The Nebula" only)
 -- Tier 2: 21x21 (after Warden defeated + Mega Antenna installed → named constellations)
--- Tier 3: 63x63 (after Sentinel defeated + Power Amplifier → full map)
+-- Tier 3: 77x77 (after Sentinel defeated + Power Amplifier → full map)
 
 M.TIER_NEBULA = 1      -- 7x7 (-3 to 3)
 M.TIER_INNER_SPACE = 2 -- 21x21 (-10 to 10) — the 9 named constellations
-M.TIER_OUTER_SPACE = 3 -- 63x63 (-31 to 31) — full world
+M.TIER_OUTER_SPACE = 3 -- 77x77 (-38 to 38) — full world
 
 M.currentTier = M.TIER_NEBULA
 
@@ -30,6 +30,7 @@ M.ZONE_OUTER_SPACE = "outer_space" -- 2 outer rings (cx or cy = ±3 or ±4)
 -- Progression flags (synced from hub)
 M.antennaInstalled = false  -- Warden defeated + antenna brought to Studio
 M.sentinelDefeated = false  -- Sentinel defeated
+M.hasTrident = false        -- Kraken defeated → fast travel in Outer Space
 
 function M.getTier()
   return M.currentTier
@@ -37,7 +38,7 @@ end
 
 function M.getGridBounds()
   if M.currentTier == M.TIER_OUTER_SPACE then
-    return -31, 31
+    return -38, 38
   elseif M.currentTier == M.TIER_INNER_SPACE then
     return -10, 10
   else
@@ -51,7 +52,7 @@ function M.getZone(tileX, tileY)
   local maxC = math.max(math.abs(cx), math.abs(cy))
   if maxC <= 1 then
     return M.ZONE_NAMED
-  elseif maxC <= 2 then
+  elseif maxC <= 3 then
     return M.ZONE_DEEP_SPACE
   else
     return M.ZONE_OUTER_SPACE
@@ -69,13 +70,14 @@ function M.isInRadioRange(tileX, tileY)
   elseif zone == M.ZONE_DEEP_SPACE then
     return M.sentinelDefeated  -- Need the power amplifier
   else
-    return false  -- Outer Space is always out of range
+    return M.hasTrident  -- Outer Space: only with The Trident
   end
 end
 
-function M.setProgression(antennaInstalled, sentinelDefeated)
+function M.setProgression(antennaInstalled, sentinelDefeated, hasTrident)
   M.antennaInstalled = antennaInstalled or false
   M.sentinelDefeated = sentinelDefeated or false
+  M.hasTrident = hasTrident or false
 
   if M.sentinelDefeated then
     M.currentTier = M.TIER_OUTER_SPACE
@@ -101,6 +103,11 @@ M.CONSTELLATION_NAMES = {
   ["-1,1"]  = "pandora",
   ["-1,-1"] = "orion",
   ["1,-1"]  = "andromeda",
+  -- Deep Space corner dungeon constellations
+  ["-3,3"]  = "synesthesia",
+  ["3,3"]   = "megalith",
+  ["-3,-3"] = "dynamo",
+  ["3,-3"]  = "logician",
 }
 
 -- Full constellation data
@@ -327,6 +334,199 @@ M.CONSTELLATIONS.outer_space = {
   asteroidDensityMod = 0.5,
 }
 
+-- ===================== DEEP SPACE DUNGEON CONSTELLATIONS =====================
+-- Four corner constellations (±3, ±3) are Zelda-style dungeon regions.
+-- Each 7x7 constellation is a themed dungeon with maze walls, obstacles,
+-- enemies, and increasingly psychedelic visuals closer to the corner portal.
+
+-- MEGALITH OF MEMORIES (top-right corner: constellation 3,3)
+-- Theme: RAM, hard drives, M.2 layouts, NAND memory cells, data puzzles
+M.CONSTELLATIONS.megalith = {
+  name = "Megalith of Memories",
+  description = "An ancient data vault — circuits of forgotten memory stretch infinitely",
+  bgColor = {0.01, 0.02, 0.06},
+  starColors = {{0.3, 0.5, 0.9}, {0.4, 0.6, 1.0}, {0.2, 0.4, 0.8}},
+  cloudPalette = {
+    {0.1, 0.2, 0.5, 0.15},   -- deep data blue
+    {0.2, 0.3, 0.7, 0.12},   -- memory bank cyan
+    {0.05, 0.15, 0.4, 0.1},  -- dark circuit
+    {0.3, 0.5, 0.9, 0.08},   -- NAND gate glow
+  },
+  asteroidColor = {0.3, 0.4, 0.7},
+  hazard = "dungeon",
+  asteroidDensityMod = 0.3,
+  isDungeon = true,
+  dungeonId = "megalith",
+  dungeonTheme = "memory",
+  -- Dungeon decoration parameters
+  decoration = {
+    -- Circuit trace colors (increasingly psychedelic near corner)
+    traceColors = {
+      {0.1, 0.3, 0.8, 0.7},  -- base blue traces
+      {0.0, 0.8, 0.6, 0.6},  -- cyan data lines
+      {0.4, 0.2, 0.9, 0.5},  -- purple address bus
+      {0.9, 0.6, 0.1, 0.4},  -- gold contacts
+    },
+    -- RAM cell grid colors
+    cellColors = {
+      {0.05, 0.15, 0.35},  -- dark substrate
+      {0.1, 0.25, 0.5},    -- active cell
+      {0.2, 0.4, 0.8},     -- charged cell
+      {0.4, 0.7, 1.0},     -- glowing cell
+    },
+    -- M.2 / NAND layout style
+    chipColor = {0.08, 0.08, 0.12},
+    pinColor = {0.7, 0.6, 0.3},
+    solderColor = {0.8, 0.75, 0.65},
+  },
+}
+
+-- DISTANT DYNAMO (bottom-left corner: constellation -3,-3)
+-- Theme: Power cables, fans, transformers, electricity, heat
+M.CONSTELLATIONS.dynamo = {
+  name = "Distant Dynamo",
+  description = "A colossal power station — crackling energy and molten heat",
+  bgColor = {0.04, 0.02, 0.01},
+  starColors = {{1.0, 0.7, 0.2}, {1.0, 0.5, 0.1}, {0.9, 0.8, 0.3}},
+  cloudPalette = {
+    {0.8, 0.4, 0.05, 0.18},  -- molten orange
+    {1.0, 0.7, 0.1, 0.14},   -- electric yellow
+    {0.6, 0.2, 0.05, 0.12},  -- deep red heat
+    {1.0, 0.9, 0.4, 0.08},   -- spark white-yellow
+  },
+  asteroidColor = {0.6, 0.4, 0.2},
+  hazard = "dungeon",
+  asteroidDensityMod = 0.3,
+  isDungeon = true,
+  dungeonId = "dynamo",
+  dungeonTheme = "power",
+  decoration = {
+    -- Cable/wire colors
+    cableColors = {
+      {0.9, 0.2, 0.1, 0.8},  -- red power cable
+      {0.1, 0.1, 0.1, 0.9},  -- black ground
+      {0.9, 0.8, 0.2, 0.7},  -- yellow high-voltage
+      {0.2, 0.5, 0.9, 0.6},  -- blue neutral
+    },
+    -- Transformer/coil colors
+    coilColor = {0.5, 0.35, 0.2},
+    coreColor = {0.3, 0.3, 0.35},
+    -- Spark/arc colors (psychedelic at max intensity)
+    sparkColors = {
+      {1.0, 0.95, 0.8},   -- white-hot
+      {0.4, 0.6, 1.0},    -- blue arc
+      {1.0, 0.4, 0.8},    -- pink plasma
+      {0.2, 1.0, 0.4},    -- green discharge
+    },
+    -- Fan blade color
+    fanColor = {0.4, 0.4, 0.45},
+    fanHubColor = {0.2, 0.2, 0.25},
+    -- Heat gradient
+    heatColors = {
+      {0.3, 0.1, 0.0},  -- cool
+      {0.7, 0.2, 0.0},  -- warm
+      {1.0, 0.5, 0.0},  -- hot
+      {1.0, 0.9, 0.3},  -- white-hot
+    },
+  },
+}
+
+-- LOGICIAN'S LAMENT (bottom-right corner: constellation 3,-3)
+-- Theme: CPU die layout, metal layers, electric fields, logic gates
+-- The 7x7 is a CPU die where the player flies over top metal layer maze
+M.CONSTELLATIONS.logician = {
+  name = "Logician's Lament",
+  description = "A silicon labyrinth — the mind of a processor laid bare",
+  bgColor = {0.02, 0.01, 0.04},
+  starColors = {{0.7, 0.5, 1.0}, {0.5, 0.3, 0.9}, {0.8, 0.6, 1.0}},
+  cloudPalette = {
+    {0.4, 0.2, 0.7, 0.16},   -- deep violet
+    {0.6, 0.3, 0.9, 0.12},   -- bright purple
+    {0.3, 0.1, 0.5, 0.1},    -- dark indigo
+    {0.8, 0.4, 1.0, 0.07},   -- neon magenta
+  },
+  asteroidColor = {0.5, 0.4, 0.6},
+  hazard = "dungeon",
+  asteroidDensityMod = 0.2,
+  isDungeon = true,
+  dungeonId = "logician",
+  dungeonTheme = "cpu",
+  decoration = {
+    -- Metal layer colors (like actual CPU cross-section)
+    metalColors = {
+      {0.7, 0.65, 0.5, 0.8},  -- M1 copper
+      {0.6, 0.6, 0.7, 0.7},   -- M2 aluminum
+      {0.5, 0.55, 0.65, 0.6},  -- M3 tungsten
+      {0.8, 0.75, 0.6, 0.5},   -- top metal gold
+    },
+    -- Via/contact colors
+    viaColor = {0.9, 0.85, 0.7},
+    -- Silicon substrate
+    substrateColor = {0.15, 0.12, 0.2},
+    -- Gate oxide
+    oxideColor = {0.25, 0.2, 0.35},
+    -- Electric field colors (outside maze walls)
+    fieldColors = {
+      {0.5, 0.2, 0.9, 0.3},  -- violet field
+      {0.8, 0.3, 1.0, 0.2},  -- magenta field
+      {0.3, 0.1, 0.7, 0.15}, -- deep purple field
+    },
+    -- Logic gate symbols drawn in maze
+    gateColor = {0.6, 0.5, 0.8, 0.4},
+  },
+}
+
+-- SYNESTHESIA INSTALLATION (top-left corner: constellation -3,3)
+-- Theme: Graphics card internals, GPU die, shader pipelines, Nvidia hype video
+-- Player flies through a stylized GPU with streaming data and prismatic effects
+M.CONSTELLATIONS.synesthesia = {
+  name = "Synesthesia Installation",
+  description = "Inside the GPU — prismatic shader cores and streaming geometry",
+  bgColor = {0.01, 0.03, 0.02},
+  starColors = {{0.0, 1.0, 0.5}, {0.2, 0.9, 0.8}, {0.0, 0.8, 0.4}},
+  cloudPalette = {
+    {0.0, 0.6, 0.3, 0.16},   -- nvidia green
+    {0.0, 0.9, 0.5, 0.12},   -- bright green
+    {0.1, 0.4, 0.3, 0.1},    -- dark PCB green
+    {0.3, 1.0, 0.6, 0.08},   -- neon green
+  },
+  asteroidColor = {0.3, 0.6, 0.4},
+  hazard = "dungeon",
+  asteroidDensityMod = 0.2,
+  isDungeon = true,
+  dungeonId = "synesthesia",
+  dungeonTheme = "gpu",
+  decoration = {
+    -- Shader core colors (prismatic, increasingly wild)
+    coreColors = {
+      {0.0, 0.8, 0.4, 0.7},  -- nvidia green
+      {0.0, 0.5, 0.9, 0.6},  -- stream blue
+      {0.9, 0.4, 0.0, 0.5},  -- compute orange
+      {0.8, 0.0, 0.6, 0.4},  -- shader pink
+    },
+    -- PCB traces
+    traceColor = {0.0, 0.5, 0.3, 0.6},
+    -- VRAM module colors
+    vramColor = {0.1, 0.12, 0.1},
+    vramLabelColor = {0.4, 0.8, 0.5},
+    -- Streaming geometry / data pipeline
+    pipelineColors = {
+      {0.0, 1.0, 0.6},  -- vertex data
+      {0.3, 0.8, 1.0},  -- fragment data
+      {1.0, 0.6, 0.0},  -- raster data
+      {1.0, 0.0, 0.8},  -- compute data
+    },
+    -- Prismatic refraction (synesthesia effect)
+    prismColors = {
+      {1, 0, 0}, {1, 0.5, 0}, {1, 1, 0},
+      {0, 1, 0}, {0, 1, 1}, {0, 0.5, 1}, {0.5, 0, 1},
+    },
+    -- Die shot grid
+    dieColor = {0.06, 0.08, 0.06},
+    dieBorderColor = {0.0, 0.6, 0.3},
+  },
+}
+
 -- ===================== CONSTELLATION LOOKUP =====================
 
 -- Get constellation grid coordinates from tile coordinates
@@ -351,14 +551,16 @@ function M.getConstellationId(tileX, tileY)
   local cx, cy = M.getConstellationCoords(tileX, tileY)
   local maxC = math.max(math.abs(cx), math.abs(cy))
 
-  -- Outer Space: cx or cy = ±3 or ±4
-  if maxC >= 3 then
+  -- Outer Space: cx or cy = ±4 or ±5
+  if maxC >= 4 then
     return "outer_space"
   end
 
-  -- Deep Space: cx or cy = ±2
-  if maxC == 2 then
-    return "generic"  -- "Deep Space"
+  -- Deep Space: cx or cy = ±2 or ±3
+  if maxC >= 2 then
+    -- Check if this is a named Deep Space dungeon constellation (corners)
+    local key = cx .. "," .. cy
+    return M.CONSTELLATION_NAMES[key] or "generic"
   end
 
   -- Named constellations: cx,cy = -1..1

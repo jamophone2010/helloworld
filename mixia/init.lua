@@ -679,8 +679,19 @@ function M.update(dt)
     end
   end
 
+  -- Collect door positions for NPC pathfinding (prevent blocking doorways)
+  local doorPositions = {}
+  if gameState.location == "floor" then
+    local floorDef = floors.getFloor(gameState.currentFloor)
+    if floorDef and floorDef.buildings then
+      for _, b in ipairs(floorDef.buildings) do
+        table.insert(doorPositions, {x = b.doorX, y = b.doorY})
+      end
+    end
+  end
+
   for _, npcObj in ipairs(gameState.currentNPCs) do
-    npc.update(npcObj, dt, gameState.collisionMap, gameState.currentNPCs, gameState.player)
+    npc.update(npcObj, dt, gameState.collisionMap, gameState.currentNPCs, gameState.player, doorPositions)
   end
 
   if love.keyboard.isDown("up") then
@@ -3721,6 +3732,17 @@ function M.keypressed(key)
     end
 
     if gameState.nearbyNPC then
+      -- Make NPC turn to face the player
+      local npcGridX = gameState.nearbyNPC.gridX or gameState.nearbyNPC.x
+      local npcGridY = gameState.nearbyNPC.gridY or gameState.nearbyNPC.y
+      local dx = gameState.player.gridX - npcGridX
+      local dy = gameState.player.gridY - npcGridY
+      if math.abs(dx) > math.abs(dy) then
+        gameState.nearbyNPC.direction = dx > 0 and "right" or "left"
+      else
+        gameState.nearbyNPC.direction = dy > 0 and "down" or "up"
+      end
+
       -- Check if this NPC sells Compressed Air
       if gameState.nearbyNPC.sellsCompressedAir and not gameState.hasCompressedAir then
         local price = gameState.nearbyNPC.price or 10000

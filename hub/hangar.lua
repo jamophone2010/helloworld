@@ -125,6 +125,40 @@ local function drawShipPreview(def, cx, cy, scale, alpha)
     end
     love.graphics.setColor(ar, ag, ab, ventPulse * 0.1 * alpha)
     love.graphics.circle("fill", 0, 0, 30)
+  elseif def.type == "Muscle" then
+    -- 1969 Pontiac GTO-inspired: wide aggressive fenders, hood scoop
+    -- Wide fender wings
+    love.graphics.setColor(r * 0.5, g * 0.5, b * 0.5, alpha)
+    love.graphics.polygon("fill", -15, 0, -50, 12, -48, 28, -15, 25)
+    love.graphics.polygon("fill", 15, 0, 50, 12, 48, 28, 15, 25)
+    -- Hood scoop ridge
+    love.graphics.setColor(r * 0.35, g * 0.35, b * 0.35, alpha)
+    love.graphics.polygon("fill", -4, -30, -5, -5, 5, -5, 4, -30)
+    -- Split grille nostrils
+    love.graphics.setColor(0.1, 0.03, 0.03, 0.7 * alpha)
+    love.graphics.rectangle("fill", -8, -32, 5, 6)
+    love.graphics.rectangle("fill", 3, -32, 5, 6)
+    -- Headlights
+    love.graphics.setColor(1, 0.85, 0.5, 0.6 * alpha)
+    love.graphics.circle("fill", -14, -25, 2)
+    love.graphics.circle("fill", 14, -25, 2)
+    -- Rear spoiler
+    love.graphics.setColor(r * 0.4, g * 0.4, b * 0.4, alpha)
+    love.graphics.rectangle("fill", -20, 22, 40, 4)
+    -- Gentle fire aura
+    local firePulse = math.sin(love.timer.getTime() * 3) * 0.15 + 0.35
+    love.graphics.setColor(0.9, 0.15, 0.05, firePulse * 0.08 * alpha)
+    love.graphics.circle("fill", 0, 0, 45)
+    love.graphics.setColor(1, 0.3, 0.08, firePulse * 0.12 * alpha)
+    love.graphics.circle("fill", 0, 0, 25)
+    -- Ember wisps
+    for fi = 1, 4 do
+      local fAngle = love.timer.getTime() * 1.5 + fi * 1.57
+      local fx = math.cos(fAngle) * 22
+      local fy = math.sin(fAngle) * 15
+      love.graphics.setColor(1, 0.35, 0.05, 0.12 * alpha)
+      love.graphics.circle("fill", fx, fy, 2)
+    end
   else
     -- Balanced wings
     love.graphics.setColor(r * 0.5, g * 0.5, b * 0.5, alpha)

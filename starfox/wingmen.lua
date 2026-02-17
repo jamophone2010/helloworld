@@ -109,4 +109,20 @@ function M.triggerVenomBossWarning()
   M.addCallout("Falco", "That's Andross's weapon! Take it out!")
 end
 
+function M.triggerFogWarning()
+  M.addCallout("Slippy", "Fog bank ahead! Visibility dropping!")
+end
+
+function M.triggerFogThickens()
+  M.addCallout("Falco", "Can't see a thing in this soup!")
+end
+
+function M.triggerFogClearing()
+  M.addCallout("Slippy", "The fog is clearing up!")
+end
+
+function M.triggerFogReturns()
+  M.addCallout("Falco", "More fog rolling in! Stay sharp!")
+end
+
 return M

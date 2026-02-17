@@ -54,18 +54,27 @@ function M.reset()
   M.empBurstRadius = 0
   M.empBurstMaxRadius = 500
   M.empBurstDamaged = {}
+  M.infernoActive = false
+  M.infernoRadius = 0
+  M.infernoMaxRadius = 900
+  M.infernoFlashTimer = 0
+  M.deepFreezeActive = false
+  M.deepFreezeTimer = 0
+  M.deepFreezeFlashTimer = 0
+  M.deepFreezeIceAlpha = 0
 end
 
 --- Add gauge from a kill (1 point per kill)
 function M.registerKill(levelId)
   if M.active then return end
-  if gauge >= GAUGE_MAX then return end
+  local gmax = M.getGaugeMax()
+  if gauge >= gmax then return end
   local def = ships.getSelectedDef()
   if not def or not def.hasSpecial then return end
-  gauge = math.min(GAUGE_MAX, gauge + 1)
+  gauge = math.min(gmax, gauge + 1)
   -- Sector Y (levelId 3) always keeps gauge full
   if levelId == 3 then
-    gauge = GAUGE_MAX
+    gauge = gmax
   end
   M.checkReady()
 end
@@ -73,12 +82,13 @@ end
 --- Add gauge from boss damage (1 point per damage dealt)
 function M.registerBossDamage(damage, levelId)
   if M.active then return end
-  if gauge >= GAUGE_MAX then return end
+  local gmax = M.getGaugeMax()
+  if gauge >= gmax then return end
   local def = ships.getSelectedDef()
   if not def or not def.hasSpecial then return end
-  gauge = math.min(GAUGE_MAX, gauge + damage)
+  gauge = math.min(gmax, gauge + damage)
   if levelId == 3 then
-    gauge = GAUGE_MAX
+    gauge = gmax
   end
   M.checkReady()
 end
@@ -87,16 +97,17 @@ end
 function M.registerMedal(medalThreshold)
   local def = ships.getSelectedDef()
   if not def or not def.hasSpecial then return end
-  if gauge >= GAUGE_MAX then return end
+  local gmax = M.getGaugeMax()
+  if gauge >= gmax then return end
   local bonus = ships.getSpecialGaugeBonus(medalThreshold)
   if bonus > 0 then
-    gauge = math.min(GAUGE_MAX, gauge + bonus)
+    gauge = math.min(gmax, gauge + bonus)
     M.checkReady()
   end
 end
 
 function M.checkReady()
-  if gauge >= GAUGE_MAX and not readyAnimActive and not M.active then
+  if gauge >= M.getGaugeMax() and not readyAnimActive and not M.active then
     readyAnimActive = true
     readyAnimTimer = 0
     justBecameReady = true
@@ -104,11 +115,11 @@ function M.checkReady()
 end
 
 function M.isReady()
-  return gauge >= GAUGE_MAX and not M.active
+  return gauge >= M.getGaugeMax() and not M.active
 end
 
 function M.getGaugePercent()
-  return gauge / GAUGE_MAX
+  return gauge / M.getGaugeMax()
 end
 
 function M.getGaugeValue()
@@ -116,6 +127,10 @@ function M.getGaugeValue()
 end
 
 function M.getGaugeMax()
+  local def = ships.getSelectedDef()
+  if def and def.infernoGaugeMax then
+    return def.infernoGaugeMax
+  end
   return GAUGE_MAX
 end
 
@@ -171,6 +186,26 @@ function M.activate(player, infiniteSpecial)
     M.empBurstDamaged = {}
     player.invulnerable = true
     player.invulnerableTimer = 1.5
+  elseif shipId == "icecube" then
+    M.abilityType = "deepfreeze"
+    M.abilityDuration = 5.0
+    M.abilityTimer = 5.0
+    M.deepFreezeActive = true
+    M.deepFreezeTimer = 5.0
+    M.deepFreezeFlashTimer = 0
+    M.deepFreezeIceAlpha = 1.0
+    player.invulnerable = true
+    player.invulnerableTimer = 5.0
+  elseif shipId == "firebird" then
+    M.abilityType = "inferno"
+    M.abilityDuration = 4.0
+    M.abilityTimer = 4.0
+    M.infernoActive = true
+    M.infernoRadius = 0
+    M.infernoMaxRadius = 900
+    M.infernoFlashTimer = 0
+    player.invulnerable = true
+    player.invulnerableTimer = 4.0
   else
     M.active = false
     return false
@@ -317,6 +352,77 @@ function M.update(dt, player)
           size = math.random(3, 6),
         })
       end
+    elseif M.abilityType == "deepfreeze" then
+      -- Deep Freeze: freeze everything on screen for 5 seconds
+      M.deepFreezeFlashTimer = M.deepFreezeFlashTimer + dt
+      M.deepFreezeTimer = M.deepFreezeTimer - dt
+      -- Pulsing ice alpha
+      M.deepFreezeIceAlpha = 0.6 + math.sin(M.deepFreezeFlashTimer * 3) * 0.2
+      -- Freeze all enemies (0 speed, no shooting)
+      local enemies = require("starfox.enemies")
+      for _, enemy in ipairs(enemies.enemies) do
+        enemy.frozen = true
+        enemy.frozenTimer = 0.2  -- keep refreshing so they stay frozen
+      end
+      -- Frost particles radiating outward
+      if math.random() < 0.6 then
+        local angle = math.random() * math.pi * 2
+        local r = math.random(50, 300)
+        table.insert(M.abilityParticles, {
+          x = player.x + math.cos(angle) * r,
+          y = player.y + math.sin(angle) * r,
+          vx = math.cos(angle) * 20,
+          vy = math.sin(angle) * 20,
+          life = 1.0, maxLife = 1.0,
+          color = {0.4, 0.8, 1.0},
+          size = math.random(3, 7),
+        })
+      end
+    elseif M.abilityType == "inferno" then
+      -- Inferno: expanding fire ring that destroys everything
+      M.infernoFlashTimer = M.infernoFlashTimer + dt
+      M.infernoRadius = M.infernoRadius + dt * 600
+      if M.infernoRadius > M.infernoMaxRadius then
+        M.infernoRadius = M.infernoMaxRadius
+      end
+      -- Damage enemies caught in the expanding inferno
+      local enemies = require("starfox.enemies")
+      for _, enemy in ipairs(enemies.enemies) do
+        local dx = enemy.x - player.x
+        local dy = enemy.y - player.y
+        local dist = math.sqrt(dx * dx + dy * dy)
+        if dist <= M.infernoRadius then
+          enemies.damage(enemy, 999)  -- Instant kill
+        end
+      end
+      -- Fire particles
+      if math.random() < 0.8 then
+        local angle = math.random() * math.pi * 2
+        local r = M.infernoRadius * (0.8 + math.random() * 0.2)
+        table.insert(M.abilityParticles, {
+          x = player.x + math.cos(angle) * r,
+          y = player.y + math.sin(angle) * r,
+          vx = math.cos(angle) * 60 + (math.random() - 0.5) * 40,
+          vy = math.sin(angle) * 60 - math.random() * 80,
+          life = 0.8, maxLife = 0.8,
+          color = {1, 0.3 + math.random() * 0.3, 0.05},
+          size = math.random(4, 10),
+        })
+      end
+      -- Inner ember particles
+      for fi = 1, 3 do
+        local angle = math.random() * math.pi * 2
+        local r = math.random() * M.infernoRadius * 0.6
+        table.insert(M.abilityParticles, {
+          x = player.x + math.cos(angle) * r,
+          y = player.y + math.sin(angle) * r,
+          vx = (math.random() - 0.5) * 60,
+          vy = -math.random() * 120,
+          life = 0.5, maxLife = 0.5,
+          color = {1, 0.8, 0.2},
+          size = math.random(2, 5),
+        })
+      end
     end
 
     -- Expire
@@ -357,6 +463,23 @@ function M.deactivate(player)
     M.empBurstRadius = 0
     M.empBurstDamaged = {}
   end
+  if M.abilityType == "inferno" then
+    M.infernoActive = false
+    M.infernoRadius = 0
+    M.infernoFlashTimer = 0
+  end
+  if M.abilityType == "deepfreeze" then
+    M.deepFreezeActive = false
+    M.deepFreezeTimer = 0
+    M.deepFreezeFlashTimer = 0
+    M.deepFreezeIceAlpha = 0
+    -- Unfreeze all enemies
+    local enemies = require("starfox.enemies")
+    for _, enemy in ipairs(enemies.enemies) do
+      enemy.frozen = false
+      enemy.frozenTimer = 0
+    end
+  end
 
   M.active = false
   M.abilityType = nil
@@ -372,6 +495,8 @@ function M.getEnemySpeedScale()
   if M.abilityType == "convert" then return 0.75 end
   if M.abilityType == "phasecloak" then return 0.75 end
   if M.abilityType == "empburst" then return 0.3 end
+  if M.abilityType == "inferno" then return 0.0 end  -- Everything frozen during inferno
+  if M.abilityType == "deepfreeze" then return 0.0 end  -- Everything frozen during deep freeze
   return 1.0
 end
 
@@ -384,7 +509,7 @@ end
 --- Returns true if enemies should NOT shoot
 function M.shouldSuppressShooting()
   if not M.active then return false end
-  return M.abilityType == "convert" or M.abilityType == "phasecloak"
+  return M.abilityType == "convert" or M.abilityType == "phasecloak" or M.abilityType == "deepfreeze"
 end
 
 --- Returns true if the player should pass through walls (maze)
@@ -433,6 +558,16 @@ function M.registerConversion()
   if not M.isConvertActive() then return false end
   M.convertKills = M.convertKills + 1
   return true
+end
+
+--- Returns true if Inferno is active (Firebird)
+function M.isInfernoActive()
+  return M.active and M.abilityType == "inferno"
+end
+
+--- Returns true if Deep Freeze is active (Ice Cube)
+function M.isDeepFreezeActive()
+  return M.active and M.abilityType == "deepfreeze"
 end
 
 --- Check if the ship has a special ability
@@ -564,6 +699,81 @@ function M.drawEffects(player)
       love.graphics.line(x1, y1, x2, y2)
     end
     love.graphics.setLineWidth(1)
+  end
+
+  -- Deep Freeze visuals (Ice Cube) — entire screen freezes with ice effect
+  if M.abilityType == "deepfreeze" then
+    local iceA = M.deepFreezeIceAlpha or 0
+    -- Full screen ice tint
+    love.graphics.setColor(0.1, 0.25, 0.5, iceA * 0.15)
+    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+    -- Frost border effect — ice creeping in from edges
+    local sw = love.graphics.getWidth()
+    local sh = love.graphics.getHeight()
+    local edgeSize = 60 + math.sin(M.deepFreezeFlashTimer * 2) * 15
+    love.graphics.setColor(0.3, 0.6, 1.0, iceA * 0.25)
+    -- Top edge frost
+    love.graphics.rectangle("fill", 0, 0, sw, edgeSize)
+    -- Bottom edge frost
+    love.graphics.rectangle("fill", 0, sh - edgeSize, sw, edgeSize)
+    -- Left edge frost
+    love.graphics.rectangle("fill", 0, 0, edgeSize, sh)
+    -- Right edge frost
+    love.graphics.rectangle("fill", sw - edgeSize, 0, edgeSize, sh)
+    -- Ice crystal sparkles
+    love.graphics.setColor(0.6, 0.9, 1.0, iceA * 0.4)
+    for i = 1, 20 do
+      local sx = math.sin(M.deepFreezeFlashTimer * 0.7 + i * 1.3) * sw * 0.5 + sw * 0.5
+      local sy = math.cos(M.deepFreezeFlashTimer * 0.5 + i * 0.9) * sh * 0.5 + sh * 0.5
+      local sparkleSize = 3 + math.sin(M.deepFreezeFlashTimer * 3 + i) * 2
+      love.graphics.circle("fill", sx, sy, sparkleSize)
+    end
+    -- "DEEP FREEZE" text
+    local textAlpha = 0.5 + math.sin(M.deepFreezeFlashTimer * 4) * 0.3
+    love.graphics.setColor(0.5, 0.85, 1.0, textAlpha)
+    love.graphics.printf("❄ DEEP FREEZE ❄", 0, sh * 0.1, sw, "center")
+    -- Expanding ice rings from player
+    local ringCount = 3
+    for ri = 1, ringCount do
+      local rPhase = (M.deepFreezeFlashTimer + ri * 0.5) % 2.0
+      local rRadius = rPhase * 250
+      local rAlpha = math.max(0, 1.0 - rPhase / 2.0) * iceA * 0.3
+      love.graphics.setColor(0.4, 0.7, 1.0, rAlpha)
+      love.graphics.setLineWidth(2)
+      love.graphics.circle("line", player.x, player.y, rRadius)
+    end
+    love.graphics.setLineWidth(1)
+  end
+
+  -- Inferno visuals (Firebird) — expanding fire ring that incinerates everything
+  if M.abilityType == "inferno" then
+    -- Expanding fire ring
+    if M.infernoRadius < M.infernoMaxRadius then
+      local ringAlpha = 1.0 - (M.infernoRadius / M.infernoMaxRadius) * 0.5
+      -- Outer fire ring
+      love.graphics.setColor(1, 0.2, 0.05, ringAlpha * 0.7)
+      love.graphics.setLineWidth(6)
+      love.graphics.circle("line", player.x, player.y, M.infernoRadius)
+      -- Mid ring (orange)
+      love.graphics.setColor(1, 0.5, 0.1, ringAlpha * 0.5)
+      love.graphics.setLineWidth(3)
+      love.graphics.circle("line", player.x, player.y, math.max(0, M.infernoRadius - 15))
+      -- Inner ring (yellow)
+      love.graphics.setColor(1, 0.9, 0.3, ringAlpha * 0.3)
+      love.graphics.setLineWidth(2)
+      love.graphics.circle("line", player.x, player.y, math.max(0, M.infernoRadius - 30))
+      love.graphics.setLineWidth(1)
+    end
+    -- Screen-wide heat distortion (red tint)
+    local heatAlpha = math.max(0, 0.15 - M.infernoFlashTimer * 0.03)
+    love.graphics.setColor(1, 0.1, 0.0, heatAlpha)
+    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+    -- Central fire glow
+    local firePulse = math.sin(M.infernoFlashTimer * 8) * 0.2 + 0.8
+    love.graphics.setColor(1, 0.4, 0.05, 0.25 * firePulse)
+    love.graphics.circle("fill", player.x, player.y, 50)
+    love.graphics.setColor(1, 0.8, 0.2, 0.15 * firePulse)
+    love.graphics.circle("fill", player.x, player.y, 30)
   end
 
   -- Timer overlay

@@ -4,6 +4,10 @@ local hub = require("hub")
 local leucadia = require("leucadia")
 local singularity = require("singularity")
 local mixia = require("mixia")
+local elendil = require("elendil")
+local chillon = require("chillon")
+local cereus = require("cereus")
+local kalapatthar = require("kalapatthar")
 local currency = require("hub.currency")
 local currentHubType = "hometown"  -- Track which hub we're in
 local saves = require("menu.saves")
@@ -156,6 +160,12 @@ function switchToGame(gameName)
     -- Sync ship selection
     local ships = require("starfox.ships")
     ships.setSelected(hub.getSelectedShip())
+    -- Wire Firebird acquisition from Vela dungeon boss
+    currentGame.onFirebirdAcquired = function()
+      local purchased = hub.getPurchasedShips()
+      purchased.firebird = true
+      hub.setPurchasedShips(purchased)
+    end
   end
 
   -- Pass shop items to starfox
@@ -167,6 +177,20 @@ function switchToGame(gameName)
     ships.setSelected(hub.getSelectedShip())
     -- Sync progression state
     currentGame.setProgression(hub.hasMegaAntenna(), hub.hasPowerAmplifier())
+    -- Sync Spread Beam permanent upgrade from Orion dungeon
+    if currentGame.setHasSpreadBeam and gameModules.asteroids and gameModules.asteroids.getShipData then
+      local shipData = gameModules.asteroids.getShipData()
+      if shipData then
+        currentGame.setHasSpreadBeam(shipData.hasSpreadBeam == true)
+      end
+    end
+    -- Sync Hyper Beam permanent upgrade from Messier dungeon
+    if currentGame.setHasHyperBeam and gameModules.asteroids and gameModules.asteroids.getShipData then
+      local shipData = gameModules.asteroids.getShipData()
+      if shipData then
+        currentGame.setHasHyperBeam(shipData.hasHyperBeam == true)
+      end
+    end
     -- Pass visited portal levels for Floor 4 level select
     currentGame.setVisitedPortalLevels(hub.getVisitedPortalLevels())
     -- Set return to hub callback for station selection
@@ -356,6 +380,138 @@ function returnToHub(stationInfo)
         end
       end
     end
+  elseif hubType == "elendil" then
+    elendil.setFadeInFromStarfox(true)
+    currentGame = elendil
+    if freshLanding then
+      elendil.load()
+    else
+      elendil.returnFromGame()
+    end
+    elendil.returnToAsteroids = function()
+      switchToGame("asteroids")
+      if gameModules.asteroids and gameModules.asteroids.restoreFromPortal then
+        gameModules.asteroids.restoreFromPortal()
+      end
+    end
+    elendil.switchToGame = switchToGame
+    if fromPlanetMap then
+      pauseMenu.returnToShip = nil
+      pauseMenu.onFastTravel = nil
+      pauseMenu.returnToStation = function()
+        switchToGame("planetmap")
+      end
+    else
+      pauseMenu.returnToShip = elendil.returnToAsteroids
+      pauseMenu.returnToStation = nil
+      pauseMenu.onFastTravel = function(tileX, tileY)
+        switchToGame("asteroids")
+        if gameModules.asteroids then
+          gameModules.asteroids.restoreFromPortal()
+          local wm = require("asteroids.worldmap")
+          gameModules.asteroids.transitionToTile(tileX, tileY, 683, 384)
+        end
+      end
+    end
+  elseif hubType == "cereus" then
+    cereus.setFadeInFromStarfox(true)
+    currentGame = cereus
+    if freshLanding then
+      cereus.load()
+    else
+      cereus.returnFromGame()
+    end
+    cereus.returnToAsteroids = function()
+      switchToGame("asteroids")
+      if gameModules.asteroids and gameModules.asteroids.restoreFromPortal then
+        gameModules.asteroids.restoreFromPortal()
+      end
+    end
+    cereus.switchToGame = switchToGame
+    if fromPlanetMap then
+      pauseMenu.returnToShip = nil
+      pauseMenu.onFastTravel = nil
+      pauseMenu.returnToStation = function()
+        switchToGame("planetmap")
+      end
+    else
+      pauseMenu.returnToShip = cereus.returnToAsteroids
+      pauseMenu.returnToStation = nil
+      pauseMenu.onFastTravel = function(tileX, tileY)
+        switchToGame("asteroids")
+        if gameModules.asteroids then
+          gameModules.asteroids.restoreFromPortal()
+          local wm = require("asteroids.worldmap")
+          gameModules.asteroids.transitionToTile(tileX, tileY, 683, 384)
+        end
+      end
+    end
+  elseif hubType == "kalapatthar" then
+    kalapatthar.setFadeInFromStarfox(true)
+    currentGame = kalapatthar
+    if freshLanding then
+      kalapatthar.load()
+    else
+      kalapatthar.returnFromGame()
+    end
+    kalapatthar.returnToAsteroids = function()
+      switchToGame("asteroids")
+      if gameModules.asteroids and gameModules.asteroids.restoreFromPortal then
+        gameModules.asteroids.restoreFromPortal()
+      end
+    end
+    kalapatthar.switchToGame = switchToGame
+    if fromPlanetMap then
+      pauseMenu.returnToShip = nil
+      pauseMenu.onFastTravel = nil
+      pauseMenu.returnToStation = function()
+        switchToGame("planetmap")
+      end
+    else
+      pauseMenu.returnToShip = kalapatthar.returnToAsteroids
+      pauseMenu.returnToStation = nil
+      pauseMenu.onFastTravel = function(tileX, tileY)
+        switchToGame("asteroids")
+        if gameModules.asteroids then
+          gameModules.asteroids.restoreFromPortal()
+          local wm = require("asteroids.worldmap")
+          gameModules.asteroids.transitionToTile(tileX, tileY, 683, 384)
+        end
+      end
+    end
+  elseif hubType == "chillon" then
+    chillon.setFadeInFromStarfox(true)
+    currentGame = chillon
+    if freshLanding then
+      chillon.load()
+    else
+      chillon.returnFromGame()
+    end
+    chillon.returnToAsteroids = function()
+      switchToGame("asteroids")
+      if gameModules.asteroids and gameModules.asteroids.restoreFromPortal then
+        gameModules.asteroids.restoreFromPortal()
+      end
+    end
+    chillon.switchToGame = switchToGame
+    if fromPlanetMap then
+      pauseMenu.returnToShip = nil
+      pauseMenu.onFastTravel = nil
+      pauseMenu.returnToStation = function()
+        switchToGame("planetmap")
+      end
+    else
+      pauseMenu.returnToShip = chillon.returnToAsteroids
+      pauseMenu.returnToStation = nil
+      pauseMenu.onFastTravel = function(tileX, tileY)
+        switchToGame("asteroids")
+        if gameModules.asteroids then
+          gameModules.asteroids.restoreFromPortal()
+          local wm = require("asteroids.worldmap")
+          gameModules.asteroids.transitionToTile(tileX, tileY, 683, 384)
+        end
+      end
+    end
   else
     -- Default to Hometown Station hub
     hub.setFadeInFromStarfox(true)
@@ -490,6 +646,12 @@ function loadGame(slot, saveData)
     mixia.setCompressedAir(saveData.mixiaHasCompressedAir)
   end
 
+  -- Restore Muse quest state
+  if saveData.museData then
+    local muses = require("kalapatthar.muses")
+    muses.loadSaveData(saveData.museData)
+  end
+
   -- Restore Prototype quest state
   local prototype = require("starfox.prototype")
   if saveData.prototypeData then
@@ -511,6 +673,7 @@ function loadGame(slot, saveData)
   currentGame = hub
   currentHubType = "hometown"  -- Starting at Hometown Station
   hub.switchToGame = switchToGame
+  hub.setFadeInFromStarfox(true)  -- Fade in from black
   hub.load()
 end
 
@@ -556,6 +719,7 @@ function love.load()
       prototypeData = prototype.getSaveData(),
       mixiaCasinoWinnings = mixia.getCasinoWinnings(),
       mixiaHasCompressedAir = mixia.hasCompressedAir(),
+      museData = require("kalapatthar.muses").getSaveData(),
     }
   end
 
@@ -634,7 +798,7 @@ function love.load()
       pauseMenu.onFastTravel = nil
 
     elseif entry.type == "hub_area" then
-      -- Warp to a non-floor hub (leucadia, singularity)
+      -- Warp to a non-floor hub
       if currentGame and currentGame.setPaused then
         currentGame.setPaused(false)
       end
@@ -642,14 +806,38 @@ function love.load()
         currentHubType = "leucadia"
         currentGame = leucadia
         leucadia.switchToGame = switchToGame
-        leucadia.setFadeInFromStarfox(true)  -- Fade in from white
+        leucadia.setFadeInFromStarfox(true)
         leucadia.load()
       elseif entry.hubType == "singularity" then
         currentHubType = "singularity"
         currentGame = singularity
         singularity.switchToGame = switchToGame
-        singularity.setFadeInFromStarfox(true)  -- Fade in from white
+        singularity.setFadeInFromStarfox(true)
         singularity.load()
+      elseif entry.hubType == "elendil" then
+        currentHubType = "elendil"
+        currentGame = elendil
+        elendil.switchToGame = switchToGame
+        elendil.setFadeInFromStarfox(true)
+        elendil.load()
+      elseif entry.hubType == "chillon" then
+        currentHubType = "chillon"
+        currentGame = chillon
+        chillon.switchToGame = switchToGame
+        chillon.setFadeInFromStarfox(true)
+        chillon.load()
+      elseif entry.hubType == "kalapatthar" then
+        currentHubType = "kalapatthar"
+        currentGame = kalapatthar
+        kalapatthar.switchToGame = switchToGame
+        kalapatthar.setFadeInFromStarfox(true)
+        kalapatthar.load()
+      elseif entry.hubType == "cereus" then
+        currentHubType = "cereus"
+        currentGame = cereus
+        cereus.switchToGame = switchToGame
+        cereus.setFadeInFromStarfox(true)
+        cereus.load()
       end
       pauseMenu.returnToShip = nil
       pauseMenu.returnToStation = nil
@@ -691,6 +879,10 @@ function love.load()
   mixia.goToMainMenu = goToMainMenu
   mixia.switchToGame = switchToGame
 
+  -- Set up Kala Patthar hub callbacks
+  kalapatthar.goToMainMenu = goToMainMenu
+  kalapatthar.switchToGame = switchToGame
+
   -- Start at main menu
   goToMainMenu()
 end
@@ -730,7 +922,7 @@ function love.keypressed(key)
     elseif currentGame == gameModules.lookout and gameModules.lookout then
       selfHandled = true
     end
-    if key == "escape" and currentGame ~= hub and currentGame ~= leucadia and currentGame ~= singularity and currentGame ~= mixia and not selfHandled then
+    if key == "escape" and currentGame ~= hub and currentGame ~= leucadia and currentGame ~= singularity and currentGame ~= mixia and currentGame ~= kalapatthar and currentGame ~= cereus and currentGame ~= elendil and currentGame ~= chillon and not selfHandled then
       returnToHub()
     else
       -- For self-handled non-starfox/non-asteroids games, check if they exited

@@ -24,6 +24,68 @@ M.CORNERIA = {
   {time = 100, type = "finalboss"}
 }
 
+-- Aquas: Deep fog ocean — enemies emerge through dense cloud layers
+-- Visibility is limited; fog banks drift across the screen like airplane clouds
+-- Enemies fade in/out as they pass through fog layers, creating tension
+M.AQUAS = {
+  -- Phase 1: Entering the fog (0-20s) — low visibility, sparse enemies
+  {time = 0, type = "callout", message = "triggerFogWarning"},
+  {time = 3, type = "wave", formation = "line", x = 683, count = 3},
+  {time = 8, type = "wave", formation = "v", x = 512, count = 4},
+  {time = 13, type = "wave", formation = "v", x = 854, count = 4},
+  {time = 17, type = "wave", formation = "line", x = 683, count = 4},
+
+  -- Phase 2: Fog thickens (20-40s) — enemies appear suddenly from cloud banks
+  {time = 20, type = "callout", message = "triggerFogThickens"},
+  {time = 22, type = "wave", formation = "v", x = 598, count = 5},
+  {time = 25, type = "wave", formation = "v", x = 769, count = 5},
+  {time = 28, type = "turret", x = 341},
+  {time = 28, type = "turret", x = 1025},
+  {time = 32, type = "wave", formation = "wave", x = 683, count = 6},
+  {time = 36, type = "wave", formation = "v", x = 512, count = 5},
+  {time = 36, type = "wave", formation = "v", x = 854, count = 5},
+
+  -- Phase 3: Deep fog — capital ship ambush (40-60s)
+  {time = 40, type = "callout", message = "triggerEnemyWarning"},
+  {time = 42, type = "capitalship", x = 683},
+  {time = 44, type = "wave", formation = "diamond", x = 512, count = 4},
+  {time = 44, type = "wave", formation = "diamond", x = 854, count = 4},
+  {time = 48, type = "wave", formation = "line", x = 683, count = 6},
+  {time = 52, type = "turret", x = 256},
+  {time = 52, type = "turret", x = 683},
+  {time = 52, type = "turret", x = 1110},
+  {time = 55, type = "wave", formation = "v", x = 683, count = 7},
+  {time = 58, type = "wave", formation = "wave", x = 683, count = 7},
+
+  -- Phase 4: Fog breaks momentarily — heavy assault (60-80s)
+  {time = 60, type = "callout", message = "triggerFogClearing"},
+  {time = 62, type = "wave", formation = "v", x = 427, count = 6},
+  {time = 62, type = "wave", formation = "v", x = 940, count = 6},
+  {time = 66, type = "capitalship", x = 427},
+  {time = 66, type = "capitalship", x = 940},
+  {time = 69, type = "wave", formation = "triangle", x = 683, count = 5},
+  {time = 72, type = "wave", formation = "line", x = 512, count = 5},
+  {time = 72, type = "wave", formation = "line", x = 854, count = 5},
+  {time = 76, type = "wave", formation = "box", x = 683, count = 5},
+  {time = 79, type = "wave", formation = "v", x = 683, count = 8},
+
+  -- Phase 5: Fog returns — final gauntlet before boss (80-100s)
+  {time = 80, type = "callout", message = "triggerFogReturns"},
+  {time = 83, type = "wave", formation = "diamond", x = 598, count = 4},
+  {time = 83, type = "wave", formation = "diamond", x = 769, count = 4},
+  {time = 87, type = "capitalship", x = 683},
+  {time = 89, type = "wave", formation = "wave", x = 683, count = 8},
+  {time = 93, type = "turret", x = 341},
+  {time = 93, type = "turret", x = 683},
+  {time = 93, type = "turret", x = 1025},
+  {time = 96, type = "wave", formation = "v", x = 512, count = 6},
+  {time = 96, type = "wave", formation = "v", x = 854, count = 6},
+
+  -- Boss: Leviathan emerges from the deepest fog
+  {time = 100, type = "callout", message = "triggerBossWarning"},
+  {time = 105, type = "finalboss"}
+}
+
 M.AREA6 = {
   -- Intense opening - wave after wave
   {time = 2, type = "wave", formation = "v", x = 683, count = 7},
@@ -877,8 +939,12 @@ function M.getWaves(levelId)
     return M.METEO
   elseif levelId == 3 then
     return M.SECTORY
+  elseif levelId == 4 then
+    return M.CORNERIA  -- Fortuna placeholder
   elseif levelId == 5 then
     return M.KATINA
+  elseif levelId == 6 then
+    return M.AQUAS
   elseif levelId == 8 then
     return M.SECTORX
   elseif levelId == 10 then

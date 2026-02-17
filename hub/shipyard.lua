@@ -71,6 +71,18 @@ M.catalog = {
     shape = "stealth",
     tier = "legendary"
   },
+  {
+    id = "firebird",
+    name = "Firebird",
+    price = 0,
+    currency = "notes",
+    description = "Born from Vela's pulsar fire. Immune to cold, bullets burn, Inferno clears all.",
+    stats = {health = 4, speed = 1.1, fireRate = 1.0, special = "inferno"},
+    color = {0.75, 0.12, 0.08},
+    shape = "muscle",
+    tier = "legendary",
+    dropOnly = true  -- Cannot be purchased, only obtained from Vela dungeon boss
+  },
 }
 
 function M.enter(purchasedList)
@@ -175,6 +187,10 @@ local function drawShipPreview(ship, cx, cy, size, time)
     vertices = {hw*1.2, 0, hw*0.2, -hh*0.6, -hw*0.8, -hh*0.3, -hw, 0, -hw*0.8, hh*0.3, hw*0.2, hh*0.6}
   elseif ship.shape == "stealth" then
     vertices = {hw, 0, hw*0.3, -hh*0.5, -hw*0.2, -hh*0.8, -hw, -hh*0.3, -hw, hh*0.3, -hw*0.2, hh*0.8, hw*0.3, hh*0.5}
+  elseif ship.shape == "muscle" then
+    -- 1969 Pontiac GTO inspired: wide, aggressive stance, hood scoop
+    vertices = {hw*1.1, 0, hw*0.6, -hh*0.9, hw*0.1, -hh*1.0, -hw*0.1, -hh*1.0, -hw*0.6, -hh*0.9, -hw*1.1, 0, -hw*0.7, hh*0.7, -hw*0.3, hh*1.0, hw*0.3, hh*1.0, hw*0.7, hh*0.7}
+    -- Fire effect drawn separately below
   end
 
   if #vertices >= 6 then
@@ -193,6 +209,25 @@ local function drawShipPreview(ship, cx, cy, size, time)
   local enginePulse = 0.5 + 0.5 * math.sin(time * 5)
   love.graphics.setColor(0.3, 0.5, 1.0, enginePulse * 0.6)
   love.graphics.circle("fill", -hw * 0.8, 0, size * 0.08)
+
+  -- Gentle fire aura for Firebird (muscle shape)
+  if ship.shape == "muscle" then
+    local firePulse = 0.5 + 0.3 * math.sin(time * 3) + 0.2 * math.sin(time * 7)
+    -- Soft red outer glow
+    love.graphics.setColor(0.9, 0.15, 0.05, 0.06 * firePulse)
+    love.graphics.circle("fill", 0, 0, size * 0.9)
+    -- Warm orange mid glow
+    love.graphics.setColor(1, 0.4, 0.08, 0.08 * firePulse)
+    love.graphics.circle("fill", 0, 0, size * 0.5)
+    -- Small flickering flame wisps
+    for fi = 1, 4 do
+      local fAngle = time * 2 + fi * 1.57
+      local fx = math.cos(fAngle) * hw * 0.6
+      local fy = math.sin(fAngle) * hh * 0.5
+      love.graphics.setColor(1, 0.3 + math.sin(time * 5 + fi) * 0.2, 0.05, 0.12 * firePulse)
+      love.graphics.circle("fill", fx, fy, 3 + math.sin(time * 8 + fi) * 1.5)
+    end
+  end
 
   love.graphics.pop()
 end
@@ -283,6 +318,9 @@ function M.draw(notes)
     if isPurchased then
       love.graphics.setColor(0.2, 0.8, 0.2)
       love.graphics.print("OWNED", listX + 220, sy + 12)
+    elseif ship.dropOnly then
+      love.graphics.setColor(0.6, 0.4, 0.2)
+      love.graphics.print("BOSS DROP", listX + 210, sy + 12)
     elseif ship.price == 0 then
       love.graphics.setColor(0.5, 0.8, 0.5)
       love.graphics.print("FREE", listX + 220, sy + 12)

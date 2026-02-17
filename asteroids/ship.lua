@@ -51,6 +51,14 @@ function M.new(x, y)
     multishotTimer = 0,
     speedBoostTimer = 0,
     magnetTimer = 0,
+    -- Permanent upgrade from Orion dungeon
+    hasSpreadBeam = false,
+    -- Permanent upgrade from Messier dungeon
+    hasHyperBeam = false,
+    -- Permanent upgrade from Outer Space dungeon
+    hasSeeker = false,
+    -- Permanent upgrade from Bomb Broker dungeon
+    hasSuperBombs = false,
   }
 end
 
@@ -341,6 +349,22 @@ end
 
 function M.hasSpeedBoost(ship)
   return (ship.speedBoostTimer or 0) > 0
+end
+
+function M.hasSpreadBeam(ship)
+  return ship.hasSpreadBeam == true
+end
+
+function M.hasHyperBeam(ship)
+  return ship.hasHyperBeam == true
+end
+
+function M.hasSeeker(ship)
+  return ship.hasSeeker == true
+end
+
+function M.hasSuperBombs(ship)
+  return ship.hasSuperBombs == true
 end
 
 function M.hyperspace(ship, width, height)

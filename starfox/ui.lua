@@ -67,6 +67,10 @@ function M.isSectorX()
   return currentLevelId == 8
 end
 
+function M.isAquas()
+  return currentLevelId == 6
+end
+
 function M.load()
   fonts.large = love.graphics.newFont("fonts/Exo2-Regular.ttf", 36)
   fonts.xlarge = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 52)
@@ -186,6 +190,24 @@ function M.drawBackground()
   elseif M.isSectorX() then
     -- Sector X: Pure dark void, no stars
     love.graphics.setBackgroundColor(0, 0, 0)
+  elseif M.isAquas() then
+    -- Aquas: Deep blue-gray ocean atmosphere with fog cloud layers
+    -- Base: dark oceanic blue that shifts slightly with fog density
+    local baseFog = terrain.fogDensity or 0
+    local br = 0.05 + baseFog * 0.06
+    local bg = 0.07 + baseFog * 0.08
+    local bb = 0.15 + baseFog * 0.05
+    love.graphics.setBackgroundColor(br, bg, bb)
+
+    -- Stars are dimmed heavily by fog - barely visible through cloud cover
+    for _, star in ipairs(terrain.stars) do
+      local starAlpha = (0.3 + (star.speed / 80) * 0.7) * (1 - baseFog * 0.8)
+      love.graphics.setColor(0.7, 0.8, 1, starAlpha * 0.3)
+      love.graphics.circle("fill", star.x, star.y, star.size)
+    end
+
+    -- Draw fog cloud banks (behind enemies, this is the background layer)
+    M.drawFogClouds("back")
   else
     love.graphics.setBackgroundColor(0.02, 0.02, 0.1)
 
@@ -193,6 +215,93 @@ function M.drawBackground()
       local alpha = 0.3 + (star.speed / 80) * 0.7
       love.graphics.setColor(1, 1, 1, alpha)
       love.graphics.circle("fill", star.x, star.y, star.size)
+    end
+  end
+end
+
+-- Draw fog cloud layers and wisps for the Aquas level
+-- layer: "back" = behind entities, "front" = in front of everything
+function M.drawFogClouds(layer)
+  if not terrain.fogEnabled then return end
+
+  local time = love.timer.getTime()
+  local density = terrain.fogDensity or 0.5
+
+  if layer == "back" then
+    -- Draw the back layer clouds (these sit behind enemies)
+    -- These are the large, distant cloud banks
+    for _, cloud in ipairs(terrain.fogClouds) do
+      -- Only draw clouds in back layer that are behind entities (further away, lower alpha)
+      if cloud.alpha < 0.3 then
+        for _, blob in ipairs(cloud.blobs) do
+          local bx = cloud.x + blob.ox
+          local by = cloud.y + blob.oy
+          local pulse = 1.0 + math.sin(time * cloud.pulseSpeed + cloud.pulsePhase) * 0.15
+
+          -- Core of cloud blob - soft white/blue-gray
+          local a = cloud.alpha * blob.alphaMulti * density * pulse * 0.6
+          love.graphics.setColor(0.65, 0.72, 0.82, a)
+          love.graphics.ellipse("fill", bx, by, blob.rx, blob.ry)
+
+          -- Softer outer glow
+          love.graphics.setColor(0.55, 0.62, 0.75, a * 0.4)
+          love.graphics.ellipse("fill", bx, by, blob.rx * 1.3, blob.ry * 1.3)
+        end
+      end
+    end
+
+    -- Draw some wisp streaks (fast thin clouds, like airplane window view)
+    for _, wisp in ipairs(terrain.fogWisps) do
+      local wAlpha = wisp.alpha * density
+      local pulse = 1 + math.sin(time * 1.5 + wisp.phase) * 0.3
+      love.graphics.setColor(0.7, 0.78, 0.88, wAlpha * pulse * 0.5)
+      love.graphics.ellipse("fill", wisp.x, wisp.y, wisp.width / 2, wisp.height / 2)
+    end
+
+  elseif layer == "front" then
+    -- Front layer: clouds that pass OVER the player and enemies
+    -- These create the "flying through clouds" effect
+    for _, cloud in ipairs(terrain.fogClouds) do
+      if cloud.alpha >= 0.3 then
+        for _, blob in ipairs(cloud.blobs) do
+          local bx = cloud.x + blob.ox
+          local by = cloud.y + blob.oy
+          local pulse = 1.0 + math.sin(time * cloud.pulseSpeed + cloud.pulsePhase) * 0.15
+
+          -- Front clouds are brighter, more opaque - like being inside a cloud
+          local a = cloud.alpha * blob.alphaMulti * density * pulse * 0.5
+          love.graphics.setColor(0.75, 0.82, 0.9, a)
+          love.graphics.ellipse("fill", bx, by, blob.rx, blob.ry)
+
+          -- Bright white core (like sunlight through cloud)
+          love.graphics.setColor(0.85, 0.9, 0.95, a * 0.3)
+          love.graphics.ellipse("fill", bx, by, blob.rx * 0.5, blob.ry * 0.5)
+
+          -- Wide diffuse edge
+          love.graphics.setColor(0.6, 0.7, 0.82, a * 0.25)
+          love.graphics.ellipse("fill", bx, by, blob.rx * 1.5, blob.ry * 1.5)
+        end
+      end
+    end
+
+    -- Overall fog overlay - atmospheric haze that increases with density
+    -- Like the white-out effect when flying through thick clouds
+    love.graphics.setColor(0.7, 0.78, 0.86, density * 0.08)
+    love.graphics.rectangle("fill", 0, 0, screen.WIDTH, screen.HEIGHT)
+
+    -- Subtle vignette at edges (fog is thicker at periphery)
+    local vigR = screen.WIDTH * 0.6
+    for i = 1, 4 do
+      local edgeAlpha = density * 0.04 * i
+      love.graphics.setColor(0.6, 0.68, 0.78, edgeAlpha)
+      -- Top edge
+      love.graphics.rectangle("fill", 0, 0, screen.WIDTH, 20 * i)
+      -- Bottom edge
+      love.graphics.rectangle("fill", 0, screen.HEIGHT - 20 * i, screen.WIDTH, 20 * i)
+      -- Left edge
+      love.graphics.rectangle("fill", 0, 0, 15 * i, screen.HEIGHT)
+      -- Right edge
+      love.graphics.rectangle("fill", screen.WIDTH - 15 * i, 0, 15 * i, screen.HEIGHT)
     end
   end
 end
@@ -892,6 +1001,11 @@ function M.drawEnemies()
       if alpha <= 0.01 then goto continue end
     end
 
+    -- In Aquas, enemies fade in/out as fog clouds drift over them
+    if M.isAquas() then
+      alpha = alpha * terrain.getFogVisibility(enemy.x, enemy.y)
+    end
+
     local time = love.timer.getTime()
     local ex, ey = enemy.x, enemy.y
 
@@ -1088,6 +1202,11 @@ function M.drawTurrets()
         if alpha <= 0.01 then goto continue end
       end
 
+      -- In Aquas, turrets fade with fog clouds
+      if M.isAquas() then
+        alpha = alpha * terrain.getFogVisibility(turret.x, turret.y)
+      end
+
       local time = love.timer.getTime()
       local tPulse = 0.7 + 0.3 * math.sin(time * 5 + turret.x * 0.1)
       local tx, ty = turret.x, turret.y
@@ -1141,6 +1260,11 @@ function M.drawCapitalShips()
         end
       end
       if alpha <= 0.01 then goto continue end
+    end
+
+    -- In Aquas, capital ships loom through the fog
+    if M.isAquas() then
+      alpha = alpha * terrain.getFogVisibility(ship.x, ship.y)
     end
 
     local time = love.timer.getTime()

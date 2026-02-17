@@ -38,9 +38,16 @@ local raid = require("starfox.raid")
 local raidboss = require("starfox.raidboss")
 local sphereboss = require("starfox.sphereboss")
 local machineboss = require("starfox.machineboss")
+local muses = require("kalapatthar.muses")
 
 local gameState = {}
 local pendingShopItems = {lives = 0, bombs = 0, health = 0}
+
+-- Muse power B-hold tracking (hold B = Muse power, tap B = N/A in starfox)
+local museBHoldTimer = 0
+local MUSE_B_HOLD_THRESHOLD = 0.3
+local museBHeld = false
+local chainLightningArcs = {}
 
 -- Progression callbacks (set by main.lua)
 M.onMegaAntennaAwarded = nil
@@ -167,6 +174,12 @@ function M.startGame()
   sphereboss.reset()
   machineboss.reset()
 
+  -- Reset Muse combat state for new level
+  muses.resetCombatState()
+  museBHeld = false
+  museBHoldTimer = 0
+  chainLightningArcs = {}
+
   -- Apply selected ship stats
   ships.applyToPlayer(gameState.player)
 
@@ -176,6 +189,11 @@ function M.startGame()
     if def and def.hasSpecial then
       abilities.gauge = abilities.getGaugeMax()
     end
+  end
+
+  -- Aquas: Initialize fog cloud system
+  if gameState.levelId == 6 then
+    terrain.initFog()
   end
 
   -- Re-apply shop health bonus after ship stats (additive to new max)
@@ -243,6 +261,26 @@ end
 function M.setProgression(hasMegaAntenna, hasPowerAmplifier)
   levelselect.hasMegaAntenna = hasMegaAntenna or false
   levelselect.hasPowerAmplifier = hasPowerAmplifier or false
+end
+
+-- Sync Spread Beam upgrade from Orion dungeon
+function M.setHasSpreadBeam(val)
+  weapons.setHasSpreadBeam(val)
+end
+
+-- Sync Hyper Beam upgrade from Messier dungeon
+function M.setHasHyperBeam(val)
+  weapons.setHasHyperBeam(val)
+end
+
+-- Sync Seeker Missiles upgrade from Outer Space dungeon
+function M.setHasSeeker(val)
+  weapons.setHasSeeker(val)
+end
+
+-- Sync Super Bombs upgrade from Bomb Broker dungeon
+function M.setHasSuperBombs(val)
+  weapons.setHasSuperBombs(val)
 end
 
 -- Set return to hub callback for station selection
@@ -371,6 +409,16 @@ function M.updatePlaying(dt)
   player.move(gameState.player, dx, dy)
   player.update(gameState.player, dt)
 
+  -- Tierra Muse power: allow screen wrap instead of clamping
+  if muses.hasScreenWrap() then
+    local sw = screen.WIDTH
+    local sh = screen.HEIGHT
+    if gameState.player.x < 0 then gameState.player.x = sw end
+    if gameState.player.x > sw then gameState.player.x = 0 end
+    if gameState.player.y < 0 then gameState.player.y = sh end
+    if gameState.player.y > sh then gameState.player.y = 0 end
+  end
+
   -- Space: targeting/shooting (weapon-dependent) -- blocked when stunned
   if love.keyboard.isDown("space") and not gameState.player.stunned then
     if abilities.isPhaseCloakActive() then
@@ -450,6 +498,27 @@ function M.updatePlaying(dt)
   abilities.update(dt, gameState.player)
   morseinput.update(dt)
 
+  -- Update Muse powers
+  muses.updateCombat(dt)
+
+  -- B-hold detection: if B is held, track duration
+  if museBHeld then
+    museBHoldTimer = museBHoldTimer + dt
+    if museBHoldTimer >= MUSE_B_HOLD_THRESHOLD and not muses.powerActive then
+      if muses.canActivate() then
+        muses.activate()
+      end
+    end
+  end
+
+  -- Djolt: update chain lightning visual arcs
+  for i = #chainLightningArcs, 1, -1 do
+    chainLightningArcs[i].timer = chainLightningArcs[i].timer - dt
+    if chainLightningArcs[i].timer <= 0 then
+      table.remove(chainLightningArcs, i)
+    end
+  end
+
   -- Handle Lancer multi-lock expiry: auto-release all locks with barrage
   if not abilities.isMultiLockActive() and targeting.overrideMaxLocks then
     targeting.overrideMaxLocks = nil
@@ -503,6 +572,12 @@ function M.updatePlaying(dt)
 
   local enemySpeedScale = abilities.getEnemySpeedScale()
   local attractEnemies = abilities.shouldAttractEnemies()
+
+  -- Melo Muse power: slow all enemies
+  if muses.isTimeSlowed() then
+    enemySpeedScale = enemySpeedScale * muses.getTimeScale()
+  end
+
   local escaped = enemies.update(dt, gameState.player.x, gameState.player.y, enemySpeedScale, attractEnemies)
   gameState.player.enemiesEscaped = gameState.player.enemiesEscaped + escaped
   turrets.update(dt, terrain.getScrollOffset(), gameState.player.x, gameState.player.y)
@@ -1873,6 +1948,32 @@ function M.checkCollisions()
               particles.spawn(enemy.x, enemy.y, 15, {1, 0.5, 0})
             end
             registerKill(gameState.player, enemy.score)
+
+            -- Djolt chain lightning: arc to nearby enemies on kill
+            if muses.hasChainLightning() then
+              local arcRange = 200
+              local arcsUsed = 0
+              for k = #enemies.enemies, 1, -1 do
+                if arcsUsed >= 3 then break end
+                if k ~= j then
+                  local other = enemies.enemies[k]
+                  local dist = math.sqrt((enemy.x - other.x)^2 + (enemy.y - other.y)^2)
+                  if dist < arcRange then
+                    table.insert(chainLightningArcs, {
+                      x1 = enemy.x, y1 = enemy.y, x2 = other.x, y2 = other.y,
+                      timer = 0.3, color = muses.MUSES.djolt.color,
+                    })
+                    if enemies.damage(other, 50) then
+                      registerKill(gameState.player, other.score)
+                      particles.spawn(other.x, other.y, 15, {0.3, 0.8, 1})
+                      enemies.remove(other)
+                    end
+                    arcsUsed = arcsUsed + 1
+                  end
+                end
+              end
+            end
+
             enemies.remove(enemy)
           end
 
@@ -2522,7 +2623,8 @@ function M.checkCollisions()
     elseif laser.owner == "prototype_emp" then
       if M.checkHitPlayer(laser, gameState.player) then
         -- EMP stuns the player (doesn't damage, immobilizes for 3s)
-        if not gameState.player.barrelRolling and not gameState.player.invulnerable then
+        -- Clarity Muse power: immune to stun effects
+        if not gameState.player.barrelRolling and not gameState.player.invulnerable and not muses.hasClarity() then
           gameState.player.stunned = true
           gameState.player.stunnedTimer = laser.stunDuration or 3
         end
@@ -3981,11 +4083,51 @@ function M.draw()
     abilities.drawEffects(gameState.player)
     ui.drawParticles()
     bossexplosion.draw()
+    -- Aquas: Draw front fog cloud layer over everything (like flying through clouds)
+    if ui.isAquas() then
+      ui.drawFogClouds("front")
+    end
     -- Draw Prototype encounter
     if prototype.isActive() then
       prototype.draw()
     end
     ui.drawHUD(gameState.player, terrain.getLevelTime(), boss.isActive(), levels.getName(gameState.levelId), portals.getCollected(), gameState.totalEnemiesSpawned)
+
+    -- Draw Muse power visual effects
+    -- Melo: time slow red tint
+    if muses.isTimeSlowed() then
+      love.graphics.setColor(0.8, 0.3, 0.3, 0.06 + math.sin(love.timer.getTime() * 2) * 0.03)
+      love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+    end
+
+    -- Djolt: chain lightning arcs
+    for _, arc in ipairs(chainLightningArcs) do
+      local segments = 6
+      local prevX, prevY = arc.x1, arc.y1
+      for s = 1, segments do
+        local t = s / segments
+        local nx = arc.x1 + (arc.x2 - arc.x1) * t + (math.random() - 0.5) * 20
+        local ny = arc.y1 + (arc.y2 - arc.y1) * t + (math.random() - 0.5) * 20
+        if s == segments then nx, ny = arc.x2, arc.y2 end
+        love.graphics.setColor(arc.color[1], arc.color[2], arc.color[3], arc.timer * 1.5)
+        love.graphics.setLineWidth(3)
+        love.graphics.line(prevX, prevY, nx, ny)
+        love.graphics.setColor(1, 1, 1, arc.timer * 2)
+        love.graphics.setLineWidth(1)
+        love.graphics.line(prevX, prevY, nx, ny)
+        prevX, prevY = nx, ny
+      end
+    end
+
+    -- Clarity: golden shimmer
+    if muses.hasClarity() then
+      love.graphics.setColor(0.9, 0.85, 0.4, 0.04 + math.sin(love.timer.getTime() * 1.5) * 0.02)
+      love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+    end
+
+    -- Muse HUD
+    muses.drawMuseHUD()
+
     supershot.draw()
   elseif gameState.state == "prototype_acquired" then
     -- Draw game frozen in background
@@ -4243,6 +4385,12 @@ function M.keypressed(key)
       player.tryDodge(gameState.player, "left")
     elseif key == "right" then
       player.tryDodge(gameState.player, "right")
+    elseif key == "b" then
+      -- Muse power activation (hold B)
+      if muses.activePower and muses.canActivate() then
+        museBHeld = true
+        museBHoldTimer = 0
+      end
     end
     -- Forward to morse input (special ability trigger)
     morseinput.keypressed(key)
@@ -4361,6 +4509,18 @@ end
 function M.keyreleased(key)
   if gameState.state == "playing" then
     morseinput.keyreleased(key)
+
+    -- Muse power B-hold release
+    if key == "b" and museBHeld then
+      if muses.powerActive then
+        -- Release hold — deactivate toggle powers (Melo, Tierra)
+        if muses.activePower == "melo" or muses.activePower == "tierra" then
+          muses.deactivate()
+        end
+      end
+      museBHeld = false
+      museBHoldTimer = 0
+    end
   end
 end
 

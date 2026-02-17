@@ -8,7 +8,8 @@ local state = "selecting" -- "selecting", "confirm_delete"
 
 local fadeState = {
   active = false,
-  alpha = 1.0
+  alpha = 0,
+  callback = nil
 }
 
 M.onSelectSave = nil
@@ -20,18 +21,21 @@ function M.load()
   fonts.info = love.graphics.newFont("fonts/EBGaramond-Regular.ttf", 16)
   selectedSlot = 1
   state = "selecting"
-  fadeState.active = true
-  fadeState.alpha = 1.0
+  fadeState.active = false
+  fadeState.alpha = 0
+  fadeState.callback = nil
 end
 
 function M.update(dt)
   galaxy.update(dt)
-  
-  -- Fade in from white
+
+  -- Fade out to white
   if fadeState.active then
-    fadeState.alpha = math.max(0, fadeState.alpha - dt * 2.0)
-    if fadeState.alpha <= 0 then
-      fadeState.active = false
+    fadeState.alpha = math.min(1.0, fadeState.alpha + dt * 2.0)
+    if fadeState.alpha >= 1.0 and fadeState.callback then
+      local cb = fadeState.callback
+      fadeState.callback = nil
+      cb()
     end
   end
 end
@@ -96,10 +100,10 @@ function M.draw()
   if state == "selecting" then
     love.graphics.printf("UP/DOWN: Select | ENTER: Load | X: Delete | ESC: Back", 0, 700, 1366, "center")
   end
-  
-  -- White fade overlay (fade in from white)
+
+  -- Black fade overlay
   if fadeState.active and fadeState.alpha > 0 then
-    love.graphics.setColor(1, 1, 1, fadeState.alpha)
+    love.graphics.setColor(0, 0, 0, fadeState.alpha)
     love.graphics.rectangle("fill", 0, 0, 1366, 768)
   end
 end
@@ -146,9 +150,15 @@ function M.keypressed(key)
       end
     elseif key == "return" then
       local saveData = saves.getSave(selectedSlot)
-      if saveData then
+      if saveData and not fadeState.active then
         if M.onSelectSave then
-          M.onSelectSave(selectedSlot, saveData)
+          -- Start fade to white, then load
+          fadeState.active = true
+          fadeState.alpha = 0
+          local slot = selectedSlot
+          fadeState.callback = function()
+            M.onSelectSave(slot, saveData)
+          end
         end
       end
     elseif key == "x" then

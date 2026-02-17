@@ -66,7 +66,7 @@ function M.load()
     gameState.transition = {
       phase = "in",
       timer = 0,
-      duration = 0.5,
+      duration = 1.0,
       callback = nil,
       color = {1, 1, 1}  -- White fade
     }
@@ -205,18 +205,29 @@ function M.update(dt)
   local isRunning = love.keyboard.isDown("z")
   player.setRunning(gameState.player, isRunning)
 
-  for _, npcObj in ipairs(gameState.currentNPCs) do
-    npc.update(npcObj, dt, gameState.collisionMap, gameState.currentNPCs, gameState.player)
+  -- Collect door positions for NPC pathfinding (prevent blocking doorways)
+  local doorPositions = {}
+  if gameState.location == "outdoors" and areas and areas.buildings then
+    for _, b in ipairs(areas.buildings) do
+      table.insert(doorPositions, {x = b.doorX, y = b.doorY})
+    end
   end
 
-  if love.keyboard.isDown("up") then
-    player.tryMove(gameState.player, "up", gameState.collisionMap, gameState.currentNPCs)
-  elseif love.keyboard.isDown("down") then
-    player.tryMove(gameState.player, "down", gameState.collisionMap, gameState.currentNPCs)
-  elseif love.keyboard.isDown("left") then
-    player.tryMove(gameState.player, "left", gameState.collisionMap, gameState.currentNPCs)
-  elseif love.keyboard.isDown("right") then
-    player.tryMove(gameState.player, "right", gameState.collisionMap, gameState.currentNPCs)
+  for _, npcObj in ipairs(gameState.currentNPCs) do
+    npc.update(npcObj, dt, gameState.collisionMap, gameState.currentNPCs, gameState.player, doorPositions)
+  end
+
+  -- Continuous movement (disabled during dialogue)
+  if not gameState.dialogueBox then
+    if love.keyboard.isDown("up") then
+      player.tryMove(gameState.player, "up", gameState.collisionMap, gameState.currentNPCs)
+    elseif love.keyboard.isDown("down") then
+      player.tryMove(gameState.player, "down", gameState.collisionMap, gameState.currentNPCs)
+    elseif love.keyboard.isDown("left") then
+      player.tryMove(gameState.player, "left", gameState.collisionMap, gameState.currentNPCs)
+    elseif love.keyboard.isDown("right") then
+      player.tryMove(gameState.player, "right", gameState.collisionMap, gameState.currentNPCs)
+    end
   end
 
   camera.update(gameState.camera, gameState.player.x, gameState.player.y)
@@ -309,8 +320,8 @@ function M.draw()
   love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
 
   love.graphics.push()
-  love.graphics.translate(-gameState.camera.x + love.graphics.getWidth() / 2,
-                          -gameState.camera.y + love.graphics.getHeight() / 2)
+  love.graphics.translate(math.floor(-gameState.camera.x + love.graphics.getWidth() / 2),
+                          math.floor(-gameState.camera.y + love.graphics.getHeight() / 2))
 
   if gameState.location == "outdoors" then
     M.drawOutdoors()
@@ -765,6 +776,17 @@ function M.keypressed(key)
     end
 
     if gameState.nearbyNPC then
+      -- Make NPC turn to face the player
+      local npcGridX = gameState.nearbyNPC.gridX or gameState.nearbyNPC.x
+      local npcGridY = gameState.nearbyNPC.gridY or gameState.nearbyNPC.y
+      local dx = gameState.player.gridX - npcGridX
+      local dy = gameState.player.gridY - npcGridY
+      if math.abs(dx) > math.abs(dy) then
+        gameState.nearbyNPC.direction = dx > 0 and "right" or "left"
+      else
+        gameState.nearbyNPC.direction = dy > 0 and "down" or "up"
+      end
+
       gameState.dialogueBox = {
         npc = gameState.nearbyNPC.name,
         text = gameState.nearbyNPC.dialogue
@@ -783,7 +805,7 @@ function M.returnFromGame()
     gameState.transition = {
       phase = "in",
       timer = 0,
-      duration = 0.5,
+      duration = 1.0,
       callback = nil
     }
     gameState.fadeInFromStarfox = false

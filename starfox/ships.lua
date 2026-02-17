@@ -87,10 +87,45 @@ M.defs = {
     color = {0.1, 0.1, 0.15},
     accentColor = {0.0, 0.8, 1.0},
   },
+  firebird = {
+    id = "firebird",
+    name = "Firebird",
+    type = "Muscle",
+    description = "Forged in Vela's pulsar fire. Inspired by the '69 Pontiac GTO — raw power, burning presence. Immune to cold. Bullets deal burn damage and melt ice.",
+    healthMultiplier = 1.3,
+    speedMultiplier = 1.1,
+    dodgeMultiplier = 0.9,
+    hasSpecial = true,
+    specialName = "Inferno",
+    specialDesc = "Unleash a screen-clearing firestorm that destroys everything. Charges at 100 kills instead of 50.",
+    color = {0.75, 0.12, 0.08},
+    accentColor = {1.0, 0.45, 0.1},
+    coldImmune = true,
+    burnDamage = 1,          -- 1 DPS burn on bullet hit
+    burnDuration = 3,        -- 3 seconds of burn
+    meltsIce = true,         -- bullets melt ice walls
+    infernoGaugeMax = 100,   -- charges at 100 instead of 50
+  },
+  icecube = {
+    id = "icecube",
+    name = "Ice Cube",
+    type = "Elemental",
+    description = "A ship that is literally an ice cube. Hitting an enemy 3x freezes it solid. Cold aura damages nearby foes.",
+    healthMultiplier = 1.4,
+    speedMultiplier = 0.9,
+    dodgeMultiplier = 0.85,
+    hasSpecial = true,
+    specialName = "Deep Freeze",
+    specialDesc = "Freezes the entire screen for 5 seconds. All enemies stop in their tracks.",
+    color = {0.25, 0.55, 0.95},
+    accentColor = {0.5, 0.85, 1.0},
+    freezeOnHit = true,       -- hitting enemy 3x freezes it
+    freezeHitsRequired = 3,   -- hits needed to freeze
+  },
 }
 
 -- Ordered list for UI navigation
-M.order = {"starwing", "lancer", "paladin", "mistral", "phantom", "prototype"}
+M.order = {"starwing", "lancer", "paladin", "mistral", "phantom", "prototype", "firebird", "icecube"}
 
 -- Currently selected ship (default starwing)
 local selectedShip = "starwing"

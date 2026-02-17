@@ -5,9 +5,9 @@ local constellation = require("asteroids.constellation")
 M.GRID_MIN = -3
 M.GRID_MAX = 3
 
--- Full world bounds (63x63)
-M.WORLD_MIN = -31
-M.WORLD_MAX = 31
+-- Full world bounds (77x77)
+M.WORLD_MIN = -38
+M.WORLD_MAX = 38
 
 -- Current tile position
 M.tileX = 0
@@ -87,46 +87,50 @@ local function initTiles()
     asteroidDensity = 0.9
   }
 
-  -- ===== RAID PORTALS (corners of The Nebula) =====
+  -- ===== RAID PORTALS (exact corners of Deep Space) =====
 
-  -- Portal tile (-3,-3): Synesthesia Installation
-  tiles["-3,-3"] = {
+  -- Portal tile (-24,24): Synesthesia Installation (top-left corner)
+  tiles["-24,24"] = {
     type = M.TILE_PORTAL,
     name = "Synesthesia Installation",
     portalTarget = "synesthesia",
     starfoxLevelId = 21,
-    color = {0.2, 0.9, 0.9},
-    asteroidDensity = 0.8
+    color = {0.0, 1.0, 0.6},
+    asteroidDensity = 0.3,
+    dungeon = "synesthesia",
   }
 
-  -- Portal tile (3,-3): Megalith of Memories
-  tiles["3,-3"] = {
+  -- Portal tile (24,24): Megalith of Memories (top-right corner)
+  tiles["24,24"] = {
     type = M.TILE_PORTAL,
     name = "Megalith of Memories",
     portalTarget = "megalith",
     starfoxLevelId = 22,
     color = {0.3, 0.5, 0.9},
-    asteroidDensity = 0.8
+    asteroidDensity = 0.3,
+    dungeon = "megalith",
   }
 
-  -- Portal tile (-3,3): Distant Dynamo
-  tiles["-3,3"] = {
+  -- Portal tile (-24,-24): Distant Dynamo (bottom-left corner)
+  tiles["-24,-24"] = {
     type = M.TILE_PORTAL,
     name = "Distant Dynamo",
     portalTarget = "dynamo",
     starfoxLevelId = 23,
     color = {0.9, 0.6, 0.1},
-    asteroidDensity = 0.8
+    asteroidDensity = 0.3,
+    dungeon = "dynamo",
   }
 
-  -- Portal tile (3,3): Logician's Lament
-  tiles["3,3"] = {
+  -- Portal tile (24,-24): Logician's Lament (bottom-right corner)
+  tiles["24,-24"] = {
     type = M.TILE_PORTAL,
     name = "Logician's Lament",
     portalTarget = "logician",
     starfoxLevelId = 25,
     color = {0.7, 0.2, 0.9},
-    asteroidDensity = 0.8
+    asteroidDensity = 0.3,
+    dungeon = "logician",
   }
 
   -- Portal tile (1,1): The Sphere
@@ -188,6 +192,33 @@ local function initTiles()
       {x = 683, y = 400},
       {x = 400, y = 250},
       {x = 900, y = 300}
+    },
+    asteroidDensity = 0
+  }
+
+  -- ===== KALA PATTHAR (Deep Space outpost) =====
+  tiles["14,14"] = {
+    type = M.TILE_STATION,
+    name = "Kala Patthar",
+    hubType = "kalapatthar",
+    color = {0.7, 0.5, 0.3},
+    helipads = {
+      {x = 400, y = 300},
+      {x = 550, y = 250},
+      {x = 300, y = 350}
+    },
+    asteroidDensity = 0
+  }
+
+  tiles["-5,5"] = {
+    type = M.TILE_STATION,
+    name = "Cereus",
+    hubType = "cereus",
+    color = {0.85, 0.65, 0.3},
+    helipads = {
+      {x = 400, y = 350},
+      {x = 600, y = 280},
+      {x = 300, y = 400}
     },
     asteroidDensity = 0
   }
@@ -260,8 +291,8 @@ function M.updateBounds()
   M.GRID_MAX = gridMax
 end
 
-function M.setProgression(antennaInstalled, sentinelDefeated)
-  constellation.setProgression(antennaInstalled, sentinelDefeated)
+function M.setProgression(antennaInstalled, sentinelDefeated, hasTrident)
+  constellation.setProgression(antennaInstalled, sentinelDefeated, hasTrident)
   M.updateBounds()
 end
 
